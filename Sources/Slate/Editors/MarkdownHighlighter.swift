@@ -20,6 +20,8 @@ enum MarkdownHighlighter {
     private static let mdLink     = rx("\\[([^\\]\\n]+)\\]\\(([^)\\n]+)\\)")
     private static let wiki       = rx("\\[\\[([^\\]\\n]+)\\]\\]")
     private static let tag        = rx("(?<!\\S)#([A-Za-z0-9_/-]+)")
+    private static let highlight  = rx("==([^=\\n]+)==")
+    private static let task       = rx("^(\\s*[-*+]\\s+)(\\[[ xX]\\])(.*)$")
 
     /// - Parameter resolveWikilink: returns true if the target note exists.
     static func apply(to storage: NSTextStorage, cursorLine: NSRange,
@@ -48,6 +50,20 @@ enum MarkdownHighlighter {
                 let level = m.range(at: 1).length
                 storage.addAttribute(.font, value: Theme.heading(level), range: lineRange)
                 mark(storage, NSRange(location: lineRange.location, length: min(level + 1, lineRange.length)), cursorLine)
+            } else if let m = task.firstMatch(in: line, range: lineNS) {
+                let g1 = m.range(at: 1), g2 = m.range(at: 2), g3 = m.range(at: 3)
+                mark(storage, NSRange(location: lineRange.location, length: g1.length + g2.length), cursorLine)
+                let checked = ns.substring(
+                    with: NSRange(location: lineRange.location + g2.location + 1, length: 1)).lowercased() == "x"
+                if checked {
+                    storage.addAttribute(.foregroundColor, value: Theme.accent,
+                        range: NSRange(location: lineRange.location + g2.location, length: g2.length))
+                    if g3.length > 0 {
+                        storage.addAttributes(
+                            [.strikethroughStyle: NSUnderlineStyle.single.rawValue, .foregroundColor: Theme.marker],
+                            range: NSRange(location: lineRange.location + g3.location, length: g3.length))
+                    }
+                }
             } else if trimmed.hasPrefix(">") {
                 storage.addAttribute(.foregroundColor, value: Theme.quote, range: lineRange)
             } else if let m = unordered.firstMatch(in: line, range: lineNS) {
@@ -65,6 +81,7 @@ enum MarkdownHighlighter {
         inline(italicStar, storage, text, full, cursorLine, [.font: Theme.italic])
         inline(strike,     storage, text, full, cursorLine, [.strikethroughStyle: NSUnderlineStyle.single.rawValue])
         inline(inlineCode, storage, text, full, cursorLine, [.font: Theme.mono, .backgroundColor: Theme.codeBg])
+        inline(highlight,  storage, text, full, cursorLine, [.backgroundColor: Theme.highlightBg])
 
         // Wikilinks: resolved (accent) vs unresolved (red); whole span clickable.
         wiki.enumerateMatches(in: text, range: full) { m, _, _ in

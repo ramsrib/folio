@@ -16,10 +16,6 @@ struct ContentView: View {
         }
         .navigationTitle(vault.vaultURL?.lastPathComponent ?? "Slate")
         .toolbar { toolbarContent }
-        .inspector(isPresented: $ui.showInspector) {
-            InspectorView()
-                .inspectorColumnWidth(min: 220, ideal: 280, max: 420)
-        }
         .sheet(isPresented: $ui.showQuickSwitcher) { QuickSwitcherView() }
         .sheet(isPresented: $ui.showCommandPalette) { CommandPaletteView() }
         .alert("Rename Note", isPresented: renamePresented) {
@@ -51,6 +47,7 @@ struct ContentView: View {
                     row(for: node)
                 }
             }
+            .listStyle(.sidebar)
             .overlay {
                 if vault.tree.isEmpty {
                     ContentUnavailableView("No notes", systemImage: "doc.text",
@@ -92,8 +89,6 @@ struct ContentView: View {
             Button { vault.refresh() } label: { Image(systemName: "arrow.clockwise") }
                 .help("Reload vault")
                 .disabled(vault.vaultURL == nil)
-            Button { ui.showInspector.toggle() } label: { Image(systemName: "sidebar.right") }
-                .help("Toggle inspector")
         }
     }
 

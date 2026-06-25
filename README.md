@@ -9,10 +9,11 @@ place** — built to replace Obsidian. Native Swift / SwiftUI, files-on-disk as 
   (the *how* and *when*).
 - **Status:** M0–M2 done, M3 in progress. The Mac app opens a folder ("vault") as a **folder tree**,
   watches it for external changes, supports **new / rename / trash**, and edits notes in an
-  Obsidian-style **Live Preview** editor (styled Markdown, cursor-reveal of syntax) with lossless
-  autosave. **Links work:** `[[wikilinks]]` with autocomplete, click-to-open, create-on-click,
-  rename-updates-links, plus **backlinks/outline** panels and a **quick switcher (⌘O)** /
-  **command palette (⌘P)**.
+  Obsidian-style **Live Preview** editor (styled Markdown, cursor-reveal of syntax, clickable task
+  checkboxes, `==highlight==`) with lossless autosave. **Links work:** `[[wikilinks]]` with
+  autocomplete, click-to-open, create-on-click, rename-updates-links, plus a **quick switcher (⌘O)** /
+  **command palette (⌘P)**. **Notion-style UI:** centered reading column, editable page title,
+  hover-reveal floating outline, inline collapsible backlinks, translucent rounded surfaces.
 
 ## Run it
 

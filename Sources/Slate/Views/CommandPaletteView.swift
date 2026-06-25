@@ -8,7 +8,7 @@ struct AppCommand: Identifiable {
     let run: () -> Void
 }
 
-/// ⌘P — fuzzy command palette.
+/// ⌘P — fuzzy command palette, styled as a floating rounded palette.
 struct CommandPaletteView: View {
     @EnvironmentObject private var vault: VaultStore
     @EnvironmentObject private var ui: UIState
@@ -22,11 +22,6 @@ struct CommandPaletteView: View {
             AppCommand(title: "Open Vault…", subtitle: "⇧⌘O") { vault.pickVault() },
             AppCommand(title: "Reload Vault", subtitle: "⇧⌘R") { vault.refresh() },
             AppCommand(title: "Quick Switcher…", subtitle: "⌘O") { ui.showQuickSwitcher = true },
-            AppCommand(title: "Toggle Inspector", subtitle: "⌥⌘I") { ui.showInspector.toggle() },
-            AppCommand(title: "Show Outline", subtitle: nil) {
-                ui.inspectorTab = .outline; ui.showInspector = true },
-            AppCommand(title: "Show Backlinks", subtitle: nil) {
-                ui.inspectorTab = .backlinks; ui.showInspector = true },
         ]
         if let sel = vault.selection {
             c.append(AppCommand(title: "Reveal in Finder", subtitle: nil) {
@@ -43,13 +38,16 @@ struct CommandPaletteView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TextField("Run a command…", text: $query)
-                .textFieldStyle(.plain)
-                .font(.title3)
-                .padding(12)
-                .focused($focused)
-                .onChange(of: query) { selected = 0 }
-                .onSubmit(runSelected)
+            HStack(spacing: 8) {
+                Image(systemName: "command").foregroundStyle(.secondary)
+                TextField("Run a command…", text: $query)
+                    .textFieldStyle(.plain)
+                    .font(.title3)
+                    .focused($focused)
+                    .onChange(of: query) { selected = 0 }
+                    .onSubmit(runSelected)
+            }
+            .padding(14)
             Divider()
             List {
                 ForEach(Array(results.enumerated()), id: \.element.id) { idx, cmd in
@@ -60,14 +58,26 @@ struct CommandPaletteView: View {
                             Text(s).font(.caption).foregroundStyle(.secondary)
                         }
                     }
-                    .padding(.vertical, 2)
+                    .padding(.vertical, 3)
                     .contentShape(Rectangle())
-                    .listRowBackground(idx == selected ? Color.accentColor.opacity(0.25) : Color.clear)
                     .onTapGesture { run(cmd) }
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(idx == selected ? Color.accentColor.opacity(0.22) : .clear)
+                    )
                 }
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .animation(.easeOut(duration: 0.12), value: selected)
         }
         .frame(width: 560, height: 400)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.separator.opacity(0.5)))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.25), radius: 30, y: 12)
+        .presentationBackground(.clear)
         .onAppear { focused = true }
         .onKeyPress(.downArrow) { move(1); return .handled }
         .onKeyPress(.upArrow) { move(-1); return .handled }

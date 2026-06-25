@@ -1,21 +1,36 @@
 import SwiftUI
 import AppKit
 
-/// Hosts the Live Preview editor for the selected note (or an empty state).
+/// Hosts the note: a centered reading column with a Notion-style page title, the
+/// Live Preview editor, a hover-reveal outline (right edge), and an inline
+/// backlinks section (bottom). No side panels.
 struct EditorPane: View {
     @EnvironmentObject private var vault: VaultStore
 
     var body: some View {
         if vault.selection != nil {
-            LivePreviewEditor(
-                text: $vault.content,
-                scrollTo: $vault.scrollRequest,
-                onChange: { vault.contentEdited() },
-                resolveWikilink: { vault.resolve($0) != nil },
-                noteNames: { vault.allNoteNames },
-                onOpenLink: openLink
-            )
+            VStack(spacing: 0) {
+                NoteTitleField()
+                    .frame(maxWidth: 720, alignment: .leading)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 28)
+                    .padding(.bottom, 2)
+                LivePreviewEditor(
+                    text: $vault.content,
+                    scrollTo: $vault.scrollRequest,
+                    onChange: { vault.contentEdited() },
+                    resolveWikilink: { vault.resolve($0) != nil },
+                    noteNames: { vault.allNoteNames },
+                    onOpenLink: openLink
+                )
+            }
             .background(Color(nsColor: .textBackgroundColor))
+            .overlay(alignment: .topTrailing) {
+                OutlineFloater().padding(.top, 14).padding(.trailing, 10)
+            }
+            .overlay(alignment: .bottom) {
+                BacklinksBar().frame(maxWidth: .infinity)
+            }
             .toolbar { ToolbarItem(placement: .status) { saveStatus } }
         } else {
             ContentUnavailableView("Select a note", systemImage: "doc.text",

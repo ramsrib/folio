@@ -6,8 +6,10 @@
 > watches it (FSEvents), creates/renames/trashes notes, and edits with an Obsidian-style **Live
 > Preview** editor (TextKit) that styles Markdown in place, losslessly. **Links layer done:**
 > `[[wikilink]]` resolution + `[[` autocomplete, click-to-open, create-on-click for unresolved,
-> rename-updates-links across the vault, **backlinks** + **outline** inspector panels, **quick
-> switcher (⌘O)** and **command palette (⌘P)**.
+> rename-updates-links across the vault, **quick switcher (⌘O)** and **command palette (⌘P)**.
+> **Notion-style UX pass done:** centered reading column, editable page title, hover-reveal floating
+> outline + inline collapsible backlinks (no side panels), translucent rounded palettes, clickable
+> task checkboxes, `==highlight==`, completed-task styling.
 > Last updated 2026-06-25.
 
 A native, UX-first Markdown notes app that edits your **existing `.md` files in place** — built to
@@ -115,10 +117,15 @@ Swapping Stage 1 → Stage 2 touches only `EditorPane`/`Editors/`, nothing else.
   - ✅ **Links:** `[[wikilink]]` resolution (basename + path), resolved/unresolved styling, `[[`
     autocomplete of note names (auto-closes `]]`), click-to-open, create-on-click for unresolved
     links, **rename-updates-links** across the vault (open note reloaded if its links changed).
-  - ✅ **Backlinks** panel + **Outline** panel (right inspector, ⌥⌘I), outline click scrolls editor.
-  - ✅ **Quick switcher** (⌘O fuzzy open) + **command palette** (⌘P).
+  - ✅ **Outline** (Notion-style hover-reveal floating TOC, right edge; click scrolls editor) and
+    **Backlinks** (Notion-style inline collapsible section at the note's bottom). No side panels.
+  - ✅ **Quick switcher** (⌘O fuzzy open) + **command palette** (⌘P), as translucent rounded palettes.
+  - ✅ **UX pass:** centered reading column, editable page title (renames the file), `.sidebar` list
+    style, smooth animations, rounded continuous corners, material backgrounds.
+  - ✅ **Richer rendering:** clickable task checkboxes (toggle + completed strike/dim), `==highlight==`.
   - *Still open:* frontmatter/properties UI, `#tags` pane, image/attachment rendering, callouts,
-    embeds/transclusion, aliases & heading/block links, unlinked mentions, graph view.
+    embeds/transclusion, aliases & heading/block links, unlinked mentions, graph view, reading mode,
+    hover link preview.
 - **M4 — Search.** SQLite FTS5 global search with operators; recents/pins; saved searches.
 - **M5 — UX depth.** Multi-pane/tabs, command palette, themes/typography, keyboard-first flows.
 - **M6 — iOS.** See §7 — gated on the sync-location decision; introduces xcodegen/Xcode.

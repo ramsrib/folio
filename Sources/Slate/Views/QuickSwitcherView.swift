@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// ⌘O — fuzzy "open note by name" overlay.
+/// ⌘O — fuzzy "open note by name" overlay, styled as a floating rounded palette.
 struct QuickSwitcherView: View {
     @EnvironmentObject private var vault: VaultStore
     @EnvironmentObject private var ui: UIState
@@ -18,44 +18,62 @@ struct QuickSwitcherView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TextField("Search notes…", text: $query)
-                .textFieldStyle(.plain)
-                .font(.title3)
-                .padding(12)
-                .focused($focused)
-                .onChange(of: query) { selected = 0 }
-                .onSubmit(openSelected)
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("Search notes…", text: $query)
+                    .textFieldStyle(.plain)
+                    .font(.title3)
+                    .focused($focused)
+                    .onChange(of: query) { selected = 0 }
+                    .onSubmit(openSelected)
+            }
+            .padding(14)
             Divider()
             ScrollViewReader { proxy in
                 List {
                     ForEach(Array(results.enumerated()), id: \.element.id) { idx, file in
-                        HStack {
-                            Image(systemName: "doc.text").foregroundStyle(.secondary)
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(file.name).lineLimit(1)
-                                if file.relativePath != "\(file.name).md" {
-                                    Text(file.relativePath).font(.caption)
-                                        .foregroundStyle(.secondary).lineLimit(1)
-                                }
-                            }
-                            Spacer()
-                        }
-                        .padding(.vertical, 2)
-                        .contentShape(Rectangle())
-                        .listRowBackground(idx == selected ? Color.accentColor.opacity(0.25) : Color.clear)
-                        .id(idx)
-                        .onTapGesture { open(file) }
+                        row(file, selected: idx == selected)
+                            .id(idx)
+                            .onTapGesture { open(file) }
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(idx == selected ? Color.accentColor.opacity(0.22) : .clear)
+                            )
                     }
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .animation(.easeOut(duration: 0.12), value: selected)
                 .onChange(of: selected) { proxy.scrollTo(selected, anchor: .center) }
             }
         }
         .frame(width: 620, height: 440)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.separator.opacity(0.5)))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.25), radius: 30, y: 12)
+        .presentationBackground(.clear)
         .onAppear { focused = true }
         .onKeyPress(.downArrow) { move(1); return .handled }
         .onKeyPress(.upArrow) { move(-1); return .handled }
         .onKeyPress(.return) { openSelected(); return .handled }
         .onExitCommand { ui.showQuickSwitcher = false }
+    }
+
+    private func row(_ file: MarkdownFile, selected: Bool) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "doc.text").foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(file.name).lineLimit(1)
+                if file.relativePath != "\(file.name).md" {
+                    Text(file.relativePath).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+            Spacer()
+        }
+        .padding(.vertical, 3)
+        .contentShape(Rectangle())
     }
 
     private func move(_ delta: Int) {

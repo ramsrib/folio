@@ -30,10 +30,6 @@ struct SlateApp: App {
                 Button("Command Palette…") { ui.showCommandPalette = true }
                     .keyboardShortcut("p", modifiers: .command)
             }
-            CommandGroup(after: .sidebar) {
-                Button("Toggle Inspector") { ui.showInspector.toggle() }
-                    .keyboardShortcut("i", modifiers: [.command, .option])
-            }
         }
     }
 }

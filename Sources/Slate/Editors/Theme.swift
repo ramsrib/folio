@@ -17,6 +17,7 @@ enum Theme {
     static let unresolved = NSColor.systemRed      // wikilink to a non-existent note
     static let quote = NSColor.secondaryLabelColor
     static let codeBg = NSColor(white: 0.5, alpha: 0.14)
+    static let highlightBg = NSColor.systemYellow.withAlphaComponent(0.30)
 
     static func heading(_ level: Int) -> NSFont {
         let sizes: [CGFloat] = [30, 25, 21, 18, 16, 15]
