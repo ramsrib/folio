@@ -86,6 +86,17 @@ final class VaultStore: ObservableObject {
         }
         rebuildLinkIndex()
         updateBacklinks()
+        maybeReloadOpenNote()
+    }
+
+    /// If the open note changed on disk (cloud sync / another app / the iOS app)
+    /// and we have no pending local save, pull the new content in. Skipping when
+    /// a save is pending preserves unsaved local edits.
+    private func maybeReloadOpenNote() {
+        guard let url = loadedURL, saveTask == nil else { return }
+        guard let disk = try? String(contentsOf: url, encoding: .utf8), disk != content else { return }
+        content = disk
+        updateOutline()
     }
 
     private func buildTree(_ dir: URL, root: URL, flat: inout [MarkdownFile]) -> [VaultNode] {
@@ -235,6 +246,7 @@ final class VaultStore: ObservableObject {
             guard let url else { return }
             try? text.write(to: url, atomically: true, encoding: .utf8)
             self?.savedAt = Date()
+            self?.saveTask = nil      // clear so external-change reload can run again
         }
     }
 

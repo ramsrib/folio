@@ -137,21 +137,50 @@ Swapping Stage 1 → Stage 2 touches only `EditorPane`/`Editors/`, nothing else.
   - *Still open:* in-editor true concealment (always-WYSIWYG), frontmatter/properties UI, `#tags`
     pane, embeds/transclusion in editor, aliases & heading/block links, unlinked mentions, graph
     view, hover link preview, syntax highlighting in code blocks.
-- **M4 — Search.** SQLite FTS5 global search with operators; recents/pins; saved searches.
-- **M5 — UX depth.** Multi-pane/tabs, command palette, themes/typography, keyboard-first flows.
-- **M6 — iOS.** See §7 — gated on the sync-location decision; introduces xcodegen/Xcode.
-- **M7 — Hardening.** Large-vault performance, accessibility, app icon, polish.
+- **M4 — Wrap up macOS v1** (the shippable finish line):
+  - [ ] **Live-reload the open note** when it changes on disk (cloud sync / another app / the iOS
+        app) without clobbering unsaved edits. *(directly enables the synced dual-app story)*
+  - [ ] **Reopen state:** restore last vault + last open note + mode on launch.
+  - [ ] **Settings:** recent vaults / switch vault; appearance (theme, font size, readable width).
+  - [ ] **App icon**, about, polished first-run empty state.
+  - [ ] **Robustness:** large vaults (incremental link index), accessibility pass.
+  - [ ] *(stretch)* syntax highlighting in code blocks; hover link preview; frontmatter/properties;
+        `#tags` pane; always-WYSIWYG concealment.
+- **M5 — Go multiplatform** (one-time restructure, kept ready by M4): xcodegen project with macOS +
+  iOS targets sharing `Sources/`; factor a `#if`-bridged platform layer (color/font/image, file
+  pick, watcher) so the shared core compiles on both. macOS behavior unchanged.
+- **M6 — iOS reader (+ optional write).** See §7.
+- **M7 — Ship both (day 1).** Signing, icons, TestFlight/store prep for macOS + iOS together.
 
-## 7. iOS — the plan, and the one real blocker
+## 7. The two apps — macOS + iOS (ship together on day 1)
 
-iOS can't reach `~/Projects`. To edit the *same* notes on iPhone/iPad, the vault must live somewhere
-iOS can read — practically **iCloud Drive** (most common for Obsidian) or a **git-synced** folder.
-So iOS is sequenced after we choose that, and it brings:
-- an **Xcode/xcodegen** project (SwiftPM can't build an iOS `.app`); the macOS target moves under it,
-- **security-scoped bookmarks** + `UIDocumentPicker` for folder access,
-- `NSFileCoordinator`/`NSFilePresenter` for safe concurrent (iCloud) access.
+**Hard requirement: both apps exist at launch.** macOS is the full editor (current focus); **iOS is a
+reader-first companion** to the *same* vaults, with optional write. iOS does **not** need to browse
+the local filesystem.
 
-Most of `VaultStore`/editor code carries over; it's the project file + file-access layer that changes.
+### iOS scope
+- **Cloud-synced vaults only.** The vault lives in **iCloud Drive** (recommended) or another
+  Files-provider/synced folder. iOS opens it once via `UIDocumentPickerViewController` and keeps a
+  **security-scoped bookmark** — no general local-FS browsing.
+- **Reader-first:** the Reading view (already cross-platform SwiftUI) is the primary iOS surface —
+  browse the vault, follow `[[links]]`, search by name, see backlinks/outline.
+- **Optional write:** tap-to-edit with the iOS editor (UITextView port) + an on-screen formatting
+  toolbar; lossless writes back to the synced file.
+- **Sync = iCloud.** Same files on Mac and iPhone; both apps reconcile external changes to an open
+  note (the macOS M4 live-reload item; iOS via `NSFilePresenter`/`NSMetadataQuery`).
+
+### Shared vs iOS-specific
+Shared (most of the app): `MarkdownParser`, `InlineMarkdown`, `ReadingView`, `VaultStore` logic,
+links/outline/backlinks, palettes, and the `NavigationSplitView` shell (collapses to a drill-down
+stack on iPhone automatically). iOS twins needed: editor (`NSTextView`→`UITextView` + custom `[[`
+autocomplete), file pick (`NSOpenPanel`→`UIDocumentPicker`), watcher (FSEvents→`NSFilePresenter`/
+`NSMetadataQuery`), a `#if`-bridged color/font/image layer, and dropping mac-only bits (menu bar,
+Reveal in Finder, `.onHover`, Esc/`onExitCommand`).
+
+### Sequencing (this is what delivers "both day 1")
+Wrap up macOS v1 (M4) → one-time multiplatform restructure (M5) → build iOS reader (M6) → ship both
+(M7). The restructure happens at the M4/M5 boundary (not mid-feature) so the working `make` flow
+isn't disrupted; meanwhile macOS code is kept portable.
 
 ## 8. Try it now
 

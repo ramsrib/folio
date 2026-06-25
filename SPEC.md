@@ -296,20 +296,30 @@ Organized, searchable preferences covering at least:
 
 - **Folder-based sync:** because the vault is just files, it syncs through whatever the folder uses
   (iCloud Drive, git, Dropbox, etc.). Slate adds no proprietary sync requirement.
+- **macOS** can open a vault anywhere on disk (e.g. `~/Projects/...`). **iOS** works with
+  **cloud-synced vaults** — practically iCloud Drive — opened via the system document picker and
+  remembered with a security-scoped bookmark; iOS does not browse the local filesystem.
 - **Cross-device consistency:** the same vault opened on macOS and iOS shows the same notes, links,
   tags, and structure.
 - **Conflict behavior:** concurrent edits never silently lose data; conflicting versions are
   preserved and surfaced for the user to resolve.
-- **External edits mid-session** are detected and reconciled without clobbering unsaved local edits.
+- **External edits mid-session** are detected and reconciled without clobbering unsaved local edits —
+  including edits made by the other Slate app over iCloud.
 
 ## 24. Platform behaviors
 
-- **macOS:** menu bar, full keyboard control, multiple/pop-out windows, drag-and-drop with Finder,
-  Services, Quick Look-style previews, window/state restoration.
-- **iOS / iPadOS:** touch-first interactions, swipe actions, share-sheet "send to Slate," document
-  picker / Files integration for vault access, on-screen formatting toolbar, hardware-keyboard
-  shortcuts on iPad, split view / Stage Manager friendliness.
-- Behavior and data are consistent across platforms; only the interaction style differs.
+Slate ships as **two apps that launch together**: a full macOS editor and an iOS companion. Data and
+behavior are consistent across both; only interaction style and editing depth differ.
+
+- **macOS (full editor):** menu bar, full keyboard control, multiple/pop-out windows, drag-and-drop
+  with Finder, vaults anywhere on disk, window/state restoration.
+- **iOS / iPadOS (reader-first, optional write):** the primary surface is the **rendered Reading
+  view** — browse the vault, follow `[[links]]`, search by name, see backlinks/outline — over a
+  **cloud-synced (iCloud Drive) vault** chosen through the document picker. Editing is optional:
+  tap-to-edit with a touch editor + on-screen formatting toolbar, lossless writes back to the synced
+  file. Touch-first interactions, swipe actions, share-sheet "send to Slate," hardware-keyboard
+  shortcuts on iPad, split view / Stage Manager friendliness; `NavigationSplitView` collapses to a
+  drill-down stack on iPhone.
 
 ## 25. Performance & reliability
 
