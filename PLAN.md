@@ -1,6 +1,7 @@
 # Slate — a file-backed, Obsidian-replacing notes app
 
 > Working codename: **Slate**. Rename later (folder, bundle id, product name).
+> Feature & behavior reference (the *what* we're building toward): [`SPEC.md`](SPEC.md).
 > Status: **M0–M2 done** — Mac app builds & packages; opens a vault as a folder tree, watches the
 > folder for external changes (FSEvents), creates/renames/trashes notes, and edits with an
 > Obsidian-style **Live Preview** editor (TextKit) that styles Markdown in place, losslessly.

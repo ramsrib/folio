@@ -3,7 +3,10 @@
 A UX-first Markdown notes app for **macOS** (iOS later) that edits your **existing `.md` files in
 place** — built to replace Obsidian. Native Swift / SwiftUI, files-on-disk as the source of truth.
 
-- **The plan:** [`PLAN.md`](PLAN.md) — architecture, the editor strategy, roadmap, open decisions.
+- **Feature & behavior reference:** [`SPEC.md`](SPEC.md) — the canonical *what Slate does* (the
+  Obsidian-grade north star we build toward). No implementation or timeline.
+- **The plan:** [`PLAN.md`](PLAN.md) — architecture, the editor strategy, roadmap, open decisions
+  (the *how* and *when*).
 - **Status:** M0–M2 done. The Mac app opens a folder ("vault") as a **folder tree**, watches it for
   external changes, supports **new / rename / trash**, and edits notes in an Obsidian-style
   **Live Preview** editor (styled Markdown, cursor-reveal of syntax) with lossless autosave to disk.
