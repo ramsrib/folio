@@ -2,9 +2,12 @@
 
 > Working codename: **Slate**. Rename later (folder, bundle id, product name).
 > Feature & behavior reference (the *what* we're building toward): [`SPEC.md`](SPEC.md).
-> Status: **M0–M2 done** — Mac app builds & packages; opens a vault as a folder tree, watches the
-> folder for external changes (FSEvents), creates/renames/trashes notes, and edits with an
-> Obsidian-style **Live Preview** editor (TextKit) that styles Markdown in place, losslessly.
+> Status: **M0–M2 done; M3 in progress.** Mac app builds & packages; opens a vault as a folder tree,
+> watches it (FSEvents), creates/renames/trashes notes, and edits with an Obsidian-style **Live
+> Preview** editor (TextKit) that styles Markdown in place, losslessly. **Links layer done:**
+> `[[wikilink]]` resolution + `[[` autocomplete, click-to-open, create-on-click for unresolved,
+> rename-updates-links across the vault, **backlinks** + **outline** inspector panels, **quick
+> switcher (⌘O)** and **command palette (⌘P)**.
 > Last updated 2026-06-25.
 
 A native, UX-first Markdown notes app that edits your **existing `.md` files in place** — built to
@@ -108,9 +111,15 @@ Swapping Stage 1 → Stage 2 touches only `EditorPane`/`Editors/`, nothing else.
       the file list only, to avoid clobbering unsaved edits); folder-level new-note placement UI.
 - **M2 — Live Preview editor.** ✅ TextKit `NSTextView` with in-place Markdown styling + cursor-reveal.
   The marquee UX milestone. *(done — see §4 Stage 2 for built scope & open refinements)*
-- **M3 — Obsidian surface.** Frontmatter handling, `[[wikilink]]` resolution + autocomplete, `#tags`,
-  backlinks panel, image/attachment rendering (relative paths), callouts.
-- **M4 — Search & navigation.** SQLite FTS5 index, quick-open (⌘O fuzzy), global search, recents/pins.
+- **M3 — Obsidian surface.** *(in progress)*
+  - ✅ **Links:** `[[wikilink]]` resolution (basename + path), resolved/unresolved styling, `[[`
+    autocomplete of note names (auto-closes `]]`), click-to-open, create-on-click for unresolved
+    links, **rename-updates-links** across the vault (open note reloaded if its links changed).
+  - ✅ **Backlinks** panel + **Outline** panel (right inspector, ⌥⌘I), outline click scrolls editor.
+  - ✅ **Quick switcher** (⌘O fuzzy open) + **command palette** (⌘P).
+  - *Still open:* frontmatter/properties UI, `#tags` pane, image/attachment rendering, callouts,
+    embeds/transclusion, aliases & heading/block links, unlinked mentions, graph view.
+- **M4 — Search.** SQLite FTS5 global search with operators; recents/pins; saved searches.
 - **M5 — UX depth.** Multi-pane/tabs, command palette, themes/typography, keyboard-first flows.
 - **M6 — iOS.** See §7 — gated on the sync-location decision; introduces xcodegen/Xcode.
 - **M7 — Hardening.** Large-vault performance, accessibility, app icon, polish.

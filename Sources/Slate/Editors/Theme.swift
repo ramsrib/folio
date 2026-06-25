@@ -14,6 +14,7 @@ enum Theme {
     static let text = NSColor.labelColor
     static let marker = NSColor.tertiaryLabelColor   // dimmed syntax when off the cursor line
     static let accent = NSColor.controlAccentColor
+    static let unresolved = NSColor.systemRed      // wikilink to a non-existent note
     static let quote = NSColor.secondaryLabelColor
     static let codeBg = NSColor(white: 0.5, alpha: 0.14)
 

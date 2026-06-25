@@ -3,6 +3,7 @@ import AppKit
 
 struct ContentView: View {
     @EnvironmentObject private var vault: VaultStore
+    @EnvironmentObject private var ui: UIState
     @State private var renameTarget: URL?
     @State private var renameText = ""
 
@@ -15,6 +16,12 @@ struct ContentView: View {
         }
         .navigationTitle(vault.vaultURL?.lastPathComponent ?? "Slate")
         .toolbar { toolbarContent }
+        .inspector(isPresented: $ui.showInspector) {
+            InspectorView()
+                .inspectorColumnWidth(min: 220, ideal: 280, max: 420)
+        }
+        .sheet(isPresented: $ui.showQuickSwitcher) { QuickSwitcherView() }
+        .sheet(isPresented: $ui.showCommandPalette) { CommandPaletteView() }
         .alert("Rename Note", isPresented: renamePresented) {
             TextField("Name", text: $renameText)
             Button("Cancel", role: .cancel) { renameTarget = nil }
@@ -85,6 +92,8 @@ struct ContentView: View {
             Button { vault.refresh() } label: { Image(systemName: "arrow.clockwise") }
                 .help("Reload vault")
                 .disabled(vault.vaultURL == nil)
+            Button { ui.showInspector.toggle() } label: { Image(systemName: "sidebar.right") }
+                .help("Toggle inspector")
         }
     }
 

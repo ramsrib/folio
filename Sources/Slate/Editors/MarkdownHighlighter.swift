@@ -5,24 +5,25 @@ import AppKit
 /// The text is never altered — only attributes are set, so the on-disk content
 /// stays byte-for-byte identical. Syntax markers (`**`, `#`, `` ` ``, …) are
 /// *dimmed* when the cursor is on another line and shown normally when the
-/// cursor is on their line — Obsidian's "reveal on edit" behaviour.
+/// cursor is on their line — Obsidian's "reveal on edit" behaviour. Wikilinks
+/// and Markdown links also get a `.link` attribute so they're clickable.
 enum MarkdownHighlighter {
-    private static func rx(_ p: String) -> NSRegularExpression {
-        try! NSRegularExpression(pattern: p)
-    }
+    private static func rx(_ p: String) -> NSRegularExpression { try! NSRegularExpression(pattern: p) }
 
-    private static let heading   = rx("^(#{1,6})\\s+.*")
-    private static let unordered = rx("^\\s*([-*+])\\s+")
-    private static let ordered   = rx("^\\s*(\\d+[.)])\\s+")
-    private static let boldStars = rx("\\*\\*([^*\\n]+)\\*\\*")
+    private static let heading    = rx("^(#{1,6})\\s+.*")
+    private static let unordered  = rx("^\\s*([-*+])\\s+")
+    private static let ordered    = rx("^\\s*(\\d+[.)])\\s+")
+    private static let boldStars  = rx("\\*\\*([^*\\n]+)\\*\\*")
     private static let italicStar = rx("(?<!\\*)\\*(?!\\*)([^*\\n]+)\\*(?!\\*)")
     private static let inlineCode = rx("`([^`\\n]+)`")
-    private static let strike    = rx("~~([^~\\n]+)~~")
-    private static let link      = rx("\\[([^\\]\\n]+)\\]\\(([^)\\n]+)\\)")
-    private static let wiki      = rx("\\[\\[([^\\]\\n]+)\\]\\]")
-    private static let tag       = rx("(?<!\\S)#([A-Za-z0-9_/-]+)")
+    private static let strike     = rx("~~([^~\\n]+)~~")
+    private static let mdLink     = rx("\\[([^\\]\\n]+)\\]\\(([^)\\n]+)\\)")
+    private static let wiki       = rx("\\[\\[([^\\]\\n]+)\\]\\]")
+    private static let tag        = rx("(?<!\\S)#([A-Za-z0-9_/-]+)")
 
-    static func apply(to storage: NSTextStorage, cursorLine: NSRange) {
+    /// - Parameter resolveWikilink: returns true if the target note exists.
+    static func apply(to storage: NSTextStorage, cursorLine: NSRange,
+                      resolveWikilink: (String) -> Bool) {
         let text = storage.string
         let ns = text as NSString
         let full = NSRange(location: 0, length: ns.length)
@@ -30,10 +31,9 @@ enum MarkdownHighlighter {
         storage.beginEditing()
         defer { storage.endEditing() }
 
-        // 1. Reset everything to the body style.
         storage.setAttributes([.font: Theme.body, .foregroundColor: Theme.text], range: full)
 
-        // 2. Block elements, line by line (also tracks fenced code regions).
+        // Block elements, line by line (tracks fenced code regions).
         var fenced: [NSRange] = []
         var inFence = false
         ns.enumerateSubstrings(in: full, options: .byLines) { sub, lineRange, _, _ in
@@ -47,8 +47,7 @@ enum MarkdownHighlighter {
             if let m = heading.firstMatch(in: line, range: lineNS) {
                 let level = m.range(at: 1).length
                 storage.addAttribute(.font, value: Theme.heading(level), range: lineRange)
-                let markerLen = min(level + 1, lineRange.length)
-                mark(storage, NSRange(location: lineRange.location, length: markerLen), cursorLine)
+                mark(storage, NSRange(location: lineRange.location, length: min(level + 1, lineRange.length)), cursorLine)
             } else if trimmed.hasPrefix(">") {
                 storage.addAttribute(.foregroundColor, value: Theme.quote, range: lineRange)
             } else if let m = unordered.firstMatch(in: line, range: lineNS) {
@@ -61,24 +60,50 @@ enum MarkdownHighlighter {
             }
         }
 
-        // 3. Inline spans (content styled, delimiters treated as markers).
+        // Inline spans whose content is styled and delimiters dimmed.
         inline(boldStars,  storage, text, full, cursorLine, [.font: Theme.bold])
         inline(italicStar, storage, text, full, cursorLine, [.font: Theme.italic])
         inline(strike,     storage, text, full, cursorLine, [.strikethroughStyle: NSUnderlineStyle.single.rawValue])
-        inline(wiki,       storage, text, full, cursorLine, [.foregroundColor: Theme.accent])
-        inline(link,       storage, text, full, cursorLine, [.foregroundColor: Theme.accent,
-                                                              .underlineStyle: NSUnderlineStyle.single.rawValue])
         inline(inlineCode, storage, text, full, cursorLine, [.font: Theme.mono, .backgroundColor: Theme.codeBg])
+
+        // Wikilinks: resolved (accent) vs unresolved (red); whole span clickable.
+        wiki.enumerateMatches(in: text, range: full) { m, _, _ in
+            guard let m else { return }
+            let whole = m.range, content = m.range(at: 1)
+            let inner = ns.substring(with: content)
+            let resolved = resolveWikilink(inner)
+            storage.addAttribute(.foregroundColor, value: resolved ? Theme.accent : Theme.unresolved, range: content)
+            if let url = wikilinkURL(inner) { storage.addAttribute(.link, value: url, range: whole) }
+            mark(storage, NSRange(location: whole.location, length: 2), cursorLine)              // [[
+            mark(storage, NSRange(location: NSMaxRange(whole) - 2, length: 2), cursorLine)       // ]]
+        }
+
+        // Markdown links: text styled + clickable, brackets/url dimmed.
+        mdLink.enumerateMatches(in: text, range: full) { m, _, _ in
+            guard let m else { return }
+            let whole = m.range, label = m.range(at: 1), dest = m.range(at: 2)
+            storage.addAttributes([.foregroundColor: Theme.accent,
+                                   .underlineStyle: NSUnderlineStyle.single.rawValue], range: label)
+            if let url = URL(string: ns.substring(with: dest)) { storage.addAttribute(.link, value: url, range: label) }
+            mark(storage, NSRange(location: whole.location, length: label.location - whole.location), cursorLine)
+            let tStart = NSMaxRange(label)
+            mark(storage, NSRange(location: tStart, length: NSMaxRange(whole) - tStart), cursorLine)
+        }
 
         tag.enumerateMatches(in: text, range: full) { m, _, _ in
             guard let m else { return }
             storage.addAttribute(.foregroundColor, value: Theme.accent, range: m.range)
         }
 
-        // 4. Fenced code overrides any inline styling that fell inside it.
-        for r in fenced {
-            storage.addAttributes([.font: Theme.mono, .backgroundColor: Theme.codeBg], range: r)
-        }
+        for r in fenced { storage.addAttributes([.font: Theme.mono, .backgroundColor: Theme.codeBg], range: r) }
+    }
+
+    private static func wikilinkURL(_ inner: String) -> URL? {
+        var comps = URLComponents()
+        comps.scheme = "slate"
+        comps.host = "wikilink"
+        comps.queryItems = [URLQueryItem(name: "target", value: inner)]
+        return comps.url
     }
 
     private static func inline(_ regex: NSRegularExpression, _ storage: NSTextStorage,
