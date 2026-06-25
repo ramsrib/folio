@@ -192,6 +192,17 @@ final class VaultStore: ObservableObject {
         scheduleSave()
     }
 
+    /// Toggle a task checkbox character (' ' <-> 'x') at a content offset — used
+    /// by Reading mode's tappable checkboxes.
+    func toggleTask(atContentIndex idx: Int) {
+        let ns = content as NSString
+        guard idx >= 0, idx < ns.length else { return }
+        let current = ns.substring(with: NSRange(location: idx, length: 1)).lowercased()
+        let new = current == "x" ? " " : "x"
+        content = ns.replacingCharacters(in: NSRange(location: idx, length: 1), with: new)
+        contentEdited()
+    }
+
     private func updateOutline() {
         let ns = content as NSString
         var items: [OutlineItem] = []

@@ -9,7 +9,9 @@
 > rename-updates-links across the vault, **quick switcher (⌘O)** and **command palette (⌘P)**.
 > **Notion-style UX pass done:** centered reading column, editable page title, hover-reveal floating
 > outline + inline collapsible backlinks (no side panels), translucent rounded palettes, clickable
-> task checkboxes, `==highlight==`, completed-task styling.
+> task checkboxes, `==highlight==`, completed-task styling. **Reading mode done:** a fully-rendered,
+> Notion-style read view (⌘E) — headings, lists, real checkboxes, callout boxes, code blocks, tables,
+> dividers, images, no syntax symbols.
 > Last updated 2026-06-25.
 
 A native, UX-first Markdown notes app that edits your **existing `.md` files in place** — built to
@@ -123,9 +125,13 @@ Swapping Stage 1 → Stage 2 touches only `EditorPane`/`Editors/`, nothing else.
   - ✅ **UX pass:** centered reading column, editable page title (renames the file), `.sidebar` list
     style, smooth animations, rounded continuous corners, material backgrounds.
   - ✅ **Richer rendering:** clickable task checkboxes (toggle + completed strike/dim), `==highlight==`.
-  - *Still open:* frontmatter/properties UI, `#tags` pane, image/attachment rendering, callouts,
-    embeds/transclusion, aliases & heading/block links, unlinked mentions, graph view, reading mode,
-    hover link preview.
+  - ✅ **Reading mode (⌘E):** fully-rendered, Notion-style read view (`Reading/`) — headings,
+    nested lists, real checkboxes (tappable), blockquotes, callout boxes, fenced code, tables,
+    dividers, local/remote images; inline via Foundation Markdown + wikilink rewrite; outline-click
+    scroll; clickable links. Parser stress-tested standalone.
+  - *Still open:* in-editor true concealment (always-WYSIWYG), frontmatter/properties UI, `#tags`
+    pane, embeds/transclusion in editor, aliases & heading/block links, unlinked mentions, graph
+    view, hover link preview, syntax highlighting in code blocks.
 - **M4 — Search.** SQLite FTS5 global search with operators; recents/pins; saved searches.
 - **M5 — UX depth.** Multi-pane/tabs, command palette, themes/typography, keyboard-first flows.
 - **M6 — iOS.** See §7 — gated on the sync-location decision; introduces xcodegen/Xcode.

@@ -29,6 +29,11 @@ struct SlateApp: App {
                     .keyboardShortcut("o", modifiers: .command)
                 Button("Command Palette…") { ui.showCommandPalette = true }
                     .keyboardShortcut("p", modifiers: .command)
+                Divider()
+                Button(ui.mode == .read ? "Edit Mode" : "Reading Mode") {
+                    ui.mode = ui.mode == .read ? .edit : .read
+                }
+                .keyboardShortcut("e", modifiers: .command)
             }
         }
     }

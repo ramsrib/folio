@@ -89,6 +89,15 @@ struct ContentView: View {
             Button { vault.refresh() } label: { Image(systemName: "arrow.clockwise") }
                 .help("Reload vault")
                 .disabled(vault.vaultURL == nil)
+            Button {
+                withAnimation(.smooth(duration: 0.2)) {
+                    ui.mode = ui.mode == .read ? .edit : .read
+                }
+            } label: {
+                Image(systemName: ui.mode == .read ? "pencil" : "eye")
+            }
+            .help(ui.mode == .read ? "Edit" : "Reading mode")
+            .disabled(vault.selection == nil)
         }
     }
 

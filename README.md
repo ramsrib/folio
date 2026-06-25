@@ -13,7 +13,9 @@ place** — built to replace Obsidian. Native Swift / SwiftUI, files-on-disk as 
   checkboxes, `==highlight==`) with lossless autosave. **Links work:** `[[wikilinks]]` with
   autocomplete, click-to-open, create-on-click, rename-updates-links, plus a **quick switcher (⌘O)** /
   **command palette (⌘P)**. **Notion-style UI:** centered reading column, editable page title,
-  hover-reveal floating outline, inline collapsible backlinks, translucent rounded surfaces.
+  hover-reveal floating outline, inline collapsible backlinks, translucent rounded surfaces, and a
+  fully-rendered **Reading mode (⌘E)** — headings, real checkboxes, callout boxes, code, tables,
+  dividers, images, no syntax symbols.
 
 ## Run it
 

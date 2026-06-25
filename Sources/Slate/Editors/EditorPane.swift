@@ -6,6 +6,7 @@ import AppKit
 /// backlinks section (bottom). No side panels.
 struct EditorPane: View {
     @EnvironmentObject private var vault: VaultStore
+    @EnvironmentObject private var ui: UIState
 
     var body: some View {
         if vault.selection != nil {
@@ -15,14 +16,18 @@ struct EditorPane: View {
                     .frame(maxWidth: .infinity)
                     .padding(.top, 28)
                     .padding(.bottom, 2)
-                LivePreviewEditor(
-                    text: $vault.content,
-                    scrollTo: $vault.scrollRequest,
-                    onChange: { vault.contentEdited() },
-                    resolveWikilink: { vault.resolve($0) != nil },
-                    noteNames: { vault.allNoteNames },
-                    onOpenLink: openLink
-                )
+                if ui.mode == .read {
+                    ReadingView()
+                } else {
+                    LivePreviewEditor(
+                        text: $vault.content,
+                        scrollTo: $vault.scrollRequest,
+                        onChange: { vault.contentEdited() },
+                        resolveWikilink: { vault.resolve($0) != nil },
+                        noteNames: { vault.allNoteNames },
+                        onOpenLink: openLink
+                    )
+                }
             }
             .background(Color(nsColor: .textBackgroundColor))
             .overlay(alignment: .topTrailing) {
