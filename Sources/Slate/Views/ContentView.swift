@@ -16,6 +16,11 @@ struct ContentView: View {
         }
         .navigationTitle(vault.vaultURL?.lastPathComponent ?? "Slate")
         .toolbar { toolbarContent }
+        .onChange(of: vault.selection) {
+            // Navigation lands in reading mode; create actions request edit mode.
+            ui.mode = vault.openInEditMode ? .edit : .read
+            vault.openInEditMode = false
+        }
         .sheet(isPresented: $ui.showQuickSwitcher) { QuickSwitcherView() }
         .sheet(isPresented: $ui.showCommandPalette) { CommandPaletteView() }
         .alert("Rename Note", isPresented: renamePresented) {

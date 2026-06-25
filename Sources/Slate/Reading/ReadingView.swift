@@ -6,6 +6,7 @@ import AppKit
 /// dividers, and images are drawn as native views.
 struct ReadingView: View {
     @EnvironmentObject private var vault: VaultStore
+    @EnvironmentObject private var ui: UIState
 
     private var blocks: [Block] { MarkdownParser.parse(vault.content) }
 
@@ -18,9 +19,12 @@ struct ReadingView: View {
                     }
                 }
                 .frame(maxWidth: 720, alignment: .leading)
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, minHeight: 200, alignment: .top)
+                .contentShape(Rectangle())
                 .padding(.horizontal, 28)
                 .padding(.vertical, 20)
+                // Double-click the page to start writing (like Notion).
+                .onTapGesture(count: 2) { withAnimation(.smooth(duration: 0.2)) { ui.mode = .edit } }
             }
             .onChange(of: vault.scrollRequest) {
                 if let req = vault.scrollRequest {

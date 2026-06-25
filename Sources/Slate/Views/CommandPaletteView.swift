@@ -21,7 +21,7 @@ struct CommandPaletteView: View {
             AppCommand(title: "New Note", subtitle: "⌘N") { vault.newNote() },
             AppCommand(title: "Open Vault…", subtitle: "⇧⌘O") { vault.pickVault() },
             AppCommand(title: "Reload Vault", subtitle: "⇧⌘R") { vault.refresh() },
-            AppCommand(title: "Quick Switcher…", subtitle: "⌘O") { ui.showQuickSwitcher = true },
+            AppCommand(title: "Search Files…", subtitle: "⌘K") { ui.showQuickSwitcher = true },
             AppCommand(title: ui.mode == .read ? "Edit Mode" : "Reading Mode", subtitle: "⌘E") {
                 ui.mode = ui.mode == .read ? .edit : .read },
         ]

@@ -25,8 +25,8 @@ struct SlateApp: App {
                 Button("Reload Vault") { vault.refresh() }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
                 Divider()
-                Button("Quick Switcher…") { ui.showQuickSwitcher = true }
-                    .keyboardShortcut("o", modifiers: .command)
+                Button("Search Files…") { ui.showQuickSwitcher = true }
+                    .keyboardShortcut("k", modifiers: .command)
                 Button("Command Palette…") { ui.showCommandPalette = true }
                     .keyboardShortcut("p", modifiers: .command)
                 Divider()

@@ -20,7 +20,7 @@ struct QuickSwitcherView: View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Search notes…", text: $query)
+                TextField("Search files by name…", text: $query)
                     .textFieldStyle(.plain)
                     .font(.title3)
                     .focused($focused)

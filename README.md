@@ -12,10 +12,11 @@ place** — built to replace Obsidian. Native Swift / SwiftUI, files-on-disk as 
   Obsidian-style **Live Preview** editor (styled Markdown, cursor-reveal of syntax, clickable task
   checkboxes, `==highlight==`) with lossless autosave. **Links work:** `[[wikilinks]]` with
   autocomplete, click-to-open, create-on-click, rename-updates-links, plus a **quick switcher (⌘O)** /
-  **command palette (⌘P)**. **Notion-style UI:** centered reading column, editable page title,
-  hover-reveal floating outline, inline collapsible backlinks, translucent rounded surfaces, and a
-  fully-rendered **Reading mode (⌘E)** — headings, real checkboxes, callout boxes, code, tables,
-  dividers, images, no syntax symbols.
+  **command palette (⌘P)**, and **file-name search (⌘K)**. **Notion-style UI:** centered reading
+  column, editable page title, hover-reveal floating outline, inline collapsible backlinks,
+  translucent rounded surfaces, and a fully-rendered **Reading mode** — headings, real checkboxes,
+  callout boxes, code, tables, dividers, images, no syntax symbols. **Reading is the default**;
+  double-click the page (or ⌘E) to write; navigation always opens in reading.
 
 ## Run it
 

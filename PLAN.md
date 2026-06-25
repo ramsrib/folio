@@ -11,7 +11,8 @@
 > outline + inline collapsible backlinks (no side panels), translucent rounded palettes, clickable
 > task checkboxes, `==highlight==`, completed-task styling. **Reading mode done:** a fully-rendered,
 > Notion-style read view (⌘E) — headings, lists, real checkboxes, callout boxes, code blocks, tables,
-> dividers, images, no syntax symbols.
+> dividers, images, no syntax symbols. **Reading is the default**; double-click the page (or ⌘E)
+> to write; navigation always opens in reading. **File search on ⌘K.**
 > Last updated 2026-06-25.
 
 A native, UX-first Markdown notes app that edits your **existing `.md` files in place** — built to
@@ -129,6 +130,10 @@ Swapping Stage 1 → Stage 2 touches only `EditorPane`/`Editors/`, nothing else.
     nested lists, real checkboxes (tappable), blockquotes, callout boxes, fenced code, tables,
     dividers, local/remote images; inline via Foundation Markdown + wikilink rewrite; outline-click
     scroll; clickable links. Parser stress-tested standalone.
+    - **Reading is the default**; every navigation (sidebar, ⌘K search, wikilink) opens in reading
+      mode. **Double-click the page** (or the toolbar Edit button / ⌘E) switches to writing. New
+      notes and create-on-unresolved-link open straight in edit mode.
+  - ✅ **File-name search (⌘K)** — fuzzy quick-open by name/path (the renamed quick switcher).
   - *Still open:* in-editor true concealment (always-WYSIWYG), frontmatter/properties UI, `#tags`
     pane, embeds/transclusion in editor, aliases & heading/block links, unlinked mentions, graph
     view, hover link preview, syntax highlighting in code blocks.

@@ -16,6 +16,9 @@ final class VaultStore: ObservableObject {
     @Published private(set) var outline: [OutlineItem] = []
     @Published private(set) var backlinks: [Backlink] = []
     @Published var scrollRequest: Int?   // character offset for the editor to scroll to
+    /// Set by create actions so the next selection opens in edit mode (navigation
+    /// otherwise opens in reading mode). Consumed by the view on selection change.
+    var openInEditMode = false
 
     var allNoteNames: [String] { files.map(\.name) }
 
@@ -183,6 +186,7 @@ final class VaultStore: ObservableObject {
             try? "# \(base)\n".write(to: url, atomically: true, encoding: .utf8)
         }
         refresh()
+        openInEditMode = true        // followed an unresolved link → new note to write
         select(url)
     }
 
@@ -254,6 +258,7 @@ final class VaultStore: ObservableObject {
         let url = dir.appendingPathComponent(name)
         try? "".write(to: url, atomically: true, encoding: .utf8)
         refresh()
+        openInEditMode = true        // new note → start writing
         select(url)
     }
 
