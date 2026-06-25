@@ -143,7 +143,10 @@ Swapping Stage 1 → Stage 2 touches only `EditorPane`/`Editors/`, nothing else.
   - [ ] **Reopen state:** restore last vault + last open note + mode on launch.
   - [ ] **Settings:** recent vaults / switch vault; appearance (theme, font size, readable width).
   - [ ] **App icon**, about, polished first-run empty state.
-  - [ ] **Robustness:** large vaults (incremental link index), accessibility pass.
+  - [~] **Robustness:** ✅ ignore dependency/build dirs on scan (`node_modules`, `vendor`, `Pods`,
+        `build`, `dist`, `target`, … ; hidden dirs already skipped) so a code-project folder doesn't
+        crawl/index package READMEs. Still: large-vault incremental link index, accessibility pass,
+        optional user-configurable `.slateignore`/settings.
   - [ ] *(stretch)* syntax highlighting in code blocks; hover link preview; frontmatter/properties;
         `#tags` pane; always-WYSIWYG concealment.
 - **M5 — Go multiplatform** (one-time restructure, kept ready by M4): xcodegen project with macOS +

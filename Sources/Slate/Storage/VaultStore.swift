@@ -24,6 +24,13 @@ final class VaultStore: ObservableObject {
 
     private let vaultPathKey = "slate.vaultPath"
     private let mdExtensions: Set<String> = ["md", "markdown", "mdown", "mkd"]
+    /// Dependency/build directories never worth scanning (so pointing a vault at a
+    /// code project doesn't crawl node_modules and index package READMEs). Hidden
+    /// dirs (.git, .build, .next, .venv, …) are already skipped via skipsHiddenFiles.
+    private let ignoredDirs: Set<String> = [
+        "node_modules", "vendor", "Pods", "bower_components", "__pycache__",
+        "venv", "build", "dist", "out", "target", "DerivedData", "coverage",
+    ]
     private var loadedURL: URL?
     private var saveTask: Task<Void, Never>?
     private var watcher: VaultWatcher?
@@ -109,6 +116,7 @@ final class VaultStore: ObservableObject {
         for url in entries {
             let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
             if isDir {
+                if ignoredDirs.contains(url.lastPathComponent) { continue }   // skip node_modules etc.
                 let children = buildTree(url, root: root, flat: &flat)
                 if !children.isEmpty {
                     nodes.append(VaultNode(id: url, name: url.lastPathComponent,
