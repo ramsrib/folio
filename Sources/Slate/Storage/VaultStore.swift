@@ -37,6 +37,7 @@ final class VaultStore: ObservableObject {
         "venv", "build", "dist", "out", "target", "DerivedData", "coverage",
     ]
     private var loadedURL: URL?
+    private var diskContent = ""   // last content known to be on disk (dirty check)
     private var saveTask: Task<Void, Never>?
     private var watcher: VaultWatcher?
     private var recentlyClosed: [URL] = []   // stack for "reopen closed tab"
@@ -227,6 +228,7 @@ final class VaultStore: ObservableObject {
         guard let url = loadedURL, saveTask == nil else { return }
         guard let disk = try? String(contentsOf: url, encoding: .utf8), disk != content else { return }
         content = disk
+        diskContent = disk
         updateOutline()
     }
 
@@ -368,6 +370,7 @@ final class VaultStore: ObservableObject {
         selection = id
         if !openTabs.contains(id) { openTabs.append(id) }   // open file → ensure a tab
         content = (try? String(contentsOf: id, encoding: .utf8)) ?? ""
+        diskContent = content
         loadedURL = id
         savedAt = nil
         updateOutline()
@@ -436,6 +439,7 @@ final class VaultStore: ObservableObject {
             if Task.isCancelled { return }
             guard let url else { return }
             try? text.write(to: url, atomically: true, encoding: .utf8)
+            self?.diskContent = text
             self?.savedAt = Date()
             self?.saveTask = nil      // clear so external-change reload can run again
         }
@@ -443,8 +447,9 @@ final class VaultStore: ObservableObject {
 
     func flushSave() {
         saveTask?.cancel(); saveTask = nil
-        guard let url = loadedURL else { return }
+        guard let url = loadedURL, content != diskContent else { return }   // skip if unchanged
         try? content.write(to: url, atomically: true, encoding: .utf8)
+        diskContent = content
     }
 
     // MARK: - CRUD

@@ -9,14 +9,15 @@ struct ReadingView: View {
     @EnvironmentObject private var ui: UIState
     @EnvironmentObject private var settings: AppSettings
 
-    private var blocks: [Block] { MarkdownParser.parse(vault.content) }
+    // Parsed once per content change (not on every redraw/scroll).
+    @State private var blocks: [Block] = []
     private var body0: CGFloat { settings.bodyFontSize }
     private var design: Font.Design { settings.readingFont.design }
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                LazyVStack(alignment: .leading, spacing: 16) {
                     ForEach(blocks) { block in
                         view(for: block).id(anchorID(block))
                     }
@@ -29,6 +30,7 @@ struct ReadingView: View {
                 // Double-click the page to start writing (like Notion).
                 .onTapGesture(count: 2) { withAnimation(.smooth(duration: 0.2)) { ui.mode = .edit } }
             }
+            .task(id: vault.content) { blocks = MarkdownParser.parse(vault.content) }
             .onChange(of: vault.scrollRequest) {
                 if let req = vault.scrollRequest {
                     withAnimation(.smooth) { proxy.scrollTo(req, anchor: .top) }
