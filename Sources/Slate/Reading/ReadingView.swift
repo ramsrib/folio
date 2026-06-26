@@ -113,9 +113,11 @@ struct ReadingView: View {
         case let .callout(kind, title, body):
             calloutView(kind: kind, title: title, body: body)
 
-        case let .code(_, text):
+        case let .code(language, text):
             ScrollView(.horizontal, showsIndicators: false) {
-                Text(text).font(.system(size: 13.5, design: .monospaced)).padding(12)
+                Text(CodeHighlighter.highlight(text, language: language))
+                    .textSelection(.enabled)
+                    .padding(12)
             }
             .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 

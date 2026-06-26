@@ -17,6 +17,7 @@ final class VaultStore: ObservableObject {
     @Published private(set) var backlinks: [Backlink] = []
     @Published var scrollRequest: Int?   // character offset for the editor to scroll to
     @Published private(set) var openTabs: [URL] = []   // open notes, in tab order
+    @Published private(set) var recentVaults: [URL] = []
     /// Set by create actions so the next selection opens in edit mode (navigation
     /// otherwise opens in reading mode). Consumed by the view on selection change.
     var openInEditMode = false
@@ -26,6 +27,7 @@ final class VaultStore: ObservableObject {
     private let vaultPathKey = "slate.vaultPath"
     private let tabsKey = "slate.tabsByVault"      // [vaultPath: [filePath]]
     private let activeKey = "slate.activeByVault"  // [vaultPath: filePath]
+    private let recentKey = "slate.recentVaults"   // [vaultPath]
     private let mdExtensions: Set<String> = ["md", "markdown", "mdown", "mkd"]
     /// Dependency/build directories never worth scanning (so pointing a vault at a
     /// code project doesn't crawl node_modules and index package READMEs). Hidden
@@ -47,7 +49,11 @@ final class VaultStore: ObservableObject {
     private static let headingRegex = try! NSRegularExpression(
         pattern: "^(#{1,6})\\s+(.+)$", options: [.anchorsMatchLines])
 
-    init() { restoreVault() }
+    init() {
+        recentVaults = (UserDefaults.standard.array(forKey: recentKey) as? [String] ?? [])
+            .map { URL(fileURLWithPath: $0) }
+        restoreVault()
+    }
 
     // MARK: - Vault selection
 
@@ -65,6 +71,7 @@ final class VaultStore: ObservableObject {
         flushSave()
         vaultURL = url
         UserDefaults.standard.set(url.path, forKey: vaultPathKey)
+        addRecent(url)
         selection = nil; content = ""; loadedURL = nil
         outline = []; backlinks = []; openTabs = []
         refresh()
@@ -72,11 +79,24 @@ final class VaultStore: ObservableObject {
         restoreSession()
     }
 
+    private func addRecent(_ url: URL) {
+        recentVaults.removeAll { $0.path == url.path }
+        recentVaults.insert(url, at: 0)
+        recentVaults = Array(recentVaults.prefix(10)).filter { FileManager.default.fileExists(atPath: $0.path) }
+        UserDefaults.standard.set(recentVaults.map(\.path), forKey: recentKey)
+    }
+
+    func clearRecentVaults() {
+        recentVaults = []
+        UserDefaults.standard.removeObject(forKey: recentKey)
+    }
+
     private func restoreVault() {
         guard let path = UserDefaults.standard.string(forKey: vaultPathKey) else { return }
         let url = URL(fileURLWithPath: path, isDirectory: true)
         guard FileManager.default.fileExists(atPath: url.path) else { return }
         vaultURL = url
+        addRecent(url)
         refresh()
         startWatching()
         restoreSession()

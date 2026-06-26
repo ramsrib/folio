@@ -33,6 +33,16 @@ struct SlateApp: App {
                     .keyboardShortcut("[", modifiers: [.command, .shift])
                 Button("Open Vault…") { vault.pickVault() }
                     .keyboardShortcut("o", modifiers: [.command, .shift])
+                Menu("Open Recent") {
+                    ForEach(vault.recentVaults, id: \.self) { url in
+                        Button(url.lastPathComponent) { vault.setVault(url) }
+                    }
+                    if !vault.recentVaults.isEmpty {
+                        Divider()
+                        Button("Clear Menu") { vault.clearRecentVaults() }
+                    }
+                }
+                .disabled(vault.recentVaults.isEmpty)
                 Button("Reload Vault") { vault.refresh() }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
                 Divider()
@@ -58,7 +68,21 @@ struct SlateApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
+        configureAppIcon()
         NSApp.activate(ignoringOtherApps: true)
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    private func configureAppIcon() {
+        let bundledIcon = Bundle.main.url(forResource: "Slate", withExtension: "icns")
+        let sourceIcon = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent("Resources/AppIcon/SlateAppIcon-mac.png")
+
+        for url in [bundledIcon, sourceIcon].compactMap({ $0 }) {
+            if let image = NSImage(contentsOf: url) {
+                NSApp.applicationIconImage = image
+                return
+            }
+        }
+    }
 }
