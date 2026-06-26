@@ -52,27 +52,27 @@ struct ContentView: View {
         HStack(spacing: 0) {
             if showSidebar {
                 sidebarTitleArea
-                    .frame(width: sidebarWidth, height: 42)
+                    .frame(width: sidebarWidth, height: 30)
                     .background(settings.sidebarBackground ?? Color(nsColor: .windowBackgroundColor))
                 Divider()
             }
             contentTitleArea
-                .frame(maxWidth: .infinity, minHeight: 42)
+                .frame(maxWidth: .infinity, minHeight: 30)
                 .background(settings.topBarBackground)
         }
-        .frame(height: 42)
+        .frame(height: 30)
     }
 
     private var sidebarTitleArea: some View {
         HStack(spacing: 6) {
+            Spacer(minLength: 0)
             Text(vault.vaultURL?.lastPathComponent ?? "Slate")
                 .font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
                 .lineLimit(1)
-            Spacer(minLength: 4)
-            toggleButton            // toggle at the trailing end (native sidebar look)
+            toggleButton            // vault title sits just before the toggle, at the trailing end
         }
         .padding(.leading, 78)      // clear the traffic lights
-        .padding(.trailing, 8)
+        .padding(.trailing, 10)
     }
 
     private var contentTitleArea: some View {
