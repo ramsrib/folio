@@ -4,21 +4,25 @@ import AppKit
 struct ContentView: View {
     @EnvironmentObject private var vault: VaultStore
     @EnvironmentObject private var ui: UIState
+    @EnvironmentObject private var settings: AppSettings
     @State private var renameTarget: URL?
     @State private var renameText = ""
     @State private var expandedDirs: Set<URL> = []
+    @State private var columns: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        NavigationSplitView {
-            sidebar
-                .navigationSplitViewColumnWidth(min: 220, ideal: 290, max: 460)
-        } detail: {
-            EditorPane()
+        VStack(spacing: 0) {
+            topBar
+            Divider()
+            NavigationSplitView(columnVisibility: $columns) {
+                sidebar
+                    .navigationSplitViewColumnWidth(min: 220, ideal: 290, max: 460)
+            } detail: {
+                EditorPane()
+            }
         }
-        .navigationTitle(vault.vaultURL?.lastPathComponent ?? "Slate")
-        .toolbar { toolbarContent }
+        .background(WindowConfigurator(background: settings.nsWindowBackground))
         .onChange(of: vault.selection) {
-            // Navigation lands in reading mode; create actions request edit mode.
             ui.mode = vault.openInEditMode ? .edit : .read
             vault.openInEditMode = false
         }
@@ -32,6 +36,54 @@ struct ContentView: View {
                 renameTarget = nil
             }
         }
+    }
+
+    // MARK: Top bar (custom title bar: tabs + actions, themed)
+
+    private var topBar: some View {
+        HStack(spacing: 8) {
+            Button {
+                withAnimation(.smooth(duration: 0.2)) {
+                    columns = columns == .detailOnly ? .all : .detailOnly
+                }
+            } label: { Image(systemName: "sidebar.leading") }
+            .buttonStyle(.borderless)
+            .help("Toggle sidebar")
+
+            Text(vault.vaultURL?.lastPathComponent ?? "Slate")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .fixedSize()
+
+            if vault.openTabs.isEmpty {
+                Spacer()
+            } else {
+                Divider().frame(height: 16)
+                TabBarView().frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            actions
+        }
+        .padding(.leading, 80)        // clear the traffic lights
+        .padding(.trailing, 12)
+        .frame(height: 44)
+        .background(settings.topBarBackground)
+    }
+
+    private var actions: some View {
+        HStack(spacing: 4) {
+            Button { vault.newNote() } label: { Image(systemName: "square.and.pencil") }
+                .help("New note").disabled(vault.vaultURL == nil)
+            Button { vault.refresh() } label: { Image(systemName: "arrow.clockwise") }
+                .help("Reload vault").disabled(vault.vaultURL == nil)
+            Button {
+                withAnimation(.smooth(duration: 0.2)) { ui.mode = ui.mode == .read ? .edit : .read }
+            } label: { Image(systemName: ui.mode == .read ? "pencil" : "eye") }
+                .help(ui.mode == .read ? "Edit" : "Reading mode").disabled(vault.selection == nil)
+        }
+        .buttonStyle(.borderless)
+        .imageScale(.large)
     }
 
     // MARK: Sidebar
@@ -61,29 +113,6 @@ struct ContentView: View {
                         description: Text("No Markdown files found in this folder."))
                 }
             }
-        }
-    }
-
-    // MARK: Toolbar
-
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItemGroup(placement: .primaryAction) {
-            Button { vault.newNote() } label: { Image(systemName: "square.and.pencil") }
-                .help("New note")
-                .disabled(vault.vaultURL == nil)
-            Button { vault.refresh() } label: { Image(systemName: "arrow.clockwise") }
-                .help("Reload vault")
-                .disabled(vault.vaultURL == nil)
-            Button {
-                withAnimation(.smooth(duration: 0.2)) {
-                    ui.mode = ui.mode == .read ? .edit : .read
-                }
-            } label: {
-                Image(systemName: ui.mode == .read ? "pencil" : "eye")
-            }
-            .help(ui.mode == .read ? "Edit" : "Reading mode")
-            .disabled(vault.selection == nil)
         }
     }
 

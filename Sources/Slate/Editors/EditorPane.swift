@@ -11,21 +11,14 @@ struct EditorPane: View {
 
     var body: some View {
         if vault.selection != nil {
-            VStack(spacing: 0) {
-                if !vault.openTabs.isEmpty {
-                    TabBarView()
-                    Divider()
+            noteBody
+                .overlay(alignment: .topTrailing) {
+                    OutlineFloater().padding(.top, 14).padding(.trailing, 10)
                 }
-                noteBody
-                    .overlay(alignment: .topTrailing) {
-                        OutlineFloater().padding(.top, 14).padding(.trailing, 10)
-                    }
-                    .overlay(alignment: .bottom) {
-                        BacklinksBar().frame(maxWidth: .infinity)
-                    }
-            }
-            .background(settings.paneBackground ?? Color(nsColor: .textBackgroundColor))
-            .toolbar { ToolbarItem(placement: .status) { saveStatus } }
+                .overlay(alignment: .bottom) {
+                    BacklinksBar().frame(maxWidth: .infinity)
+                }
+                .background(settings.paneBackground ?? Color(nsColor: .textBackgroundColor))
         } else {
             ContentUnavailableView("Select a note", systemImage: "doc.text",
                 description: Text("Pick a note from the sidebar to start editing."))
@@ -70,14 +63,5 @@ struct EditorPane: View {
             return true
         }
         return false
-    }
-
-    @ViewBuilder
-    private var saveStatus: some View {
-        if vault.savedAt != nil {
-            Label("Saved", systemImage: "checkmark.circle")
-                .foregroundStyle(.secondary)
-                .font(.caption)
-        }
     }
 }

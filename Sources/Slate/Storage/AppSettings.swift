@@ -61,6 +61,9 @@ final class AppSettings: ObservableObject {
     }
     var paneBackground: Color? { theme == .paper ? Color(nsColor: Self.paper) : nil }
     var nsPaneBackground: NSColor { theme == .paper ? Self.paper : .textBackgroundColor }
+    /// Top-bar (title-bar) tint; falls back to the standard window chrome color.
+    var topBarBackground: Color { theme == .paper ? Color(nsColor: Self.paper) : Color(nsColor: .windowBackgroundColor) }
+    var nsWindowBackground: NSColor? { theme == .paper ? Self.paper : nil }
 
     private static let paper = NSColor(red: 0.98, green: 0.96, blue: 0.90, alpha: 1)
 }
