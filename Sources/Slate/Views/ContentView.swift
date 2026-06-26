@@ -15,6 +15,7 @@ struct ContentView: View {
             sidebar
                 .navigationSplitViewColumnWidth(min: 220, ideal: 290, max: 460)
                 .toolbar(removing: .sidebarToggle)
+                .toolbar { sidebarToolbar }
         } detail: {
             EditorPane()
         }
@@ -39,8 +40,9 @@ struct ContentView: View {
 
     // MARK: Title-bar toolbar (vault name + tabs + actions)
 
+    /// Lives in the sidebar's region of the title bar: vault name + sidebar toggle.
     @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
+    private var sidebarToolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .navigation) {
             Text(vault.vaultURL?.lastPathComponent ?? "Slate")
                 .font(.system(size: 13, weight: .semibold))
@@ -54,6 +56,12 @@ struct ContentView: View {
             } label: { Image(systemName: "sidebar.leading") }
             .help("Toggle sidebar")
         }
+    }
+
+    // MARK: Main title bar (tabs + actions)
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .principal) {
             if !vault.openTabs.isEmpty {
                 TabBarView().frame(maxWidth: .infinity, alignment: .leading)
