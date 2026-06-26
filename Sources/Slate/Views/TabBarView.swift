@@ -2,8 +2,8 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// Horizontal bar of open notes (tabs): click to activate, ✕/⌘W to close,
-/// drag to reorder, right-click for close-others/all. Scrolls when there are
-/// many tabs so it never overflows the title bar.
+/// drag to reorder, right-click for close-others/all. A "+" at the end creates a
+/// new note. Scrolls when there are many tabs.
 struct TabBarView: View {
     @EnvironmentObject private var vault: VaultStore
     @State private var dragging: URL?
@@ -20,8 +20,21 @@ struct TabBarView: View {
                         .onDrop(of: [.plainText],
                                 delegate: TabDropDelegate(item: url, dragging: $dragging, vault: vault))
                 }
+                if !vault.openTabs.isEmpty {
+                    Divider().frame(height: 14).padding(.horizontal, 2)
+                }
+                Button { vault.newNote() } label: {
+                    Image(systemName: "plus").font(.system(size: 12, weight: .medium))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .padding(6)
+                .contentShape(Rectangle())
+                .help("New note").accessibilityLabel("New note")
+                .disabled(vault.vaultURL == nil)
             }
             .padding(.vertical, 3)
+            .padding(.horizontal, 4)
             .animation(.snappy(duration: 0.2), value: vault.openTabs)
         }
     }
@@ -31,7 +44,6 @@ private struct TabChip: View {
     let url: URL
     let isActive: Bool
     @EnvironmentObject private var vault: VaultStore
-    @EnvironmentObject private var settings: AppSettings
     @State private var hover = false
 
     private var name: String { (url.lastPathComponent as NSString).deletingPathExtension }
@@ -50,18 +62,14 @@ private struct TabChip: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .opacity(isActive || hover ? 0.8 : 0)
+            .opacity(isActive || hover ? 0.7 : 0)
             .accessibilityLabel("Close \(name)")
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
         .frame(maxWidth: 200)
-        .background(chipBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(isActive ? Color.black.opacity(0.08) : .clear, lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(isActive ? 0.12 : 0), radius: 2.5, y: 1)   // active tab "pops"
+        // Flat selected style (Obsidian/Notion): a subtle fill, no shadow/border.
+        .background(chipBackground, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         .contentShape(Rectangle())
         .onTapGesture { vault.select(url) }
         .onHover { hover = $0 }
@@ -78,8 +86,8 @@ private struct TabChip: View {
     }
 
     private var chipBackground: Color {
-        if isActive { return settings.paneBackground ?? Color(nsColor: .textBackgroundColor) }
-        return hover ? Color.primary.opacity(0.06) : .clear
+        if isActive { return Color.primary.opacity(0.09) }
+        return hover ? Color.primary.opacity(0.05) : .clear
     }
 }
 

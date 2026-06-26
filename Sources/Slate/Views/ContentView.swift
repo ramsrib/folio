@@ -69,7 +69,10 @@ struct ContentView: View {
             Text(vault.vaultURL?.lastPathComponent ?? "Slate")
                 .font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
                 .lineLimit(1)
-            toggleButton            // vault title sits just before the toggle, at the trailing end
+            Button { vault.refresh() } label: { Image(systemName: "arrow.clockwise") }
+                .buttonStyle(.borderless).help("Reload vault").accessibilityLabel("Reload vault")
+                .disabled(vault.vaultURL == nil)
+            toggleButton            // vault title + reload sit just before the toggle
         }
         .padding(.leading, 78)      // clear the traffic lights
         .padding(.trailing, 10)
@@ -78,11 +81,7 @@ struct ContentView: View {
     private var contentTitleArea: some View {
         HStack(spacing: 8) {
             if !showSidebar { toggleButton }   // toggle relocates here when the sidebar is hidden
-            if vault.openTabs.isEmpty {
-                Spacer()
-            } else {
-                TabBarView().frame(maxWidth: .infinity, alignment: .leading)
-            }
+            TabBarView().frame(maxWidth: .infinity, alignment: .leading)   // tabs + trailing "+"
             actionButtons
         }
         .padding(.leading, showSidebar ? 12 : 78)   // clear traffic lights only when sidebar is off
@@ -100,10 +99,6 @@ struct ContentView: View {
         HStack(spacing: 6) {
             Button { ui.showTags = true } label: { Image(systemName: "number") }
                 .help("Browse tags").accessibilityLabel("Browse tags").disabled(vault.vaultURL == nil)
-            Button { vault.newNote() } label: { Image(systemName: "square.and.pencil") }
-                .help("New note").accessibilityLabel("New note").disabled(vault.vaultURL == nil)
-            Button { vault.refresh() } label: { Image(systemName: "arrow.clockwise") }
-                .help("Reload vault").accessibilityLabel("Reload vault").disabled(vault.vaultURL == nil)
             Button {
                 withAnimation(.smooth(duration: 0.2)) { ui.mode = ui.mode == .read ? .edit : .read }
             } label: { Image(systemName: ui.mode == .read ? "pencil" : "eye") }
