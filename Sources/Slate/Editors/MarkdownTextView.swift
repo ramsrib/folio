@@ -18,7 +18,11 @@ final class MarkdownTextView: NSTextView {
     /// Center the text in a readable column by padding the container insets.
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
-        let target = max(28, (newSize.width - readableWidth) / 2)
+        applyReadableInset()
+    }
+
+    func applyReadableInset() {
+        let target = max(28, (bounds.width - readableWidth) / 2)
         if abs(textContainerInset.width - target) > 0.5 {
             textContainerInset = NSSize(width: target, height: textContainerInset.height)
         }

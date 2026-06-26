@@ -7,8 +7,11 @@ import AppKit
 struct ReadingView: View {
     @EnvironmentObject private var vault: VaultStore
     @EnvironmentObject private var ui: UIState
+    @EnvironmentObject private var settings: AppSettings
 
     private var blocks: [Block] { MarkdownParser.parse(vault.content) }
+    private var body0: CGFloat { settings.bodyFontSize }
+    private var design: Font.Design { settings.readingFont.design }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -18,7 +21,7 @@ struct ReadingView: View {
                         view(for: block).id(anchorID(block))
                     }
                 }
-                .frame(maxWidth: 720, alignment: .leading)
+                .frame(maxWidth: settings.readableWidth, alignment: .leading)
                 .frame(maxWidth: .infinity, minHeight: 200, alignment: .top)
                 .contentShape(Rectangle())
                 .padding(.horizontal, 32)
@@ -74,16 +77,16 @@ struct ReadingView: View {
 
         case let .heading(level, text, _):
             Text(InlineMarkdown.render(text))
-                .font(.system(size: headingSize(level), weight: level <= 2 ? .bold : .semibold))
+                .font(.system(size: headingSize(level), weight: level <= 2 ? .bold : .semibold, design: design))
                 .padding(.top, level <= 2 ? 18 : 8)
 
         case let .paragraph(text):
-            Text(InlineMarkdown.render(text)).font(.system(size: 17)).lineSpacing(7)
+            Text(InlineMarkdown.render(text)).font(.system(size: body0, design: design)).lineSpacing(body0 * 0.42)
 
         case let .listItem(ordered, number, indent, text):
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(ordered ? "\(number)." : "•").font(.system(size: 16.5)).foregroundStyle(.secondary)
-                Text(InlineMarkdown.render(text)).font(.system(size: 16.5)).lineSpacing(6)
+                Text(ordered ? "\(number)." : "•").font(.system(size: body0 - 0.5)).foregroundStyle(.secondary)
+                Text(InlineMarkdown.render(text)).font(.system(size: body0 - 0.5, design: design)).lineSpacing(body0 * 0.36)
             }
             .padding(.leading, CGFloat(indent) * 22)
 
@@ -92,10 +95,10 @@ struct ReadingView: View {
                 Button { vault.toggleTask(atContentIndex: checkboxIndex) } label: {
                     Image(systemName: checked ? "checkmark.square.fill" : "square")
                         .foregroundStyle(checked ? Color.accentColor : .secondary)
-                        .font(.system(size: 16))
+                        .font(.system(size: body0 - 1))
                 }
                 .buttonStyle(.plain)
-                Text(InlineMarkdown.render(text)).font(.system(size: 16.5)).lineSpacing(6)
+                Text(InlineMarkdown.render(text)).font(.system(size: body0 - 0.5, design: design)).lineSpacing(body0 * 0.36)
                     .strikethrough(checked).foregroundStyle(checked ? .secondary : .primary)
             }
             .padding(.leading, CGFloat(indent) * 22)
@@ -103,7 +106,7 @@ struct ReadingView: View {
         case let .quote(text):
             HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 2).fill(.secondary.opacity(0.5)).frame(width: 3)
-                Text(InlineMarkdown.render(text)).font(.system(size: 16.5)).lineSpacing(6)
+                Text(InlineMarkdown.render(text)).font(.system(size: body0 - 0.5, design: design)).lineSpacing(body0 * 0.36)
                     .foregroundStyle(.secondary)
             }
 
@@ -186,7 +189,8 @@ struct ReadingView: View {
     // MARK: helpers
 
     private func headingSize(_ level: Int) -> CGFloat {
-        [30, 24, 20, 18, 16, 15][min(max(level - 1, 0), 5)]
+        let scale: [CGFloat] = [1.75, 1.4, 1.18, 1.06, 0.98, 0.9]
+        return body0 * scale[min(max(level - 1, 0), 5)]
     }
 
     private func localImage(_ source: String) -> NSImage? {

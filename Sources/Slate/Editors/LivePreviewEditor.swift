@@ -11,6 +11,8 @@ struct LivePreviewEditor: NSViewRepresentable {
     var resolveWikilink: (String) -> Bool
     var noteNames: () -> [String]
     var onOpenLink: (URL) -> Bool
+    var background: NSColor = .textBackgroundColor
+    var readableWidth: CGFloat = 720
 
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView()
@@ -29,7 +31,8 @@ struct LivePreviewEditor: NSViewRepresentable {
         tv.isAutomaticSpellingCorrectionEnabled = false
         tv.font = Theme.body
         tv.textContainerInset = NSSize(width: 22, height: 18)
-        tv.backgroundColor = .textBackgroundColor
+        tv.backgroundColor = background
+        tv.readableWidth = readableWidth
         tv.typingAttributes = [.font: Theme.body, .foregroundColor: Theme.text]
         tv.isVerticallyResizable = true
         tv.isHorizontallyResizable = false
@@ -54,6 +57,8 @@ struct LivePreviewEditor: NSViewRepresentable {
         guard let tv = nsView.documentView as? MarkdownTextView else { return }
         tv.noteNames = noteNames
         tv.onClickLink = onOpenLink
+        if tv.backgroundColor != background { tv.backgroundColor = background }
+        if tv.readableWidth != readableWidth { tv.readableWidth = readableWidth; tv.applyReadableInset() }
 
         if tv.string != text {                  // external change (file switch / disk reload)
             let len = (text as NSString).length

@@ -17,8 +17,10 @@ place** — built to replace Obsidian. Native Swift / SwiftUI, files-on-disk as 
   translucent rounded surfaces, and a fully-rendered **Reading mode** — headings, real checkboxes,
   callout boxes, code, tables, dividers, images, frontmatter as a Properties panel, no syntax symbols.
   **Reading is the default**; double-click the page (or ⌘E) to write; navigation always opens in
-  reading. **Tabs** (open/close, ⌘W) with **session restore** — reopen a vault and your open notes
-  come back, Obsidian-style. The file-name search shortcut is **⌘K**.
+  reading. **Tabs** (open/close, ⌘W, drag-to-reorder, ⌘⇧T reopen, ⌘⇧[ / ⌘⇧] cycle) with **session
+  restore** — reopen a vault and your open notes come back, Obsidian-style. **Appearance settings (⌘,):**
+  theme (System/Light/Dark/Paper), reading font (System/Serif/Mono), font size, line width — applied
+  live. The file-name search shortcut is **⌘K**.
 
 ## Run it
 

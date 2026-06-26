@@ -144,7 +144,9 @@ Swapping Stage 1 → Stage 2 touches only `EditorPane`/`Editors/`, nothing else.
         open tabs + active note are **restored per vault on relaunch** (Obsidian-style session).
         Frontmatter now renders as a Properties panel in reading mode. *(mode not yet persisted —
         restored notes open in reading mode; tab reordering & split panes still to do)*
-  - [ ] **Settings:** recent vaults / switch vault; appearance (theme, font size, readable width).
+  - [~] **Settings (⌘,):** ✅ Appearance — theme (System/Light/Dark/**Paper warm**), reading font
+        (System/Serif/Mono), body font size, line width; applied live to reading + editor. Still:
+        recent vaults / switch-vault UI, per-vault appearance, link-color/accent.
   - [ ] **App icon**, about, polished first-run empty state.
   - [~] **Robustness:** ✅ ignore dependency/build dirs on scan (`node_modules`, `vendor`, `Pods`,
         `build`, `dist`, `target`, … ; hidden dirs already skipped) so a code-project folder doesn't

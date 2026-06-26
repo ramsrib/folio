@@ -6,13 +6,16 @@ struct SlateApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var vault = VaultStore()
     @StateObject private var ui = UIState()
+    @StateObject private var settings = AppSettings()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(vault)
                 .environmentObject(ui)
+                .environmentObject(settings)
                 .frame(minWidth: 900, minHeight: 600)
+                .preferredColorScheme(settings.colorScheme)
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
@@ -43,6 +46,10 @@ struct SlateApp: App {
                 }
                 .keyboardShortcut("e", modifiers: .command)
             }
+        }
+
+        Settings {
+            SettingsView().environmentObject(settings)
         }
     }
 }

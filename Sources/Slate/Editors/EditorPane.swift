@@ -7,6 +7,7 @@ import AppKit
 struct EditorPane: View {
     @EnvironmentObject private var vault: VaultStore
     @EnvironmentObject private var ui: UIState
+    @EnvironmentObject private var settings: AppSettings
 
     var body: some View {
         if vault.selection != nil {
@@ -23,7 +24,7 @@ struct EditorPane: View {
                         BacklinksBar().frame(maxWidth: .infinity)
                     }
             }
-            .background(Color(nsColor: .textBackgroundColor))
+            .background(settings.paneBackground ?? Color(nsColor: .textBackgroundColor))
             .toolbar { ToolbarItem(placement: .status) { saveStatus } }
         } else {
             ContentUnavailableView("Select a note", systemImage: "doc.text",
@@ -47,7 +48,9 @@ struct EditorPane: View {
                     onChange: { vault.contentEdited() },
                     resolveWikilink: { vault.resolve($0) != nil },
                     noteNames: { vault.allNoteNames },
-                    onOpenLink: openLink
+                    onOpenLink: openLink,
+                    background: settings.nsPaneBackground,
+                    readableWidth: settings.readableWidth
                 )
             }
         }
