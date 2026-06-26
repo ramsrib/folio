@@ -66,6 +66,11 @@ final class AppSettings: ObservableObject {
     var nsWindowBackground: NSColor? { theme == .paper ? Self.paper : nil }
     /// Sidebar tint — slightly darker than the page for separation. nil = native sidebar material.
     var sidebarBackground: Color? { theme == .paper ? Color(nsColor: Self.paperSidebar) : nil }
+    /// Background for floating surfaces (palettes, outline, backlinks): theme tint or material.
+    var surfaceStyle: AnyShapeStyle {
+        if let paper = paneBackground { return AnyShapeStyle(paper) }
+        return AnyShapeStyle(.regularMaterial)
+    }
 
     private static let paper = NSColor(red: 0.98, green: 0.96, blue: 0.90, alpha: 1)
     private static let paperSidebar = NSColor(red: 0.96, green: 0.93, blue: 0.84, alpha: 1)

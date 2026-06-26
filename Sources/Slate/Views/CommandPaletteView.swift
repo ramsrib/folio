@@ -76,11 +76,7 @@ struct CommandPaletteView: View {
             .animation(.easeOut(duration: 0.12), value: selected)
         }
         .frame(width: 560, height: 400)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.separator.opacity(0.5)))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: .black.opacity(0.25), radius: 30, y: 12)
-        .presentationBackground(.clear)
+        .paletteSurface()
         .onAppear { focused = true }
         .onKeyPress(.downArrow) { move(1); return .handled }
         .onKeyPress(.upArrow) { move(-1); return .handled }

@@ -5,6 +5,7 @@ import SwiftUI
 /// panel. Click a heading to scroll the editor there.
 struct OutlineFloater: View {
     @EnvironmentObject private var vault: VaultStore
+    @EnvironmentObject private var settings: AppSettings
     @State private var hovering = false
 
     var body: some View {
@@ -52,7 +53,7 @@ struct OutlineFloater: View {
         .frame(width: 250, alignment: .leading)
         .frame(maxHeight: 460)
         .fixedSize(horizontal: false, vertical: true)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(settings.surfaceStyle, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.separator.opacity(0.6)))
         .shadow(color: .black.opacity(0.18), radius: 16, y: 6)
         .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .topTrailing)))

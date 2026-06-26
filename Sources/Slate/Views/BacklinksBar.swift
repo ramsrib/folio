@@ -5,6 +5,7 @@ import SwiftUI
 /// upward into a translucent rounded card listing the inbound links.
 struct BacklinksBar: View {
     @EnvironmentObject private var vault: VaultStore
+    @EnvironmentObject private var settings: AppSettings
     @State private var expanded = false
 
     var body: some View {
@@ -49,7 +50,7 @@ struct BacklinksBar: View {
                 .buttonStyle(.plain)
             }
             .frame(maxWidth: 680)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(settings.surfaceStyle, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.separator.opacity(0.6)))
             .shadow(color: .black.opacity(0.16), radius: 14, y: 4)
             .padding(.horizontal, 16)
