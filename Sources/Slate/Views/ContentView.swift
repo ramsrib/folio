@@ -13,12 +13,13 @@ struct ContentView: View {
         NavigationSplitView {
             sidebar
                 .navigationSplitViewColumnWidth(min: 220, ideal: 290, max: 460)
+                .toolbar { sidebarToolbar }
         } detail: {
             EditorPane()
+                .toolbar { detailToolbar }
         }
         .navigationTitle("")
         .background(WindowConfigurator(background: settings.nsWindowBackground))
-        .toolbar { toolbarContent }
         .onChange(of: vault.selection) {
             ui.mode = vault.openInEditMode ? .edit : .read
             vault.openInEditMode = false
@@ -35,10 +36,24 @@ struct ContentView: View {
         }
     }
 
-    // MARK: Main title bar (tabs + actions); sidebar toggle is the built-in one
+    // MARK: Per-column title-bar toolbars
 
+    /// Attached to the SIDEBAR view → renders in the sidebar's title-bar region,
+    /// next to the built-in sidebar toggle.
     @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
+    private var sidebarToolbar: some ToolbarContent {
+        ToolbarItem(placement: .navigation) {
+            Text(vault.vaultURL?.lastPathComponent ?? "Slate")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .fixedSize()
+        }
+    }
+
+    /// Attached to the DETAIL view → renders in the main title-bar region.
+    @ToolbarContentBuilder
+    private var detailToolbar: some ToolbarContent {
         ToolbarItem(placement: .principal) {
             if !vault.openTabs.isEmpty {
                 TabBarView().frame(maxWidth: .infinity, alignment: .leading)
@@ -70,31 +85,17 @@ struct ContentView: View {
                     .buttonStyle(.borderedProminent)
             }
         } else {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 6) {
-                    Image(systemName: "books.vertical.fill")
-                        .font(.system(size: 12)).foregroundStyle(.secondary)
-                    Text(vault.vaultURL?.lastPathComponent ?? "")
-                        .font(.system(size: 13, weight: .semibold))
-                        .lineLimit(1)
-                    Spacer(minLength: 0)
+            List(selection: Binding(get: { vault.selection }, set: { vault.select($0) })) {
+                ForEach(vault.tree) { node in
+                    FileTreeRow(node: node, expanded: $expandedDirs, startRename: startRename)
                 }
-                .padding(.horizontal, 14)
-                .padding(.top, 8)
-                .padding(.bottom, 6)
-
-                List(selection: Binding(get: { vault.selection }, set: { vault.select($0) })) {
-                    ForEach(vault.tree) { node in
-                        FileTreeRow(node: node, expanded: $expandedDirs, startRename: startRename)
-                    }
-                }
-                .listStyle(.sidebar)
-                .onChange(of: vault.vaultURL) { expandedDirs.removeAll() }
-                .overlay {
-                    if vault.tree.isEmpty {
-                        ContentUnavailableView("No notes", systemImage: "doc.text",
-                            description: Text("No Markdown files found in this folder."))
-                    }
+            }
+            .listStyle(.sidebar)
+            .onChange(of: vault.vaultURL) { expandedDirs.removeAll() }
+            .overlay {
+                if vault.tree.isEmpty {
+                    ContentUnavailableView("No notes", systemImage: "doc.text",
+                        description: Text("No Markdown files found in this folder."))
                 }
             }
         }
