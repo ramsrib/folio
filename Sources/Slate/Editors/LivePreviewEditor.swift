@@ -11,6 +11,7 @@ struct LivePreviewEditor: NSViewRepresentable {
     var resolveWikilink: (String) -> Bool
     var noteNames: () -> [String]
     var onOpenLink: (URL) -> Bool
+    var previewForLink: (URL) -> String? = { _ in nil }
     var background: NSColor = .textBackgroundColor
     var readableWidth: CGFloat = 720
 
@@ -44,6 +45,7 @@ struct LivePreviewEditor: NSViewRepresentable {
 
         tv.noteNames = noteNames
         tv.onClickLink = onOpenLink
+        tv.previewProvider = previewForLink
         tv.string = text
 
         scroll.documentView = tv
@@ -57,6 +59,7 @@ struct LivePreviewEditor: NSViewRepresentable {
         guard let tv = nsView.documentView as? MarkdownTextView else { return }
         tv.noteNames = noteNames
         tv.onClickLink = onOpenLink
+        tv.previewProvider = previewForLink
         if tv.backgroundColor != background { tv.backgroundColor = background }
         if tv.readableWidth != readableWidth { tv.readableWidth = readableWidth; tv.applyReadableInset() }
 

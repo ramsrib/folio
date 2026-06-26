@@ -1,19 +1,24 @@
 import AppKit
+import SwiftUI
 
-/// NSTextView subclass that adds two behaviors on top of plain editing:
-///   1. `[[` autocomplete of note names (using AppKit's native completion list,
-///      so positioning + keyboard nav come for free), with auto-closing `]]`.
-///   2. Plain-click navigation for `.link` ranges (wikilinks / URLs), so a click
-///      follows the link instead of just placing the caret.
+/// NSTextView subclass that adds editing affordances:
+///   1. `[[` autocomplete of note names, with auto-closing `]]`.
+///   2. Plain-click navigation for `.link` ranges (wikilinks / URLs).
+///   3. Hover preview popovers for wikilinks.
 final class MarkdownTextView: NSTextView {
     /// Supplies the current vault's note names for `[[` completion.
     var noteNames: () -> [String] = { [] }
     /// Invoked when a `.link` range is clicked; returns true if it was handled.
     var onClickLink: (URL) -> Bool = { _ in false }
+    /// Returns preview text for a hovered link URL (nil = no preview).
+    var previewProvider: (URL) -> String? = { _ in nil }
     /// Width of the centered reading column.
     var readableWidth: CGFloat = 720
 
     private static let taskClick = try! NSRegularExpression(pattern: "^(\\s*[-*+]\\s+)(\\[[ xX]\\])")
+
+    private var hoverPopover: NSPopover?
+    private var hoveredKey: String?
 
     /// Center the text in a readable column by padding the container insets.
     override func setFrameSize(_ newSize: NSSize) {
@@ -83,6 +88,55 @@ final class MarkdownTextView: NSTextView {
         super.mouseDown(with: event)
     }
 
+    // MARK: - Hover preview
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        for area in trackingAreas where area.owner === self { removeTrackingArea(area) }
+        addTrackingArea(NSTrackingArea(
+            rect: .zero,
+            options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+            owner: self, userInfo: nil))
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        let point = convert(event.locationInWindow, from: nil)
+        guard let storage = textStorage else { dismissHover(); return }
+        let idx = characterIndexForInsertion(at: point)
+        guard idx >= 0, idx < storage.length,
+              let value = storage.attribute(.link, at: idx, effectiveRange: nil),
+              let url = (value as? URL) ?? (value as? String).flatMap({ URL(string: $0) }),
+              url.scheme == "slate", url.host == "wikilink" else { dismissHover(); return }
+
+        let key = url.absoluteString
+        if key == hoveredKey { return }                 // already previewing this link
+        guard let preview = previewProvider(url), !preview.isEmpty else { dismissHover(); return }
+        showHover(preview, at: point)
+        hoveredKey = key
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        dismissHover()
+    }
+
+    private func showHover(_ text: String, at point: NSPoint) {
+        dismissHover()
+        let popover = NSPopover()
+        popover.behavior = .transient
+        popover.contentViewController = NSHostingController(rootView: HoverPreview(text: text))
+        popover.show(relativeTo: NSRect(origin: point, size: CGSize(width: 1, height: 1)),
+                     of: self, preferredEdge: .maxY)
+        hoverPopover = popover
+    }
+
+    private func dismissHover() {
+        hoverPopover?.performClose(nil)
+        hoverPopover = nil
+        hoveredKey = nil
+    }
+
     /// Toggle a `- [ ]` / `- [x]` checkbox when its box is clicked.
     private func toggleTask(atClick idx: Int) -> Bool {
         guard idx >= 0 else { return false }
@@ -102,5 +156,19 @@ final class MarkdownTextView: NSTextView {
             insertText(newChar, replacementRange: inner)
         }
         return true
+    }
+}
+
+/// Content of the wikilink hover popover: a scrollable peek at the target note.
+private struct HoverPreview: View {
+    let text: String
+    var body: some View {
+        ScrollView {
+            Text(text)
+                .font(.system(size: 12))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+        }
+        .frame(width: 340, height: 240)
     }
 }

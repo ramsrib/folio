@@ -42,6 +42,7 @@ struct EditorPane: View {
                     resolveWikilink: { vault.resolve($0) != nil },
                     noteNames: { vault.allNoteNames },
                     onOpenLink: openLink,
+                    previewForLink: previewForLink,
                     background: settings.nsPaneBackground,
                     readableWidth: settings.readableWidth
                 )
@@ -63,5 +64,15 @@ struct EditorPane: View {
             return true
         }
         return false
+    }
+
+    /// Peek text for a hovered wikilink: the first ~800 chars of the target note.
+    private func previewForLink(_ url: URL) -> String? {
+        guard url.scheme == "slate", url.host == "wikilink" else { return nil }
+        let target = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?.first(where: { $0.name == "target" })?.value ?? ""
+        guard let dest = vault.resolve(target),
+              let text = try? String(contentsOf: dest, encoding: .utf8) else { return nil }
+        return String(text.prefix(800))
     }
 }
