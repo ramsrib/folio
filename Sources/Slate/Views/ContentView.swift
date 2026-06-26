@@ -8,15 +8,17 @@ struct ContentView: View {
     @State private var renameTarget: URL?
     @State private var renameText = ""
     @State private var expandedDirs: Set<URL> = []
+    @State private var columns: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columns) {
             sidebar
                 .navigationSplitViewColumnWidth(min: 220, ideal: 290, max: 460)
         } detail: {
             EditorPane()
         }
         .navigationTitle("")
+        .toolbar(removing: .sidebarToggle)
         .background(WindowConfigurator(background: settings.nsWindowBackground))
         .toolbar { toolbarContent }
         .onChange(of: vault.selection) {
@@ -39,12 +41,18 @@ struct ContentView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .navigation) {
+        ToolbarItemGroup(placement: .navigation) {
             Text(vault.vaultURL?.lastPathComponent ?? "Slate")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .fixedSize()
+            Button {
+                withAnimation(.smooth(duration: 0.2)) {
+                    columns = columns == .detailOnly ? .all : .detailOnly
+                }
+            } label: { Image(systemName: "sidebar.leading") }
+            .help("Toggle sidebar")
         }
         ToolbarItem(placement: .principal) {
             if !vault.openTabs.isEmpty {
