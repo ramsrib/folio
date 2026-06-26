@@ -45,7 +45,21 @@ final class VaultStore: ObservableObject {
     private var noteByName: [String: [URL]] = [:]     // lowercased basename -> urls
     private var backlinkMap: [URL: [Backlink]] = [:]  // target note -> inbound links
     private typealias LinkRef = (inner: String, context: String)
-    private var linkCache: [URL: (mtime: Date, refs: [LinkRef])] = [:]  // mtime-keyed cache
+    private var linkCache: [URL: (mtime: Date, refs: [LinkRef], tags: [String])] = [:]  // mtime-keyed cache
+    @Published private(set) var tagsIndex: [String: [URL]] = [:]   // tag -> notes
+    private static let tagRegex = try! NSRegularExpression(pattern: "(?<!\\S)#([A-Za-z0-9_][A-Za-z0-9_/-]*)")
+
+    var allTags: [(tag: String, count: Int)] {
+        tagsIndex.map { (tag: $0.key, count: $0.value.count) }.sorted {
+            $0.count != $1.count ? $0.count > $1.count
+                : $0.tag.localizedCaseInsensitiveCompare($1.tag) == .orderedAscending
+        }
+    }
+
+    func notes(forTag tag: String) -> [MarkdownFile] {
+        let urls = Set(tagsIndex[tag] ?? [])
+        return files.filter { urls.contains($0.url) }
+    }
 
     private static let wikiRegex = try! NSRegularExpression(pattern: "\\[\\[([^\\]]+)\\]\\]")
     private static let headingRegex = try! NSRegularExpression(
@@ -251,38 +265,74 @@ final class VaultStore: ObservableObject {
         backlinkMap = [:]
         for f in files { noteByName[f.name.lowercased(), default: []].append(f.url) }
 
+        var tags: [String: [URL]] = [:]
         for f in files {
             let mtime = (try? f.url.resourceValues(forKeys: [.contentModificationDateKey])
                 .contentModificationDate) ?? .distantPast
-            let refs: [LinkRef]
+            let info: (refs: [LinkRef], tags: [String])
             if let cached = linkCache[f.url], cached.mtime == mtime {
-                refs = cached.refs
+                info = (cached.refs, cached.tags)
             } else {
-                refs = extractRefs(f.url)
-                linkCache[f.url] = (mtime, refs)
+                info = extractInfo(f.url)
+                linkCache[f.url] = (mtime, info.refs, info.tags)
             }
-            for ref in refs where resolve(ref.inner) != nil {
+            for ref in info.refs where resolve(ref.inner) != nil {
                 let dest = resolve(ref.inner)!
                 backlinkMap[dest, default: []].append(
                     Backlink(source: f.url, sourceName: f.name, context: ref.context))
             }
+            for tag in info.tags { tags[tag, default: []].append(f.url) }
         }
+        tagsIndex = tags
         let current = Set(files.map(\.url))               // drop cache for deleted files
         linkCache = linkCache.filter { current.contains($0.key) }
     }
 
-    private func extractRefs(_ url: URL) -> [LinkRef] {
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
+    private func extractInfo(_ url: URL) -> (refs: [LinkRef], tags: [String]) {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return ([], []) }
         let ns = text as NSString
+        let full = NSRange(location: 0, length: ns.length)
         var refs: [LinkRef] = []
-        Self.wikiRegex.enumerateMatches(in: text, range: NSRange(location: 0, length: ns.length)) { m, _, _ in
+        Self.wikiRegex.enumerateMatches(in: text, range: full) { m, _, _ in
             guard let m else { return }
             refs.append((
                 inner: ns.substring(with: m.range(at: 1)),
                 context: ns.substring(with: ns.lineRange(for: m.range))
                     .trimmingCharacters(in: .whitespacesAndNewlines)))
         }
-        return refs
+        var tags = Set<String>()
+        Self.tagRegex.enumerateMatches(in: text, range: full) { m, _, _ in
+            guard let m else { return }
+            tags.insert(ns.substring(with: m.range(at: 1)))
+        }
+        tags.formUnion(frontmatterTags(text))
+        return (refs, Array(tags))
+    }
+
+    private func frontmatterTags(_ text: String) -> [String] {
+        let lines = text.components(separatedBy: "\n")
+        guard lines.first == "---" else { return [] }
+        var out: [String] = []
+        var inTags = false
+        var i = 1
+        while i < lines.count, lines[i] != "---" {
+            let raw = lines[i]
+            let t = raw.trimmingCharacters(in: .whitespaces)
+            if inTags {
+                if t.hasPrefix("-") { out.append(t.dropFirst().trimmingCharacters(in: .whitespaces)) }
+                else if !(raw.first == " " || raw.first == "\t") { inTags = false }
+            }
+            if t.hasPrefix("tags:") {
+                let val = t.dropFirst("tags:".count).trimmingCharacters(in: .whitespaces)
+                if val.hasPrefix("[") {
+                    out.append(contentsOf: val.dropFirst().dropLast()
+                        .split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
+                } else if val.isEmpty { inTags = true }
+                else { out.append(val) }
+            }
+            i += 1
+        }
+        return out.filter { !$0.isEmpty }
     }
 
     // MARK: - Link resolution

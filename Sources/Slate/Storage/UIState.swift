@@ -7,5 +7,6 @@ enum EditorMode { case edit, read }
 final class UIState: ObservableObject {
     @Published var showQuickSwitcher = false
     @Published var showCommandPalette = false
+    @Published var showTags = false
     @Published var mode: EditorMode = .read
 }

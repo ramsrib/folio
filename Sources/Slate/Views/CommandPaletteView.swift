@@ -25,6 +25,7 @@ struct CommandPaletteView: View {
             AppCommand(title: ui.mode == .read ? "Edit Mode" : "Reading Mode", subtitle: "⌘E") {
                 ui.mode = ui.mode == .read ? .edit : .read },
         ]
+        c.append(AppCommand(title: "Browse Tags", subtitle: nil) { ui.showTags = true })
         if let sel = vault.selection {
             c.append(AppCommand(title: "Reveal in Finder", subtitle: nil) {
                 NSWorkspace.shared.activateFileViewerSelecting([sel]) })

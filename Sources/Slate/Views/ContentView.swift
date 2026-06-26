@@ -25,6 +25,7 @@ struct ContentView: View {
         }
         .sheet(isPresented: $ui.showQuickSwitcher) { QuickSwitcherView() }
         .sheet(isPresented: $ui.showCommandPalette) { CommandPaletteView() }
+        .sheet(isPresented: $ui.showTags) { TagsView() }
         .alert("Rename Note", isPresented: renamePresented) {
             TextField("Name", text: $renameText)
             Button("Cancel", role: .cancel) { renameTarget = nil }
@@ -46,6 +47,8 @@ struct ContentView: View {
             }
         }
         ToolbarItemGroup(placement: .primaryAction) {
+            Button { ui.showTags = true } label: { Image(systemName: "number") }
+                .help("Browse tags").accessibilityLabel("Browse tags").disabled(vault.vaultURL == nil)
             Button { vault.newNote() } label: { Image(systemName: "square.and.pencil") }
                 .help("New note").accessibilityLabel("New note").disabled(vault.vaultURL == nil)
             Button { vault.refresh() } label: { Image(systemName: "arrow.clockwise") }
