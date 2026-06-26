@@ -8,16 +8,24 @@ struct ContentView: View {
     @State private var renameTarget: URL?
     @State private var renameText = ""
     @State private var expandedDirs: Set<URL> = []
+    @State private var showSidebar = true
+    @State private var sidebarWidth: CGFloat = 280
+    @State private var dragStartWidth: CGFloat?
 
     var body: some View {
-        NavigationSplitView {
-            sidebar
-                .navigationSplitViewColumnWidth(min: 220, ideal: 290, max: 460)
-        } detail: {
-            EditorPane()
-                .toolbar { detailToolbar }
+        VStack(spacing: 0) {
+            titleBar
+            Divider()
+            HStack(spacing: 0) {
+                if showSidebar {
+                    sidebar.frame(width: sidebarWidth)
+                    resizeDivider
+                }
+                EditorPane()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
-        .navigationTitle("")
+        .ignoresSafeArea(.container, edges: .top)   // let the title-bar row reach the traffic-light line
         .background(WindowConfigurator(background: settings.nsWindowBackground))
         .onChange(of: vault.selection) {
             ui.mode = vault.openInEditMode ? .edit : .read
@@ -36,17 +44,38 @@ struct ContentView: View {
         }
     }
 
-    // MARK: Detail title-bar toolbar (tabs + actions); the vault name is a
-    // leading title-bar accessory installed by WindowConfigurator.
+    // MARK: Title bar — a plain content row that fills the title-bar strip
+    // (via fullSizeContentView). Tabs live in a ScrollView so they scroll with
+    // many tabs and can never collapse into a ">>" overflow menu.
 
-    @ToolbarContentBuilder
-    private var detailToolbar: some ToolbarContent {
-        ToolbarItem(placement: .principal) {
-            if !vault.openTabs.isEmpty {
+    private var titleBar: some View {
+        HStack(spacing: 8) {
+            Button { withAnimation(.smooth(duration: 0.2)) { showSidebar.toggle() } } label: {
+                Image(systemName: "sidebar.leading")
+            }
+            .buttonStyle(.borderless).help("Toggle sidebar").accessibilityLabel("Toggle sidebar")
+
+            Text(vault.vaultURL?.lastPathComponent ?? "Slate")
+                .font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
+                .lineLimit(1).fixedSize()
+
+            if vault.openTabs.isEmpty {
+                Spacer()
+            } else {
+                Divider().frame(height: 16)
                 TabBarView().frame(maxWidth: .infinity, alignment: .leading)
             }
+
+            actionButtons
         }
-        ToolbarItemGroup(placement: .primaryAction) {
+        .padding(.leading, 80)   // clear the traffic lights
+        .padding(.trailing, 12)
+        .frame(height: 42)
+        .background(settings.topBarBackground)
+    }
+
+    private var actionButtons: some View {
+        HStack(spacing: 6) {
             Button { ui.showTags = true } label: { Image(systemName: "number") }
                 .help("Browse tags").accessibilityLabel("Browse tags").disabled(vault.vaultURL == nil)
             Button { vault.newNote() } label: { Image(systemName: "square.and.pencil") }
@@ -60,6 +89,24 @@ struct ContentView: View {
                 .accessibilityLabel(ui.mode == .read ? "Switch to editing" : "Switch to reading")
                 .disabled(vault.selection == nil)
         }
+        .buttonStyle(.borderless)
+        .imageScale(.large)
+    }
+
+    private var resizeDivider: some View {
+        Divider()
+            .overlay(
+                Color.clear.frame(width: 8).contentShape(Rectangle())
+                    .onHover { inside in
+                        if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+                    }
+                    .gesture(DragGesture()
+                        .onChanged { v in
+                            if dragStartWidth == nil { dragStartWidth = sidebarWidth }
+                            sidebarWidth = min(max((dragStartWidth ?? sidebarWidth) + v.translation.width, 200), 480)
+                        }
+                        .onEnded { _ in dragStartWidth = nil })
+            )
     }
 
     // MARK: Sidebar

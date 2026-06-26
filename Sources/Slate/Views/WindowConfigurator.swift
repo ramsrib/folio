@@ -18,6 +18,9 @@ struct WindowConfigurator: NSViewRepresentable {
 
     private func configure(_ window: NSWindow?) {
         guard let window else { return }
+        // Let our SwiftUI content draw all the way up into the title-bar strip
+        // (so a custom title-bar row sits under the traffic lights, not below them).
+        window.styleMask.insert(.fullSizeContentView)
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.isMovableByWindowBackground = true
