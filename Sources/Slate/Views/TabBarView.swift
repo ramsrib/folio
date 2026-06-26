@@ -45,7 +45,11 @@ private struct TabChip: View {
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
             .opacity(isActive || hover ? 1 : 0)
+            .accessibilityLabel("Close \(name)")
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(name)
+        .accessibilityAddTraits(isActive ? [.isSelected, .isButton] : .isButton)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .frame(maxWidth: 200)

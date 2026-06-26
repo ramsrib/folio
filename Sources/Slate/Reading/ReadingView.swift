@@ -98,6 +98,8 @@ struct ReadingView: View {
                         .font(.system(size: body0 - 1))
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(checked ? "Completed task" : "Incomplete task")
+                .accessibilityAddTraits(.isButton)
                 Text(InlineMarkdown.render(text)).font(.system(size: body0 - 0.5, design: design)).lineSpacing(body0 * 0.36)
                     .strikethrough(checked).foregroundStyle(checked ? .secondary : .primary)
             }

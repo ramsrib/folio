@@ -44,6 +44,8 @@ final class VaultStore: ObservableObject {
     // Link index
     private var noteByName: [String: [URL]] = [:]     // lowercased basename -> urls
     private var backlinkMap: [URL: [Backlink]] = [:]  // target note -> inbound links
+    private typealias LinkRef = (inner: String, context: String)
+    private var linkCache: [URL: (mtime: Date, refs: [LinkRef])] = [:]  // mtime-keyed cache
 
     private static let wikiRegex = try! NSRegularExpression(pattern: "\\[\\[([^\\]]+)\\]\\]")
     private static let headingRegex = try! NSRegularExpression(
@@ -242,23 +244,45 @@ final class VaultStore: ObservableObject {
         }
     }
 
+    /// Incremental link index: only re-reads files whose modification date
+    /// changed since last scan; unchanged files reuse cached wikilink refs.
     private func rebuildLinkIndex() {
         noteByName = [:]
         backlinkMap = [:]
         for f in files { noteByName[f.name.lowercased(), default: []].append(f.url) }
+
         for f in files {
-            guard let text = try? String(contentsOf: f.url, encoding: .utf8) else { continue }
-            let ns = text as NSString
-            Self.wikiRegex.enumerateMatches(in: text, range: NSRange(location: 0, length: ns.length)) { m, _, _ in
-                guard let m else { return }
-                let inner = ns.substring(with: m.range(at: 1))
-                guard let dest = resolve(inner) else { return }   // unresolved → no backlink
-                let line = ns.substring(with: ns.lineRange(for: m.range))
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            let mtime = (try? f.url.resourceValues(forKeys: [.contentModificationDateKey])
+                .contentModificationDate) ?? .distantPast
+            let refs: [LinkRef]
+            if let cached = linkCache[f.url], cached.mtime == mtime {
+                refs = cached.refs
+            } else {
+                refs = extractRefs(f.url)
+                linkCache[f.url] = (mtime, refs)
+            }
+            for ref in refs where resolve(ref.inner) != nil {
+                let dest = resolve(ref.inner)!
                 backlinkMap[dest, default: []].append(
-                    Backlink(source: f.url, sourceName: f.name, context: line))
+                    Backlink(source: f.url, sourceName: f.name, context: ref.context))
             }
         }
+        let current = Set(files.map(\.url))               // drop cache for deleted files
+        linkCache = linkCache.filter { current.contains($0.key) }
+    }
+
+    private func extractRefs(_ url: URL) -> [LinkRef] {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
+        let ns = text as NSString
+        var refs: [LinkRef] = []
+        Self.wikiRegex.enumerateMatches(in: text, range: NSRange(location: 0, length: ns.length)) { m, _, _ in
+            guard let m else { return }
+            refs.append((
+                inner: ns.substring(with: m.range(at: 1)),
+                context: ns.substring(with: ns.lineRange(for: m.range))
+                    .trimmingCharacters(in: .whitespacesAndNewlines)))
+        }
+        return refs
     }
 
     // MARK: - Link resolution

@@ -47,13 +47,15 @@ struct ContentView: View {
         }
         ToolbarItemGroup(placement: .primaryAction) {
             Button { vault.newNote() } label: { Image(systemName: "square.and.pencil") }
-                .help("New note").disabled(vault.vaultURL == nil)
+                .help("New note").accessibilityLabel("New note").disabled(vault.vaultURL == nil)
             Button { vault.refresh() } label: { Image(systemName: "arrow.clockwise") }
-                .help("Reload vault").disabled(vault.vaultURL == nil)
+                .help("Reload vault").accessibilityLabel("Reload vault").disabled(vault.vaultURL == nil)
             Button {
                 withAnimation(.smooth(duration: 0.2)) { ui.mode = ui.mode == .read ? .edit : .read }
             } label: { Image(systemName: ui.mode == .read ? "pencil" : "eye") }
-                .help(ui.mode == .read ? "Edit" : "Reading mode").disabled(vault.selection == nil)
+                .help(ui.mode == .read ? "Edit" : "Reading mode")
+                .accessibilityLabel(ui.mode == .read ? "Switch to editing" : "Switch to reading")
+                .disabled(vault.selection == nil)
         }
     }
 
