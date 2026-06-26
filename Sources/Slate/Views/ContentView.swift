@@ -18,8 +18,7 @@ struct ContentView: View {
                 .toolbar { detailToolbar }
         }
         .navigationTitle("")
-        .background(WindowConfigurator(background: settings.nsWindowBackground,
-                                       title: vault.vaultURL?.lastPathComponent ?? "Slate"))
+        .background(WindowConfigurator(background: settings.nsWindowBackground))
         .onChange(of: vault.selection) {
             ui.mode = vault.openInEditMode ? .edit : .read
             vault.openInEditMode = false
