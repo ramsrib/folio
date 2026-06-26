@@ -44,34 +44,56 @@ struct ContentView: View {
         }
     }
 
-    // MARK: Title bar — a plain content row that fills the title-bar strip
-    // (via fullSizeContentView). Tabs live in a ScrollView so they scroll with
-    // many tabs and can never collapse into a ">>" overflow menu.
+    // MARK: Title bar — split into a sidebar title area + a content title area
+    // (aligned with the columns below), filling the title-bar strip via
+    // fullSizeContentView. Tabs live only in the content area and scroll.
 
     private var titleBar: some View {
-        HStack(spacing: 8) {
-            Button { withAnimation(.smooth(duration: 0.2)) { showSidebar.toggle() } } label: {
-                Image(systemName: "sidebar.leading")
+        HStack(spacing: 0) {
+            if showSidebar {
+                sidebarTitleArea
+                    .frame(width: sidebarWidth, height: 42)
+                    .background(settings.sidebarBackground ?? Color(nsColor: .windowBackgroundColor))
+                Divider()
             }
-            .buttonStyle(.borderless).help("Toggle sidebar").accessibilityLabel("Toggle sidebar")
+            contentTitleArea
+                .frame(maxWidth: .infinity, minHeight: 42)
+                .background(settings.topBarBackground)
+        }
+        .frame(height: 42)
+    }
 
+    private var sidebarTitleArea: some View {
+        HStack(spacing: 6) {
             Text(vault.vaultURL?.lastPathComponent ?? "Slate")
                 .font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
-                .lineLimit(1).fixedSize()
+                .lineLimit(1)
+            Spacer(minLength: 4)
+            toggleButton            // toggle at the trailing end (native sidebar look)
+        }
+        .padding(.leading, 78)      // clear the traffic lights
+        .padding(.trailing, 8)
+    }
 
+    private var contentTitleArea: some View {
+        HStack(spacing: 8) {
+            if !showSidebar { toggleButton }   // toggle relocates here when the sidebar is hidden
             if vault.openTabs.isEmpty {
                 Spacer()
             } else {
-                Divider().frame(height: 16)
                 TabBarView().frame(maxWidth: .infinity, alignment: .leading)
             }
-
             actionButtons
         }
-        .padding(.leading, 80)   // clear the traffic lights
+        .padding(.leading, showSidebar ? 12 : 78)   // clear traffic lights only when sidebar is off
         .padding(.trailing, 12)
-        .frame(height: 42)
-        .background(settings.topBarBackground)
+    }
+
+    private var toggleButton: some View {
+        Button { withAnimation(.smooth(duration: 0.2)) { showSidebar.toggle() } } label: {
+            Image(systemName: "sidebar.leading")
+        }
+        .buttonStyle(.borderless).help("Toggle sidebar").accessibilityLabel("Toggle sidebar")
     }
 
     private var actionButtons: some View {
