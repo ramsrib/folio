@@ -20,6 +20,8 @@ struct SlateApp: App {
             CommandGroup(after: .newItem) {
                 Button("New Note") { vault.newNote() }
                     .keyboardShortcut("n", modifiers: .command)
+                Button("Close Tab") { if let s = vault.selection { vault.closeTab(s) } }
+                    .keyboardShortcut("w", modifiers: .command)
                 Button("Open Vault…") { vault.pickVault() }
                     .keyboardShortcut("o", modifiers: [.command, .shift])
                 Button("Reload Vault") { vault.refresh() }

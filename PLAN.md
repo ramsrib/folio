@@ -138,17 +138,20 @@ Swapping Stage 1 → Stage 2 touches only `EditorPane`/`Editors/`, nothing else.
     pane, embeds/transclusion in editor, aliases & heading/block links, unlinked mentions, graph
     view, hover link preview, syntax highlighting in code blocks.
 - **M4 — Wrap up macOS v1** (the shippable finish line):
-  - [ ] **Live-reload the open note** when it changes on disk (cloud sync / another app / the iOS
+  - [x] **Live-reload the open note** when it changes on disk (cloud sync / another app / the iOS
         app) without clobbering unsaved edits. *(directly enables the synced dual-app story)*
-  - [ ] **Reopen state:** restore last vault + last open note + mode on launch.
+  - [x] **Tabs + reopen state:** multiple open notes as **tabs** (open/close, ⌘W, click to switch);
+        open tabs + active note are **restored per vault on relaunch** (Obsidian-style session).
+        Frontmatter now renders as a Properties panel in reading mode. *(mode not yet persisted —
+        restored notes open in reading mode; tab reordering & split panes still to do)*
   - [ ] **Settings:** recent vaults / switch vault; appearance (theme, font size, readable width).
   - [ ] **App icon**, about, polished first-run empty state.
   - [~] **Robustness:** ✅ ignore dependency/build dirs on scan (`node_modules`, `vendor`, `Pods`,
         `build`, `dist`, `target`, … ; hidden dirs already skipped) so a code-project folder doesn't
         crawl/index package READMEs. Still: large-vault incremental link index, accessibility pass,
         optional user-configurable `.slateignore`/settings.
-  - [ ] *(stretch)* syntax highlighting in code blocks; hover link preview; frontmatter/properties;
-        `#tags` pane; always-WYSIWYG concealment.
+  - [ ] *(stretch)* syntax highlighting in code blocks; hover link preview; tab reordering / split
+        panes; `#tags` pane; always-WYSIWYG concealment.
 - **M5 — Go multiplatform** (one-time restructure, kept ready by M4): xcodegen project with macOS +
   iOS targets sharing `Sources/`; factor a `#if`-bridged platform layer (color/font/image, file
   pick, watcher) so the shared core compiles on both. macOS behavior unchanged.

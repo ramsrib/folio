@@ -11,35 +11,45 @@ struct EditorPane: View {
     var body: some View {
         if vault.selection != nil {
             VStack(spacing: 0) {
-                NoteTitleField()
-                    .frame(maxWidth: 720, alignment: .leading)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 28)
-                    .padding(.bottom, 2)
-                if ui.mode == .read {
-                    ReadingView()
-                } else {
-                    LivePreviewEditor(
-                        text: $vault.content,
-                        scrollTo: $vault.scrollRequest,
-                        onChange: { vault.contentEdited() },
-                        resolveWikilink: { vault.resolve($0) != nil },
-                        noteNames: { vault.allNoteNames },
-                        onOpenLink: openLink
-                    )
+                if !vault.openTabs.isEmpty {
+                    TabBarView()
+                    Divider()
                 }
+                noteBody
+                    .overlay(alignment: .topTrailing) {
+                        OutlineFloater().padding(.top, 14).padding(.trailing, 10)
+                    }
+                    .overlay(alignment: .bottom) {
+                        BacklinksBar().frame(maxWidth: .infinity)
+                    }
             }
             .background(Color(nsColor: .textBackgroundColor))
-            .overlay(alignment: .topTrailing) {
-                OutlineFloater().padding(.top, 14).padding(.trailing, 10)
-            }
-            .overlay(alignment: .bottom) {
-                BacklinksBar().frame(maxWidth: .infinity)
-            }
             .toolbar { ToolbarItem(placement: .status) { saveStatus } }
         } else {
             ContentUnavailableView("Select a note", systemImage: "doc.text",
                 description: Text("Pick a note from the sidebar to start editing."))
+        }
+    }
+
+    private var noteBody: some View {
+        VStack(spacing: 0) {
+            NoteTitleField()
+                .frame(maxWidth: 720, alignment: .leading)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 28)
+                .padding(.bottom, 2)
+            if ui.mode == .read {
+                ReadingView()
+            } else {
+                LivePreviewEditor(
+                    text: $vault.content,
+                    scrollTo: $vault.scrollRequest,
+                    onChange: { vault.contentEdited() },
+                    resolveWikilink: { vault.resolve($0) != nil },
+                    noteNames: { vault.allNoteNames },
+                    onOpenLink: openLink
+                )
+            }
         }
     }
 

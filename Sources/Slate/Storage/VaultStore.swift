@@ -16,6 +16,7 @@ final class VaultStore: ObservableObject {
     @Published private(set) var outline: [OutlineItem] = []
     @Published private(set) var backlinks: [Backlink] = []
     @Published var scrollRequest: Int?   // character offset for the editor to scroll to
+    @Published private(set) var openTabs: [URL] = []   // open notes, in tab order
     /// Set by create actions so the next selection opens in edit mode (navigation
     /// otherwise opens in reading mode). Consumed by the view on selection change.
     var openInEditMode = false
@@ -23,6 +24,8 @@ final class VaultStore: ObservableObject {
     var allNoteNames: [String] { files.map(\.name) }
 
     private let vaultPathKey = "slate.vaultPath"
+    private let tabsKey = "slate.tabsByVault"      // [vaultPath: [filePath]]
+    private let activeKey = "slate.activeByVault"  // [vaultPath: filePath]
     private let mdExtensions: Set<String> = ["md", "markdown", "mdown", "mkd"]
     /// Dependency/build directories never worth scanning (so pointing a vault at a
     /// code project doesn't crawl node_modules and index package READMEs). Hidden
@@ -62,9 +65,10 @@ final class VaultStore: ObservableObject {
         vaultURL = url
         UserDefaults.standard.set(url.path, forKey: vaultPathKey)
         selection = nil; content = ""; loadedURL = nil
-        outline = []; backlinks = []
+        outline = []; backlinks = []; openTabs = []
         refresh()
         startWatching()
+        restoreSession()
     }
 
     private func restoreVault() {
@@ -74,6 +78,51 @@ final class VaultStore: ObservableObject {
         vaultURL = url
         refresh()
         startWatching()
+        restoreSession()
+    }
+
+    // MARK: - Session (tabs) persistence
+
+    /// Restore the tabs + active note saved for this vault.
+    private func restoreSession() {
+        guard let root = vaultURL else { return }
+        let byPath = Dictionary(files.map { ($0.id.path, $0.id) }, uniquingKeysWith: { a, _ in a })
+        let savedTabs = (UserDefaults.standard.dictionary(forKey: tabsKey) as? [String: [String]])?[root.path] ?? []
+        openTabs = savedTabs.compactMap { byPath[$0] }
+        let activePath = (UserDefaults.standard.dictionary(forKey: activeKey) as? [String: String])?[root.path]
+        if let activePath, let active = byPath[activePath] {
+            select(active)
+        } else if let first = openTabs.first {
+            select(first)
+        }
+    }
+
+    private func persistSession() {
+        guard let root = vaultURL else { return }
+        var tabs = UserDefaults.standard.dictionary(forKey: tabsKey) as? [String: [String]] ?? [:]
+        tabs[root.path] = openTabs.map(\.path)
+        UserDefaults.standard.set(tabs, forKey: tabsKey)
+        var active = UserDefaults.standard.dictionary(forKey: activeKey) as? [String: String] ?? [:]
+        active[root.path] = selection?.path
+        UserDefaults.standard.set(active, forKey: activeKey)
+    }
+
+    /// Close a tab; if it was active, activate a neighbor (or clear if last).
+    func closeTab(_ url: URL) {
+        guard let idx = openTabs.firstIndex(of: url) else { return }
+        let wasActive = selection == url
+        openTabs.remove(at: idx)
+        if wasActive {
+            if loadedURL == url { saveTask?.cancel(); saveTask = nil }
+            flushSave()
+            selection = nil; loadedURL = nil
+            if !openTabs.isEmpty {
+                select(openTabs[min(idx, openTabs.count - 1)])
+            } else {
+                content = ""; outline = []; backlinks = []
+            }
+        }
+        persistSession()
     }
 
     private func startWatching() {
@@ -184,11 +233,13 @@ final class VaultStore: ObservableObject {
         guard let id, files.contains(where: { $0.id == id }), id != selection else { return }
         flushSave()
         selection = id
+        if !openTabs.contains(id) { openTabs.append(id) }   // open file → ensure a tab
         content = (try? String(contentsOf: id, encoding: .utf8)) ?? ""
         loadedURL = id
         savedAt = nil
         updateOutline()
         updateBacklinks()
+        persistSession()
     }
 
     /// Open a wikilink target — navigate if it resolves, else create the note.
@@ -294,11 +345,13 @@ final class VaultStore: ObservableObject {
             let newBase = (dest.lastPathComponent as NSString).deletingPathExtension
             let changed = updateLinks(oldBase: oldBase, newBase: newBase)
             if selection == id { selection = dest; loadedURL = dest }
+            if let i = openTabs.firstIndex(of: id) { openTabs[i] = dest }   // keep tab on rename
             if let open = loadedURL, changed.contains(open) {
                 content = (try? String(contentsOf: open, encoding: .utf8)) ?? content
             }
             refresh()
             updateOutline()
+            persistSession()
         } catch { NSSound.beep() }
     }
 
@@ -327,7 +380,18 @@ final class VaultStore: ObservableObject {
     func delete(_ id: URL) {
         if loadedURL == id { saveTask?.cancel(); saveTask = nil; loadedURL = nil }
         try? FileManager.default.trashItem(at: id, resultingItemURL: nil)
-        if selection == id { selection = nil; content = ""; outline = []; backlinks = [] }
+        let wasActive = selection == id
+        let idx = openTabs.firstIndex(of: id)
+        openTabs.removeAll { $0 == id }
         refresh()
+        if wasActive {
+            selection = nil
+            if let idx, !openTabs.isEmpty {
+                select(openTabs[min(idx, openTabs.count - 1)])
+            } else {
+                content = ""; outline = []; backlinks = []
+            }
+        }
+        persistSession()
     }
 }

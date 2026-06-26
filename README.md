@@ -15,8 +15,10 @@ place** — built to replace Obsidian. Native Swift / SwiftUI, files-on-disk as 
   **command palette (⌘P)**, and **file-name search (⌘K)**. **Notion-style UI:** centered reading
   column, editable page title, hover-reveal floating outline, inline collapsible backlinks,
   translucent rounded surfaces, and a fully-rendered **Reading mode** — headings, real checkboxes,
-  callout boxes, code, tables, dividers, images, no syntax symbols. **Reading is the default**;
-  double-click the page (or ⌘E) to write; navigation always opens in reading.
+  callout boxes, code, tables, dividers, images, frontmatter as a Properties panel, no syntax symbols.
+  **Reading is the default**; double-click the page (or ⌘E) to write; navigation always opens in
+  reading. **Tabs** (open/close, ⌘W) with **session restore** — reopen a vault and your open notes
+  come back, Obsidian-style. The file-name search shortcut is **⌘K**.
 
 ## Run it
 
