@@ -14,11 +14,11 @@ struct ContentView: View {
         NavigationSplitView(columnVisibility: $columns) {
             sidebar
                 .navigationSplitViewColumnWidth(min: 220, ideal: 290, max: 460)
+                .toolbar(removing: .sidebarToggle)
         } detail: {
             EditorPane()
         }
         .navigationTitle("")
-        .toolbar(removing: .sidebarToggle)
         .background(WindowConfigurator(background: settings.nsWindowBackground))
         .toolbar { toolbarContent }
         .onChange(of: vault.selection) {
