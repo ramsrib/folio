@@ -1,0 +1,41 @@
+name: SlateiOS
+
+options:
+  bundleIdPrefix: io.github.ramsrib
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CODE_SIGNING_REQUIRED: "NO"
+    CODE_SIGNING_ALLOWED: "NO"
+    CODE_SIGN_IDENTITY: ""
+    DEVELOPMENT_TEAM: ""
+    ENABLE_USER_SCRIPT_SANDBOXING: "YES"
+
+targets:
+  SlateiOS:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.0"
+    # Shared core (compiled into the iOS app directly — same files as the macOS
+    # SwiftPM target) plus the iOS-only UI. macOS-only code (Editors/, Views/,
+    # SlateApp.swift) is deliberately excluded.
+    sources:
+      - path: Sources/Slate/Models
+      - path: Sources/Slate/Reading
+      - path: Sources/Slate/Storage
+      - path: iOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.ramsrib.slate.ios
+        PRODUCT_NAME: Slate
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: "YES"
+        INFOPLIST_KEY_CFBundleDisplayName: Slate
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: "YES"
+        INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        SWIFT_VERSION: "5.0"

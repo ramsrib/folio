@@ -1,5 +1,9 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
 import AppKit
+#endif
 
 /// Notion-style fully-rendered, read-(mostly)-only view of the current note.
 /// No syntax symbols — headings, lists, checkboxes, callouts, code, tables,
@@ -157,8 +161,8 @@ struct ReadingView: View {
             AsyncImage(url: url) { $0.resizable().scaledToFit() } placeholder: { ProgressView() }
                 .frame(maxWidth: 680, maxHeight: 480, alignment: .leading)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        } else if let nsImage = localImage(source) {
-            Image(nsImage: nsImage).resizable().scaledToFit()
+        } else if let local = localImage(source) {
+            Image(platform: local).resizable().scaledToFit()
                 .frame(maxWidth: 680, maxHeight: 480, alignment: .leading)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         } else {
@@ -199,7 +203,7 @@ struct ReadingView: View {
         return body0 * scale[min(max(level - 1, 0), 5)]
     }
 
-    private func localImage(_ source: String) -> NSImage? {
+    private func localImage(_ source: String) -> PlatformImage? {
         guard let note = vault.selection else { return nil }
         let candidates = [
             note.deletingLastPathComponent().appendingPathComponent(source),
@@ -207,7 +211,7 @@ struct ReadingView: View {
             URL(fileURLWithPath: source)
         ].compactMap { $0 }
         for url in candidates where FileManager.default.fileExists(atPath: url.path) {
-            if let img = NSImage(contentsOf: url) { return img }
+            if let img = PlatformImage.load(contentsOf: url) { return img }
         }
         return nil
     }

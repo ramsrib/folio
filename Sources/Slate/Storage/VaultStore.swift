@@ -1,6 +1,8 @@
 import Foundation
 import SwiftUI
+#if os(macOS)
 import AppKit
+#endif
 
 /// Owns the open vault (a folder of Markdown files), the folder tree, the link
 /// index, and the currently-open note's text. The on-disk file is always the
@@ -75,6 +77,7 @@ final class VaultStore: ObservableObject {
     // MARK: - Vault selection
 
     func pickVault() {
+        #if os(macOS)
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
@@ -82,6 +85,8 @@ final class VaultStore: ObservableObject {
         panel.prompt = "Open Vault"
         panel.message = "Choose a folder of Markdown notes"
         if panel.runModal() == .OK, let url = panel.url { setVault(url) }
+        #endif
+        // iOS opens vaults via UIDocumentPicker from the app layer → setVault(_:).
     }
 
     func setVault(_ url: URL) {
@@ -490,7 +495,11 @@ final class VaultStore: ObservableObject {
             refresh()
             updateOutline()
             persistSession()
-        } catch { NSSound.beep() }
+        } catch {
+            #if os(macOS)
+            NSSound.beep()
+            #endif
+        }
     }
 
     /// Rewrite `[[oldBase]]`, `[[oldBase|…]]`, `[[oldBase#…]]` to use `newBase`

@@ -1,4 +1,6 @@
 import Foundation
+
+#if os(macOS)
 import CoreServices
 
 /// Watches a vault directory (recursively) and fires `onChange` when files are
@@ -50,3 +52,15 @@ final class VaultWatcher {
 
     deinit { stop() }
 }
+
+#else
+
+/// iOS has no FSEvents; live external-change watching is a no-op for now. The
+/// type stays available so `VaultStore` compiles unchanged (rely on manual
+/// refresh / file coordination later).
+final class VaultWatcher {
+    init?(path: String, onChange: @escaping () -> Void) { nil }
+    func stop() {}
+}
+
+#endif

@@ -1,10 +1,15 @@
+import Foundation
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
 import AppKit
+#endif
 
 /// Lightweight, language-agnostic syntax highlighter for fenced code blocks in
 /// Reading mode. Not a full parser — regex passes for comments, strings,
 /// numbers, and a broad set of common keywords. Good enough to make code legible.
 enum CodeHighlighter {
-    private static let mono = NSFont.monospacedSystemFont(ofSize: 13.5, weight: .regular)
+    private static let mono = PlatformFont.monospacedSystemFont(ofSize: 13.5, weight: .regular)
 
     private static let keywords: Set<String> = [
         "func", "function", "fn", "def", "let", "var", "const", "val", "mut",
@@ -30,7 +35,7 @@ enum CodeHighlighter {
 
     static func highlight(_ code: String, language: String) -> AttributedString {
         let storage = NSMutableAttributedString(
-            string: code, attributes: [.font: mono, .foregroundColor: NSColor.labelColor])
+            string: code, attributes: [.font: mono, .foregroundColor: PlatformColor.pLabel])
         let full = NSRange(location: 0, length: (code as NSString).length)
         let ns = code as NSString
 
@@ -38,18 +43,18 @@ enum CodeHighlighter {
         identifier.enumerateMatches(in: code, range: full) { m, _, _ in
             guard let m else { return }
             if keywords.contains(ns.substring(with: m.range)) {
-                storage.addAttribute(.foregroundColor, value: NSColor.systemPink, range: m.range)
+                storage.addAttribute(.foregroundColor, value: PlatformColor.systemPink, range: m.range)
             }
         }
         apply(number, code, full, storage, .systemOrange)
         apply(string, code, full, storage, .systemGreen)
-        apply(comment, code, full, storage, .secondaryLabelColor)
+        apply(comment, code, full, storage, .pSecondaryLabel)
 
         return AttributedString(storage)
     }
 
     private static func apply(_ regex: NSRegularExpression, _ code: String, _ full: NSRange,
-                              _ storage: NSMutableAttributedString, _ color: NSColor) {
+                              _ storage: NSMutableAttributedString, _ color: PlatformColor) {
         regex.enumerateMatches(in: code, range: full) { m, _, _ in
             guard let m else { return }
             storage.addAttribute(.foregroundColor, value: color, range: m.range)

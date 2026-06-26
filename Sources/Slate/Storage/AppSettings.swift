@@ -1,5 +1,9 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
 import AppKit
+#endif
 
 enum AppTheme: String, CaseIterable, Identifiable {
     case system, light, dark, paper
@@ -59,19 +63,19 @@ final class AppSettings: ObservableObject {
         case .dark:           return .dark
         }
     }
-    var paneBackground: Color? { theme == .paper ? Color(nsColor: Self.paper) : nil }
-    var nsPaneBackground: NSColor { theme == .paper ? Self.paper : .textBackgroundColor }
+    var paneBackground: Color? { theme == .paper ? Color(platform: Self.paper) : nil }
+    var nsPaneBackground: PlatformColor { theme == .paper ? Self.paper : .pTextBackground }
     /// Top-bar (title-bar) tint; falls back to the standard window chrome color.
-    var topBarBackground: Color { theme == .paper ? Color(nsColor: Self.paper) : Color(nsColor: .windowBackgroundColor) }
-    var nsWindowBackground: NSColor? { theme == .paper ? Self.paper : nil }
+    var topBarBackground: Color { theme == .paper ? Color(platform: Self.paper) : Color(platform: .pWindowBackground) }
+    var nsWindowBackground: PlatformColor? { theme == .paper ? Self.paper : nil }
     /// Sidebar tint — slightly darker than the page for separation. nil = native sidebar material.
-    var sidebarBackground: Color? { theme == .paper ? Color(nsColor: Self.paperSidebar) : nil }
+    var sidebarBackground: Color? { theme == .paper ? Color(platform: Self.paperSidebar) : nil }
     /// Background for floating surfaces (palettes, outline, backlinks): theme tint or material.
     var surfaceStyle: AnyShapeStyle {
         if let paper = paneBackground { return AnyShapeStyle(paper) }
         return AnyShapeStyle(.regularMaterial)
     }
 
-    private static let paper = NSColor(red: 0.98, green: 0.96, blue: 0.90, alpha: 1)
-    private static let paperSidebar = NSColor(red: 0.96, green: 0.93, blue: 0.84, alpha: 1)
+    private static let paper = PlatformColor(red: 0.98, green: 0.96, blue: 0.90, alpha: 1)
+    private static let paperSidebar = PlatformColor(red: 0.96, green: 0.93, blue: 0.84, alpha: 1)
 }
