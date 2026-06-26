@@ -8,14 +8,11 @@ struct ContentView: View {
     @State private var renameTarget: URL?
     @State private var renameText = ""
     @State private var expandedDirs: Set<URL> = []
-    @State private var columns: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columns) {
+        NavigationSplitView {
             sidebar
                 .navigationSplitViewColumnWidth(min: 220, ideal: 290, max: 460)
-                .toolbar(removing: .sidebarToggle)
-                .toolbar { sidebarToolbar }
         } detail: {
             EditorPane()
         }
@@ -38,27 +35,7 @@ struct ContentView: View {
         }
     }
 
-    // MARK: Title-bar toolbar (vault name + tabs + actions)
-
-    /// Lives in the sidebar's region of the title bar: vault name + sidebar toggle.
-    @ToolbarContentBuilder
-    private var sidebarToolbar: some ToolbarContent {
-        ToolbarItemGroup(placement: .navigation) {
-            Text(vault.vaultURL?.lastPathComponent ?? "Slate")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .fixedSize()
-            Button {
-                withAnimation(.smooth(duration: 0.2)) {
-                    columns = columns == .detailOnly ? .all : .detailOnly
-                }
-            } label: { Image(systemName: "sidebar.leading") }
-            .help("Toggle sidebar")
-        }
-    }
-
-    // MARK: Main title bar (tabs + actions)
+    // MARK: Main title bar (tabs + actions); sidebar toggle is the built-in one
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
@@ -93,17 +70,31 @@ struct ContentView: View {
                     .buttonStyle(.borderedProminent)
             }
         } else {
-            List(selection: Binding(get: { vault.selection }, set: { vault.select($0) })) {
-                ForEach(vault.tree) { node in
-                    FileTreeRow(node: node, expanded: $expandedDirs, startRename: startRename)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 6) {
+                    Image(systemName: "books.vertical.fill")
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                    Text(vault.vaultURL?.lastPathComponent ?? "")
+                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
                 }
-            }
-            .listStyle(.sidebar)
-            .onChange(of: vault.vaultURL) { expandedDirs.removeAll() }
-            .overlay {
-                if vault.tree.isEmpty {
-                    ContentUnavailableView("No notes", systemImage: "doc.text",
-                        description: Text("No Markdown files found in this folder."))
+                .padding(.horizontal, 14)
+                .padding(.top, 8)
+                .padding(.bottom, 6)
+
+                List(selection: Binding(get: { vault.selection }, set: { vault.select($0) })) {
+                    ForEach(vault.tree) { node in
+                        FileTreeRow(node: node, expanded: $expandedDirs, startRename: startRename)
+                    }
+                }
+                .listStyle(.sidebar)
+                .onChange(of: vault.vaultURL) { expandedDirs.removeAll() }
+                .overlay {
+                    if vault.tree.isEmpty {
+                        ContentUnavailableView("No notes", systemImage: "doc.text",
+                            description: Text("No Markdown files found in this folder."))
+                    }
                 }
             }
         }
