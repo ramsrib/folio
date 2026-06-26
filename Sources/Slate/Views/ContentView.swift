@@ -13,13 +13,13 @@ struct ContentView: View {
         NavigationSplitView {
             sidebar
                 .navigationSplitViewColumnWidth(min: 220, ideal: 290, max: 460)
-                .toolbar { sidebarToolbar }
         } detail: {
             EditorPane()
                 .toolbar { detailToolbar }
         }
         .navigationTitle("")
-        .background(WindowConfigurator(background: settings.nsWindowBackground))
+        .background(WindowConfigurator(background: settings.nsWindowBackground,
+                                       title: vault.vaultURL?.lastPathComponent ?? "Slate"))
         .onChange(of: vault.selection) {
             ui.mode = vault.openInEditMode ? .edit : .read
             vault.openInEditMode = false
@@ -36,22 +36,9 @@ struct ContentView: View {
         }
     }
 
-    // MARK: Per-column title-bar toolbars
+    // MARK: Detail title-bar toolbar (tabs + actions); the vault name is a
+    // leading title-bar accessory installed by WindowConfigurator.
 
-    /// Attached to the SIDEBAR view → renders in the sidebar's title-bar region,
-    /// next to the built-in sidebar toggle.
-    @ToolbarContentBuilder
-    private var sidebarToolbar: some ToolbarContent {
-        ToolbarItem(placement: .navigation) {
-            Text(vault.vaultURL?.lastPathComponent ?? "Slate")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .fixedSize()
-        }
-    }
-
-    /// Attached to the DETAIL view → renders in the main title-bar region.
     @ToolbarContentBuilder
     private var detailToolbar: some ToolbarContent {
         ToolbarItem(placement: .principal) {
