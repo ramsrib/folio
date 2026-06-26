@@ -6,6 +6,7 @@ struct ContentView: View {
     @EnvironmentObject private var ui: UIState
     @State private var renameTarget: URL?
     @State private var renameText = ""
+    @State private var expandedDirs: Set<URL> = []
 
     var body: some View {
         NavigationSplitView {
@@ -48,38 +49,18 @@ struct ContentView: View {
             }
         } else {
             List(selection: Binding(get: { vault.selection }, set: { vault.select($0) })) {
-                OutlineGroup(vault.tree, children: \.children) { node in
-                    row(for: node)
+                ForEach(vault.tree) { node in
+                    FileTreeRow(node: node, expanded: $expandedDirs, startRename: startRename)
                 }
             }
             .listStyle(.sidebar)
+            .onChange(of: vault.vaultURL) { expandedDirs.removeAll() }
             .overlay {
                 if vault.tree.isEmpty {
                     ContentUnavailableView("No notes", systemImage: "doc.text",
                         description: Text("No Markdown files found in this folder."))
                 }
             }
-        }
-    }
-
-    @ViewBuilder
-    private func row(for node: VaultNode) -> some View {
-        if node.isDirectory {
-            Label(node.name, systemImage: "folder")
-                .foregroundStyle(.secondary)
-                .selectionDisabled()
-        } else {
-            Label(node.name, systemImage: "doc.text")
-                .lineLimit(1)
-                .tag(node.id)
-                .contextMenu {
-                    Button("Rename…") { startRename(node.id) }
-                    Button("Reveal in Finder") {
-                        NSWorkspace.shared.activateFileViewerSelecting([node.id])
-                    }
-                    Divider()
-                    Button("Move to Trash", role: .destructive) { vault.delete(node.id) }
-                }
         }
     }
 

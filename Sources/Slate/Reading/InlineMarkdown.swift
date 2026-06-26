@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 /// Renders a line of inline Markdown to a clean `AttributedString` (markers
 /// removed) for Reading mode. Uses Foundation's built-in inline Markdown parser
@@ -14,8 +15,18 @@ enum InlineMarkdown {
             allowsExtendedAttributes: true,
             interpretedSyntax: .inlineOnlyPreservingWhitespace,
             failurePolicy: .returnPartiallyParsedIfPossible)
-        if let parsed = try? AttributedString(markdown: transformed, options: opts) { return parsed }
-        return AttributedString(raw)
+        guard var attr = try? AttributedString(markdown: transformed, options: opts) else {
+            return AttributedString(raw)
+        }
+        // Style inline `code` spans as subtle monospaced pills (like Obsidian).
+        let codeRanges = attr.runs.compactMap {
+            ($0.inlinePresentationIntent?.contains(.code) == true) ? $0.range : nil
+        }
+        for r in codeRanges {
+            attr[r].font = .system(size: 14.5, design: .monospaced)
+            attr[r].backgroundColor = Color.primary.opacity(0.06)
+        }
+        return attr
     }
 
     private static func transform(_ raw: String) -> String {

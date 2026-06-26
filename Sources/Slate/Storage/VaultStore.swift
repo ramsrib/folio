@@ -179,11 +179,10 @@ final class VaultStore: ObservableObject {
     // MARK: - Open / edit / save
 
     func select(_ id: MarkdownFile.ID?) {
+        // Ignore nil/folder/duplicate selections so a folder click never blanks
+        // the open note (folders toggle expansion in the explorer instead).
+        guard let id, files.contains(where: { $0.id == id }), id != selection else { return }
         flushSave()
-        guard let id, files.contains(where: { $0.id == id }) else {
-            selection = nil; content = ""; loadedURL = nil
-            outline = []; backlinks = []; return
-        }
         selection = id
         content = (try? String(contentsOf: id, encoding: .utf8)) ?? ""
         loadedURL = id

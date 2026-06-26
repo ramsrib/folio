@@ -3,7 +3,7 @@ import AppKit
 /// Visual vocabulary for the Live Preview editor. Kept in one place so the
 /// styling stays consistent and is easy to tune.
 enum Theme {
-    static let bodySize: CGFloat = 15
+    static let bodySize: CGFloat = 16
 
     static let body = NSFont.systemFont(ofSize: bodySize)
     static let bold = NSFont.boldSystemFont(ofSize: bodySize)

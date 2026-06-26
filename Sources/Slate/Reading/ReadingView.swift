@@ -13,7 +13,7 @@ struct ReadingView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 16) {
                     ForEach(blocks) { block in
                         view(for: block).id(anchorID(block))
                     }
@@ -21,8 +21,8 @@ struct ReadingView: View {
                 .frame(maxWidth: 720, alignment: .leading)
                 .frame(maxWidth: .infinity, minHeight: 200, alignment: .top)
                 .contentShape(Rectangle())
-                .padding(.horizontal, 28)
-                .padding(.vertical, 20)
+                .padding(.horizontal, 32)
+                .padding(.vertical, 28)
                 // Double-click the page to start writing (like Notion).
                 .onTapGesture(count: 2) { withAnimation(.smooth(duration: 0.2)) { ui.mode = .edit } }
             }
@@ -52,37 +52,56 @@ struct ReadingView: View {
     @ViewBuilder
     private func view(for block: Block) -> some View {
         switch block.kind {
+        case let .properties(props):
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(props) { p in
+                    HStack(alignment: .top, spacing: 12) {
+                        Text(p.key)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 120, alignment: .leading)
+                        Text(p.value.isEmpty ? "—" : p.value)
+                            .font(.system(size: 13))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+            .padding(12)
+            .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
         case let .heading(level, text, _):
             Text(InlineMarkdown.render(text))
-                .font(.system(size: headingSize(level), weight: .bold, design: .rounded))
-                .padding(.top, level <= 2 ? 10 : 4)
+                .font(.system(size: headingSize(level), weight: level <= 2 ? .bold : .semibold))
+                .padding(.top, level <= 2 ? 18 : 8)
 
         case let .paragraph(text):
-            Text(InlineMarkdown.render(text)).font(.system(size: 16)).lineSpacing(4)
+            Text(InlineMarkdown.render(text)).font(.system(size: 17)).lineSpacing(7)
 
         case let .listItem(ordered, number, indent, text):
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(ordered ? "\(number)." : "•").font(.system(size: 16)).foregroundStyle(.secondary)
-                Text(InlineMarkdown.render(text)).font(.system(size: 16))
+                Text(ordered ? "\(number)." : "•").font(.system(size: 16.5)).foregroundStyle(.secondary)
+                Text(InlineMarkdown.render(text)).font(.system(size: 16.5)).lineSpacing(6)
             }
-            .padding(.leading, CGFloat(indent) * 20)
+            .padding(.leading, CGFloat(indent) * 22)
 
         case let .task(checked, indent, text, checkboxIndex):
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Button { vault.toggleTask(atContentIndex: checkboxIndex) } label: {
                     Image(systemName: checked ? "checkmark.square.fill" : "square")
                         .foregroundStyle(checked ? Color.accentColor : .secondary)
+                        .font(.system(size: 16))
                 }
                 .buttonStyle(.plain)
-                Text(InlineMarkdown.render(text)).font(.system(size: 16))
+                Text(InlineMarkdown.render(text)).font(.system(size: 16.5)).lineSpacing(6)
                     .strikethrough(checked).foregroundStyle(checked ? .secondary : .primary)
             }
-            .padding(.leading, CGFloat(indent) * 20)
+            .padding(.leading, CGFloat(indent) * 22)
 
         case let .quote(text):
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 2).fill(.secondary.opacity(0.5)).frame(width: 3)
-                Text(InlineMarkdown.render(text)).font(.system(size: 16)).foregroundStyle(.secondary)
+                Text(InlineMarkdown.render(text)).font(.system(size: 16.5)).lineSpacing(6)
+                    .foregroundStyle(.secondary)
             }
 
         case let .callout(kind, title, body):
@@ -164,7 +183,7 @@ struct ReadingView: View {
     // MARK: helpers
 
     private func headingSize(_ level: Int) -> CGFloat {
-        [28, 23, 19, 17, 16, 15][min(max(level - 1, 0), 5)]
+        [30, 24, 20, 18, 16, 15][min(max(level - 1, 0), 5)]
     }
 
     private func localImage(_ source: String) -> NSImage? {

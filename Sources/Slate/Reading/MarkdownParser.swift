@@ -2,10 +2,18 @@ import Foundation
 
 /// A rendered block of a note (used by Reading mode). The editor still edits the
 /// literal Markdown; this is a read view parsed from it.
+/// A key/value pair from a note's YAML frontmatter.
+struct Prop: Identifiable, Hashable {
+    let id = UUID()
+    let key: String
+    let value: String
+}
+
 struct Block: Identifiable {
     let id = UUID()
     let kind: Kind
     enum Kind {
+        case properties([Prop])
         case heading(level: Int, text: String, anchor: Int)
         case paragraph(text: String)
         case listItem(ordered: Bool, number: Int, indent: Int, text: String)
@@ -47,10 +55,14 @@ enum MarkdownParser {
         }
 
         var i = 0
-        if lines.first == "---" {                       // skip YAML frontmatter
+        if lines.first == "---" {                       // YAML frontmatter → properties block
             var j = 1
             while j < lines.count && lines[j] != "---" { j += 1 }
-            if j < lines.count { i = j + 1 }
+            if j < lines.count {
+                let props = parseFrontmatter(Array(lines[1..<j]))
+                if !props.isEmpty { blocks.append(Block(kind: .properties(props))) }
+                i = j + 1
+            }
         }
 
         while i < lines.count {
@@ -155,6 +167,30 @@ enum MarkdownParser {
         guard r.location != NSNotFound else { return "" }
         return (s as NSString).substring(with: r)
     }
+    private static func parseFrontmatter(_ lines: [String]) -> [Prop] {
+        var props: [Prop] = []
+        for raw in lines {
+            let trimmed = raw.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty { continue }
+            // "- item" continuation appends to the previous key's value
+            if trimmed.hasPrefix("-"), let last = props.last {
+                let item = trimmed.dropFirst().trimmingCharacters(in: .whitespaces)
+                let joined = last.value.isEmpty ? String(item) : last.value + ", " + item
+                props[props.count - 1] = Prop(key: last.key, value: joined)
+                continue
+            }
+            guard let colon = raw.firstIndex(of: ":") else { continue }
+            let key = String(raw[..<colon]).trimmingCharacters(in: .whitespaces)
+            guard !key.isEmpty else { continue }
+            var value = String(raw[raw.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
+            if value.hasPrefix("[") && value.hasSuffix("]") {
+                value = String(value.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
+            }
+            props.append(Prop(key: key, value: value))
+        }
+        return props
+    }
+
     private static func indentLevel(_ leading: String) -> Int {
         let spaces = leading.reduce(0) { $0 + ($1 == "\t" ? 4 : 1) }
         return min(spaces / 2, 6)
