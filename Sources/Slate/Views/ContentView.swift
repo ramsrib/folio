@@ -8,20 +8,17 @@ struct ContentView: View {
     @State private var renameTarget: URL?
     @State private var renameText = ""
     @State private var expandedDirs: Set<URL> = []
-    @State private var columns: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        VStack(spacing: 0) {
-            topBar
-            Divider()
-            NavigationSplitView(columnVisibility: $columns) {
-                sidebar
-                    .navigationSplitViewColumnWidth(min: 220, ideal: 290, max: 460)
-            } detail: {
-                EditorPane()
-            }
+        NavigationSplitView {
+            sidebar
+                .navigationSplitViewColumnWidth(min: 220, ideal: 290, max: 460)
+        } detail: {
+            EditorPane()
         }
+        .navigationTitle("")
         .background(WindowConfigurator(background: settings.nsWindowBackground))
+        .toolbar { toolbarContent }
         .onChange(of: vault.selection) {
             ui.mode = vault.openInEditMode ? .edit : .read
             vault.openInEditMode = false
@@ -38,41 +35,23 @@ struct ContentView: View {
         }
     }
 
-    // MARK: Top bar (custom title bar: tabs + actions, themed)
+    // MARK: Title-bar toolbar (vault name + tabs + actions)
 
-    private var topBar: some View {
-        HStack(spacing: 8) {
-            Button {
-                withAnimation(.smooth(duration: 0.2)) {
-                    columns = columns == .detailOnly ? .all : .detailOnly
-                }
-            } label: { Image(systemName: "sidebar.leading") }
-            .buttonStyle(.borderless)
-            .help("Toggle sidebar")
-
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .navigation) {
             Text(vault.vaultURL?.lastPathComponent ?? "Slate")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .fixedSize()
-
-            if vault.openTabs.isEmpty {
-                Spacer()
-            } else {
-                Divider().frame(height: 16)
+        }
+        ToolbarItem(placement: .principal) {
+            if !vault.openTabs.isEmpty {
                 TabBarView().frame(maxWidth: .infinity, alignment: .leading)
             }
-
-            actions
         }
-        .padding(.leading, 80)        // clear the traffic lights
-        .padding(.trailing, 12)
-        .frame(height: 44)
-        .background(settings.topBarBackground)
-    }
-
-    private var actions: some View {
-        HStack(spacing: 4) {
+        ToolbarItemGroup(placement: .primaryAction) {
             Button { vault.newNote() } label: { Image(systemName: "square.and.pencil") }
                 .help("New note").disabled(vault.vaultURL == nil)
             Button { vault.refresh() } label: { Image(systemName: "arrow.clockwise") }
@@ -82,8 +61,6 @@ struct ContentView: View {
             } label: { Image(systemName: ui.mode == .read ? "pencil" : "eye") }
                 .help(ui.mode == .read ? "Edit" : "Reading mode").disabled(vault.selection == nil)
         }
-        .buttonStyle(.borderless)
-        .imageScale(.large)
     }
 
     // MARK: Sidebar

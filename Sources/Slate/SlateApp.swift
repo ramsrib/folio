@@ -18,6 +18,7 @@ struct SlateApp: App {
                 .preferredColorScheme(settings.colorScheme)
         }
         .windowStyle(.hiddenTitleBar)
+        .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(after: .newItem) {
                 Button("New Note") { vault.newNote() }
