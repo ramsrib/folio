@@ -22,6 +22,12 @@ struct SlateApp: App {
                     .keyboardShortcut("n", modifiers: .command)
                 Button("Close Tab") { if let s = vault.selection { vault.closeTab(s) } }
                     .keyboardShortcut("w", modifiers: .command)
+                Button("Reopen Closed Tab") { vault.reopenClosedTab() }
+                    .keyboardShortcut("t", modifiers: [.command, .shift])
+                Button("Next Tab") { vault.cycleTab(1) }
+                    .keyboardShortcut("]", modifiers: [.command, .shift])
+                Button("Previous Tab") { vault.cycleTab(-1) }
+                    .keyboardShortcut("[", modifiers: [.command, .shift])
                 Button("Open Vault…") { vault.pickVault() }
                     .keyboardShortcut("o", modifiers: [.command, .shift])
                 Button("Reload Vault") { vault.refresh() }

@@ -37,6 +37,7 @@ final class VaultStore: ObservableObject {
     private var loadedURL: URL?
     private var saveTask: Task<Void, Never>?
     private var watcher: VaultWatcher?
+    private var recentlyClosed: [URL] = []   // stack for "reopen closed tab"
 
     // Link index
     private var noteByName: [String: [URL]] = [:]     // lowercased basename -> urls
@@ -112,6 +113,7 @@ final class VaultStore: ObservableObject {
         guard let idx = openTabs.firstIndex(of: url) else { return }
         let wasActive = selection == url
         openTabs.remove(at: idx)
+        recentlyClosed.append(url); trimClosed()
         if wasActive {
             if loadedURL == url { saveTask?.cancel(); saveTask = nil }
             flushSave()
@@ -124,6 +126,43 @@ final class VaultStore: ObservableObject {
         }
         persistSession()
     }
+
+    /// Drag-reorder: move `src` to `dst`'s position.
+    func reorderTab(from src: URL, to dst: URL) {
+        guard let from = openTabs.firstIndex(of: src),
+              let to = openTabs.firstIndex(of: dst), from != to else { return }
+        openTabs.move(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
+        persistSession()
+    }
+
+    func closeOtherTabs(keeping url: URL) {
+        recentlyClosed.append(contentsOf: openTabs.filter { $0 != url }); trimClosed()
+        openTabs = openTabs.contains(url) ? [url] : []
+        if selection != url { select(url) } else { persistSession() }
+    }
+
+    func closeAllTabs() {
+        recentlyClosed.append(contentsOf: openTabs); trimClosed()
+        flushSave()
+        openTabs = []
+        selection = nil; loadedURL = nil; content = ""; outline = []; backlinks = []
+        persistSession()
+    }
+
+    /// Re-open the most recently closed tab whose file still exists (⌘⇧T).
+    func reopenClosedTab() {
+        while let url = recentlyClosed.popLast() {
+            if files.contains(where: { $0.id == url }) { select(url); return }
+        }
+    }
+
+    /// Cycle the active tab (+1 next, -1 previous), wrapping around.
+    func cycleTab(_ delta: Int) {
+        guard let sel = selection, let idx = openTabs.firstIndex(of: sel), !openTabs.isEmpty else { return }
+        select(openTabs[(idx + delta + openTabs.count) % openTabs.count])
+    }
+
+    private func trimClosed() { if recentlyClosed.count > 20 { recentlyClosed.removeFirst(recentlyClosed.count - 20) } }
 
     private func startWatching() {
         watcher = nil
