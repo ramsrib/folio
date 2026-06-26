@@ -54,7 +54,7 @@ private struct TabChip: View {
             .accessibilityLabel("Close \(name)")
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 3)
+        .padding(.vertical, 5)
         .frame(maxWidth: 200)
         .background(chipBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(

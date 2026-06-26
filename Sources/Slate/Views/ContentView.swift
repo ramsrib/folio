@@ -52,15 +52,15 @@ struct ContentView: View {
         HStack(spacing: 0) {
             if showSidebar {
                 sidebarTitleArea
-                    .frame(width: sidebarWidth, height: 30)
+                    .frame(width: sidebarWidth, height: 42)
                     .background(settings.sidebarBackground ?? Color(nsColor: .windowBackgroundColor))
                 Divider()
             }
             contentTitleArea
-                .frame(maxWidth: .infinity, minHeight: 30)
+                .frame(maxWidth: .infinity, minHeight: 42)
                 .background(settings.topBarBackground)
         }
-        .frame(height: 30)
+        .frame(height: 42)
     }
 
     private var sidebarTitleArea: some View {

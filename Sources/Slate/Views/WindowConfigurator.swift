@@ -25,5 +25,21 @@ struct WindowConfigurator: NSViewRepresentable {
         window.titleVisibility = .hidden
         window.isMovableByWindowBackground = true
         window.backgroundColor = background ?? .windowBackgroundColor
+        centerTrafficLights(window, barHeight: 42)
+    }
+
+    /// Vertically center the traffic lights within our taller (42pt) title bar.
+    /// Idempotent — sets an absolute target Y so repeated calls don't drift.
+    private func centerTrafficLights(_ window: NSWindow, barHeight: CGFloat) {
+        let buttons = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton]
+            .compactMap { window.standardWindowButton($0) }
+        guard let container = buttons.first?.superview else { return }
+        for button in buttons {
+            let h = button.frame.height
+            let targetY = container.bounds.height - barHeight / 2 - h / 2   // center at barHeight/2 from top
+            if abs(button.frame.origin.y - targetY) > 0.5 {
+                button.setFrameOrigin(NSPoint(x: button.frame.origin.x, y: targetY))
+            }
+        }
     }
 }
