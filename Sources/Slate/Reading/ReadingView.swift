@@ -53,21 +53,24 @@ struct ReadingView: View {
     private func view(for block: Block) -> some View {
         switch block.kind {
         case let .properties(props):
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 11) {
                 ForEach(props) { p in
-                    HStack(alignment: .top, spacing: 12) {
+                    HStack(alignment: .top, spacing: 16) {
                         Text(p.key)
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 13.5, weight: .medium))
                             .foregroundStyle(.secondary)
-                            .frame(width: 120, alignment: .leading)
+                            .frame(width: 150, alignment: .leading)
                         Text(p.value.isEmpty ? "—" : p.value)
-                            .font(.system(size: 13))
+                            .font(.system(size: 14.5))
+                            .lineSpacing(3)
+                            .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
-            .padding(12)
-            .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
+            .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
         case let .heading(level, text, _):
             Text(InlineMarkdown.render(text))
