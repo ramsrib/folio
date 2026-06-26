@@ -27,13 +27,12 @@ struct ContentView: View {
         }
         .ignoresSafeArea(.container, edges: .top)   // let the title-bar row reach the traffic-light line
         .background(WindowConfigurator(background: settings.nsWindowBackground))
+        .overlay { paletteOverlay }
+        .animation(.easeOut(duration: 0.14), value: paletteShown)
         .onChange(of: vault.selection) {
             ui.mode = vault.openInEditMode ? .edit : .read
             vault.openInEditMode = false
         }
-        .sheet(isPresented: $ui.showQuickSwitcher) { QuickSwitcherView() }
-        .sheet(isPresented: $ui.showCommandPalette) { CommandPaletteView() }
-        .sheet(isPresented: $ui.showTags) { TagsView() }
         .alert("Rename Note", isPresented: renamePresented) {
             TextField("Name", text: $renameText)
             Button("Cancel", role: .cancel) { renameTarget = nil }
@@ -42,6 +41,41 @@ struct ContentView: View {
                 renameTarget = nil
             }
         }
+    }
+
+    // MARK: Command palettes — in-window overlays (not sheets), so there's no
+    // sheet window to flash white on first present. A transparent backdrop
+    // catches clicks outside the palette to dismiss it; Esc still works via each
+    // palette's own onExitCommand.
+
+    private var paletteShown: Bool {
+        ui.showCommandPalette || ui.showQuickSwitcher || ui.showTags || ui.showShortcuts
+    }
+
+    @ViewBuilder
+    private var paletteOverlay: some View {
+        if paletteShown {
+            ZStack {
+                Color.black.opacity(0.001)        // invisible click-catcher
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture { dismissPalettes() }
+                Group {
+                    if ui.showCommandPalette { CommandPaletteView() }
+                    else if ui.showQuickSwitcher { QuickSwitcherView() }
+                    else if ui.showTags { TagsView() }
+                    else if ui.showShortcuts { ShortcutsView() }
+                }
+            }
+            .transition(.opacity)
+        }
+    }
+
+    private func dismissPalettes() {
+        ui.showCommandPalette = false
+        ui.showQuickSwitcher = false
+        ui.showTags = false
+        ui.showShortcuts = false
     }
 
     // MARK: Title bar — split into a sidebar title area + a content title area
@@ -64,24 +98,31 @@ struct ContentView: View {
     }
 
     private var sidebarTitleArea: some View {
-        HStack(spacing: 6) {
-            Spacer(minLength: 0)
+        ZStack {
+            // Vault title centered in the sidebar column, growing symmetrically on
+            // both sides. The 78pt horizontal clearance keeps it clear of the
+            // traffic lights (left) and the trailing controls (right) when long.
             Text(vault.vaultURL?.lastPathComponent ?? "Slate")
                 .font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
-                .lineLimit(1)
-            Button { vault.refresh() } label: { Image(systemName: "arrow.clockwise") }
-                .buttonStyle(.borderless).help("Reload vault").accessibilityLabel("Reload vault")
-                .disabled(vault.vaultURL == nil)
-            toggleButton            // vault title + reload sit just before the toggle
+                .lineLimit(1).truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.horizontal, 78)
+
+            HStack(spacing: 6) {
+                Spacer(minLength: 0)
+                Button { vault.refresh() } label: { Image(systemName: "arrow.clockwise") }
+                    .buttonStyle(.borderless).help("Reload Vault (⇧⌘R)").accessibilityLabel("Reload vault")
+                    .disabled(vault.vaultURL == nil)
+                toggleButton            // reload + toggle pinned to the trailing edge
+            }
+            .padding(.trailing, 10)
         }
-        .padding(.leading, 78)      // clear the traffic lights
-        .padding(.trailing, 10)
     }
 
     private var contentTitleArea: some View {
         HStack(spacing: 8) {
             if !showSidebar { toggleButton }   // toggle relocates here when the sidebar is hidden
-            TabBarView().frame(maxWidth: .infinity, alignment: .leading)   // tabs + trailing "+"
+            TabBarView().frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)   // tabs + trailing "+"
             actionButtons
         }
         .padding(.leading, showSidebar ? 12 : 78)   // clear traffic lights only when sidebar is off
@@ -92,18 +133,18 @@ struct ContentView: View {
         Button { withAnimation(.smooth(duration: 0.2)) { showSidebar.toggle() } } label: {
             Image(systemName: "sidebar.leading")
         }
-        .buttonStyle(.borderless).help("Toggle sidebar").accessibilityLabel("Toggle sidebar")
+        .buttonStyle(.borderless).help("Toggle Sidebar").accessibilityLabel("Toggle sidebar")
     }
 
     private var actionButtons: some View {
         HStack(spacing: 6) {
             Button { ui.showTags = true } label: { Image(systemName: "number") }
-                .help("Browse tags").accessibilityLabel("Browse tags").disabled(vault.vaultURL == nil)
+                .help("Browse Tags").accessibilityLabel("Browse tags").disabled(vault.vaultURL == nil)
             Button {
                 withAnimation(.smooth(duration: 0.2)) { ui.mode = ui.mode == .read ? .edit : .read }
             } label: { Image(systemName: ui.mode == .read ? "pencil" : "eye") }
-                .help(ui.mode == .read ? "Edit" : "Reading mode")
-                .accessibilityLabel(ui.mode == .read ? "Switch to editing" : "Switch to reading")
+                .help(ui.mode == .read ? "Writing Mode (⌘E)" : "Reading Mode (⌘E)")
+                .accessibilityLabel(ui.mode == .read ? "Switch to writing" : "Switch to reading")
                 .disabled(vault.selection == nil)
         }
         .buttonStyle(.borderless)

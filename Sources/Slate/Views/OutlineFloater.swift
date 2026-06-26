@@ -7,6 +7,8 @@ struct OutlineFloater: View {
     @EnvironmentObject private var vault: VaultStore
     @EnvironmentObject private var settings: AppSettings
     @State private var hovering = false
+    @State private var listHeight: CGFloat = 0
+    private let maxListHeight: CGFloat = 420
 
     var body: some View {
         if !vault.outline.isEmpty {
@@ -36,23 +38,29 @@ struct OutlineFloater: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .padding(.bottom, 4)
-            ForEach(vault.outline) { item in
-                Button { vault.scrollRequest = item.charIndex } label: {
-                    Text(item.title)
-                        .font(.callout)
-                        .lineLimit(1)
-                        .padding(.leading, CGFloat(item.level - 1) * 11)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
+            ScrollView {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(vault.outline) { item in
+                        Button { vault.scrollRequest = item.charIndex } label: {
+                            Text(item.title)
+                                .font(.callout)
+                                .lineLimit(1)
+                                .padding(.leading, CGFloat(item.level - 1) * 11)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.vertical, 1)
+                    }
                 }
-                .buttonStyle(.plain)
-                .padding(.vertical, 1)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
             }
+            .frame(height: min(listHeight, maxListHeight))
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollIndicators(.hidden)
         }
         .padding(14)
         .frame(width: 250, alignment: .leading)
-        .frame(maxHeight: 460)
-        .fixedSize(horizontal: false, vertical: true)
         .background(settings.surfaceStyle, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.separator.opacity(0.6)))
         .shadow(color: .black.opacity(0.18), radius: 16, y: 6)

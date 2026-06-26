@@ -22,10 +22,11 @@ struct CommandPaletteView: View {
             AppCommand(title: "Open Vault…", subtitle: "⇧⌘O") { vault.pickVault() },
             AppCommand(title: "Reload Vault", subtitle: "⇧⌘R") { vault.refresh() },
             AppCommand(title: "Search Files…", subtitle: "⌘K") { ui.showQuickSwitcher = true },
-            AppCommand(title: ui.mode == .read ? "Edit Mode" : "Reading Mode", subtitle: "⌘E") {
+            AppCommand(title: ui.mode == .read ? "Writing Mode" : "Reading Mode", subtitle: "⌘E") {
                 ui.mode = ui.mode == .read ? .edit : .read },
         ]
-        c.append(AppCommand(title: "Browse Tags", subtitle: nil) { ui.showTags = true })
+        c.append(AppCommand(title: "Browse Tags", subtitle: "⇧⌘Y") { ui.showTags = true })
+        c.append(AppCommand(title: "Keyboard Shortcuts", subtitle: "⌘/") { ui.showShortcuts = true })
         if let sel = vault.selection {
             c.append(AppCommand(title: "Reveal in Finder", subtitle: nil) {
                 NSWorkspace.shared.activateFileViewerSelecting([sel]) })
@@ -47,10 +48,11 @@ struct CommandPaletteView: View {
                     .textFieldStyle(.plain)
                     .font(.title3)
                     .focused($focused)
+                    .autocorrectionDisabled(true)
                     .onChange(of: query) { selected = 0 }
                     .onSubmit(runSelected)
             }
-            .padding(14)
+            .padding(16)
             Divider()
             List {
                 ForEach(Array(results.enumerated()), id: \.element.id) { idx, cmd in
@@ -61,7 +63,8 @@ struct CommandPaletteView: View {
                             Text(s).font(.caption).foregroundStyle(.secondary)
                         }
                     }
-                    .padding(.vertical, 3)
+                    .padding(.vertical, 5)
+                    .padding(.horizontal, 8)
                     .contentShape(Rectangle())
                     .onTapGesture { run(cmd) }
                     .listRowSeparator(.hidden)
@@ -73,11 +76,12 @@ struct CommandPaletteView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
+            .contentMargins(8, for: .scrollContent)
             .animation(.easeOut(duration: 0.12), value: selected)
         }
         .frame(width: 560, height: 400)
         .paletteSurface()
-        .onAppear { focused = true }
+        .onAppear { focused = true; tamePaletteFieldEditor() }
         .onKeyPress(.downArrow) { move(1); return .handled }
         .onKeyPress(.upArrow) { move(-1); return .handled }
         .onKeyPress(.return) { runSelected(); return .handled }

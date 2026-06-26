@@ -1,9 +1,11 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Notion-style tab strip: tabs separated by thin dividers, the active tab shown
-/// by bolder/darker text (no fill), with the dividers beside it suppressed so it
-/// stands out. A "+" at the end creates a new note. Scrolls when crowded.
+/// Browser/Notion-style tab strip. The active tab is a full-height cell framed on
+/// three sides (top edge of the window + left/right borders); its bottom merges
+/// into the title bar's own bottom divider, so it reads as a defined tab rather
+/// than a floating box. Inactive tabs are plain text with thin separators between
+/// them. A "+" at the end creates a new note. Scrolls when crowded.
 struct TabBarView: View {
     @EnvironmentObject private var vault: VaultStore
     @State private var dragging: URL?
@@ -33,15 +35,17 @@ struct TabBarView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .padding(.horizontal, 8).padding(.vertical, 5)
+                .padding(.horizontal, 8)
+                .frame(maxHeight: .infinity)
                 .contentShape(Rectangle())
-                .help("New note").accessibilityLabel("New note")
+                .help("New Note (⌘N)").accessibilityLabel("New note")
                 .disabled(vault.vaultURL == nil)
             }
-            .padding(.vertical, 3)
+            .frame(maxHeight: .infinity)
             .padding(.horizontal, 2)
             .animation(.snappy(duration: 0.2), value: vault.openTabs)
         }
+        .frame(maxHeight: .infinity)
     }
 
     private func isActive(_ i: Int) -> Bool {
@@ -54,9 +58,17 @@ private struct TabChip: View {
     let url: URL
     let isActive: Bool
     @EnvironmentObject private var vault: VaultStore
+    @EnvironmentObject private var settings: AppSettings
     @State private var hover = false
 
     private var name: String { (url.lastPathComponent as NSString).deletingPathExtension }
+
+    /// Active tab uses the editor's page color so the framed cell reads distinctly;
+    /// inactive tabs are transparent with only a faint hover hint.
+    private var chipBackground: Color {
+        if isActive { return settings.paneBackground ?? Color(nsColor: .textBackgroundColor) }
+        return hover ? Color.primary.opacity(0.06) : .clear
+    }
 
     var body: some View {
         HStack(spacing: 6) {
@@ -76,11 +88,16 @@ private struct TabChip: View {
             .accessibilityLabel("Close \(name)")
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 5)
-        .frame(maxWidth: 220)
-        // No fill (Notion style); a faint hover hint only on inactive tabs.
-        .background(hover && !isActive ? Color.primary.opacity(0.05) : .clear,
-                    in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .frame(maxWidth: 220, maxHeight: .infinity)
+        .background(chipBackground, in: TabShape(radius: 6))
+        // Active tab: three-sided frame (top + sides) with softly rounded top
+        // corners; the bottom is left open so it merges into the title-bar divider.
+        .overlay {
+            if isActive {
+                TabFrame(radius: 6).stroke(Color.secondary.opacity(0.45),
+                                           style: StrokeStyle(lineWidth: 1, lineJoin: .round))
+            }
+        }
         .contentShape(Rectangle())
         .onTapGesture { vault.select(url) }
         .onHover { hover = $0 }
@@ -94,6 +111,43 @@ private struct TabChip: View {
             Divider()
             Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
         }
+    }
+}
+
+/// Three-sided tab outline — up the left side, across the top with rounded top
+/// corners, down the right — and no bottom edge, so the active tab's bottom
+/// blends into the title-bar divider below it.
+private struct TabFrame: Shape {
+    var radius: CGFloat
+    func path(in rect: CGRect) -> Path {
+        let r = rect.insetBy(dx: 0.5, dy: 0)
+        let top = r.minY + 0.5
+        var p = Path()
+        p.move(to: CGPoint(x: r.minX, y: r.maxY))
+        p.addLine(to: CGPoint(x: r.minX, y: top + radius))
+        p.addQuadCurve(to: CGPoint(x: r.minX + radius, y: top),
+                       control: CGPoint(x: r.minX, y: top))
+        p.addLine(to: CGPoint(x: r.maxX - radius, y: top))
+        p.addQuadCurve(to: CGPoint(x: r.maxX, y: top + radius),
+                       control: CGPoint(x: r.maxX, y: top))
+        p.addLine(to: CGPoint(x: r.maxX, y: r.maxY))
+        return p
+    }
+}
+
+/// Fill shape for a tab: rounded top corners, square bottom (so it sits flush on
+/// the title-bar divider). Matches `TabFrame`.
+private struct TabShape: InsettableShape {
+    var radius: CGFloat
+    var inset: CGFloat = 0
+    func path(in rect: CGRect) -> Path {
+        UnevenRoundedRectangle(topLeadingRadius: radius, bottomLeadingRadius: 0,
+                               bottomTrailingRadius: 0, topTrailingRadius: radius,
+                               style: .continuous)
+            .path(in: rect.insetBy(dx: inset, dy: 0))
+    }
+    func inset(by amount: CGFloat) -> some InsettableShape {
+        TabShape(radius: radius, inset: inset + amount)
     }
 }
 

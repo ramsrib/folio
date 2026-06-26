@@ -24,10 +24,11 @@ struct QuickSwitcherView: View {
                     .textFieldStyle(.plain)
                     .font(.title3)
                     .focused($focused)
+                    .autocorrectionDisabled(true)
                     .onChange(of: query) { selected = 0 }
                     .onSubmit(openSelected)
             }
-            .padding(14)
+            .padding(16)
             Divider()
             ScrollViewReader { proxy in
                 List {
@@ -44,13 +45,14 @@ struct QuickSwitcherView: View {
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
+                .contentMargins(8, for: .scrollContent)
                 .animation(.easeOut(duration: 0.12), value: selected)
                 .onChange(of: selected) { proxy.scrollTo(selected, anchor: .center) }
             }
         }
         .frame(width: 620, height: 440)
         .paletteSurface()
-        .onAppear { focused = true }
+        .onAppear { focused = true; tamePaletteFieldEditor() }
         .onKeyPress(.downArrow) { move(1); return .handled }
         .onKeyPress(.upArrow) { move(-1); return .handled }
         .onKeyPress(.return) { openSelected(); return .handled }
@@ -68,7 +70,8 @@ struct QuickSwitcherView: View {
             }
             Spacer()
         }
-        .padding(.vertical, 3)
+        .padding(.vertical, 5)
+        .padding(.horizontal, 8)
         .contentShape(Rectangle())
     }
 

@@ -26,19 +26,35 @@ struct TagsView: View {
             header
             Divider()
             ScrollViewReader { proxy in
-                List {
-                    if selectedTag == nil { tagRows } else { noteRows }
+                ScrollView {
+                    LazyVStack(spacing: 2) {
+                        if selectedTag == nil {
+                            tagRows
+                        } else if notes.isEmpty {
+                            ContentUnavailableView("No notes", systemImage: "doc.text")
+                                .frame(maxWidth: .infinity, minHeight: 320)
+                        } else {
+                            noteRows
+                        }
+                    }
+                    // Distinct identity per mode so the lazy stack rebuilds rows on
+                    // drill-in instead of reusing tag rows (both use .id(idx)).
+                    .id(selectedTag ?? "__tags__")
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .environment(\.defaultMinListRowHeight, 30)
+                .contentMargins(8, for: .scrollContent)
                 .animation(.easeOut(duration: 0.12), value: selected)
-                .onChange(of: selected) { proxy.scrollTo(selected, anchor: .center) }
+                .onChange(of: selected) {
+                    if selectedTag == nil, tags.indices.contains(selected) {
+                        proxy.scrollTo(tags[selected].tag, anchor: .center)
+                    } else if selectedTag != nil, notes.indices.contains(selected) {
+                        proxy.scrollTo(notes[selected].id, anchor: .center)
+                    }
+                }
             }
         }
         .frame(width: 560, height: 440)
         .paletteSurface()
-        .onAppear { focused = true }
+        .onAppear { focused = true; tamePaletteFieldEditor() }
         .onKeyPress(.downArrow) { move(1); return .handled }
         .onKeyPress(.upArrow) { move(-1); return .handled }
         .onKeyPress(.return) { activate(); return .handled }
@@ -57,10 +73,11 @@ struct TagsView: View {
                 .textFieldStyle(.plain)
                 .font(.title3)
                 .focused($focused)
+                .autocorrectionDisabled(true)
                 .onChange(of: query) { selected = 0 }
                 .onSubmit(activate)
         }
-        .padding(14)
+        .padding(16)
     }
 
     private var tagRows: some View {
@@ -70,11 +87,11 @@ struct TagsView: View {
                 Spacer()
                 Text("\(item.count)").font(.callout).foregroundStyle(.secondary).monospacedDigit()
             }
-            .padding(.vertical, 3)
+            .padding(.vertical, 6)
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .id(idx)
-            .listRowSeparator(.hidden)
-            .listRowBackground(rowBackground(idx))
+            .background(rowBackground(idx))
             .onTapGesture { selected = idx; activate() }
         }
     }
@@ -86,17 +103,12 @@ struct TagsView: View {
                 Text(file.name).lineLimit(1)
                 Spacer()
             }
-            .padding(.vertical, 3)
+            .padding(.vertical, 6)
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .id(idx)
-            .listRowSeparator(.hidden)
-            .listRowBackground(rowBackground(idx))
+            .background(rowBackground(idx))
             .onTapGesture { selected = idx; activate() }
-        }
-        .overlay(alignment: .center) {
-            if notes.isEmpty {
-                ContentUnavailableView("No notes", systemImage: "doc.text")
-            }
         }
     }
 

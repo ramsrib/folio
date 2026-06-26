@@ -27,9 +27,9 @@ struct SlateApp: App {
                 Button("Reopen Closed Tab") { vault.reopenClosedTab() }
                     .keyboardShortcut("t", modifiers: [.command, .shift])
                 Button("Next Tab") { vault.cycleTab(1) }
-                    .keyboardShortcut("]", modifiers: [.command, .shift])
+                    .keyboardShortcut(.tab, modifiers: .control)
                 Button("Previous Tab") { vault.cycleTab(-1) }
-                    .keyboardShortcut("[", modifiers: [.command, .shift])
+                    .keyboardShortcut(.tab, modifiers: [.control, .shift])
                 Button("Open Vault…") { vault.pickVault() }
                     .keyboardShortcut("o", modifiers: [.command, .shift])
                 Menu("Open Recent") {
@@ -49,11 +49,15 @@ struct SlateApp: App {
                     .keyboardShortcut("k", modifiers: .command)
                 Button("Command Palette…") { ui.showCommandPalette = true }
                     .keyboardShortcut("p", modifiers: .command)
+                Button("Browse Tags…") { ui.showTags = true }
+                    .keyboardShortcut("y", modifiers: [.command, .shift])
                 Divider()
-                Button(ui.mode == .read ? "Edit Mode" : "Reading Mode") {
+                Button(ui.mode == .read ? "Writing Mode" : "Reading Mode") {
                     ui.mode = ui.mode == .read ? .edit : .read
                 }
                 .keyboardShortcut("e", modifiers: .command)
+                Button("Keyboard Shortcuts") { ui.showShortcuts = true }
+                    .keyboardShortcut("/", modifiers: .command)
             }
         }
 

@@ -21,7 +21,7 @@ struct EditorPane: View {
                 .background(settings.paneBackground ?? Color(nsColor: .textBackgroundColor))
         } else {
             ContentUnavailableView("Select a note", systemImage: "doc.text",
-                description: Text("Pick a note from the sidebar to start editing."))
+                description: Text("Pick a note from the sidebar to start writing."))
         }
     }
 
