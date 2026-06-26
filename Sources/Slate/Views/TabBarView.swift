@@ -1,17 +1,22 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Horizontal bar of open notes (tabs): click to activate, ✕/⌘W to close,
-/// drag to reorder, right-click for close-others/all. A "+" at the end creates a
-/// new note. Scrolls when there are many tabs.
+/// Notion-style tab strip: tabs separated by thin dividers, the active tab shown
+/// by bolder/darker text (no fill), with the dividers beside it suppressed so it
+/// stands out. A "+" at the end creates a new note. Scrolls when crowded.
 struct TabBarView: View {
     @EnvironmentObject private var vault: VaultStore
     @State private var dragging: URL?
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 4) {
-                ForEach(vault.openTabs, id: \.self) { url in
+            HStack(spacing: 0) {
+                ForEach(Array(vault.openTabs.enumerated()), id: \.element) { idx, url in
+                    if idx > 0 {
+                        Divider().frame(height: 14)
+                            .opacity(dividerHidden(idx) ? 0 : 0.5)
+                            .padding(.horizontal, 1)
+                    }
                     TabChip(url: url, isActive: url == vault.selection)
                         .onDrag {
                             dragging = url
@@ -21,23 +26,28 @@ struct TabBarView: View {
                                 delegate: TabDropDelegate(item: url, dragging: $dragging, vault: vault))
                 }
                 if !vault.openTabs.isEmpty {
-                    Divider().frame(height: 14).padding(.horizontal, 2)
+                    Divider().frame(height: 14).opacity(0.5).padding(.horizontal, 1)
                 }
                 Button { vault.newNote() } label: {
                     Image(systemName: "plus").font(.system(size: 12, weight: .medium))
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .padding(6)
+                .padding(.horizontal, 8).padding(.vertical, 5)
                 .contentShape(Rectangle())
                 .help("New note").accessibilityLabel("New note")
                 .disabled(vault.vaultURL == nil)
             }
             .padding(.vertical, 3)
-            .padding(.horizontal, 4)
+            .padding(.horizontal, 2)
             .animation(.snappy(duration: 0.2), value: vault.openTabs)
         }
     }
+
+    private func isActive(_ i: Int) -> Bool {
+        vault.openTabs.indices.contains(i) && vault.openTabs[i] == vault.selection
+    }
+    private func dividerHidden(_ idx: Int) -> Bool { isActive(idx) || isActive(idx - 1) }
 }
 
 private struct TabChip: View {
@@ -54,7 +64,7 @@ private struct TabChip: View {
                 .font(.system(size: 11))
                 .foregroundStyle(isActive ? Color.primary : .secondary)
             Text(name)
-                .font(.system(size: 12.5, weight: isActive ? .medium : .regular))
+                .font(.system(size: 13, weight: isActive ? .semibold : .regular))
                 .foregroundStyle(isActive ? Color.primary : .secondary)
                 .lineLimit(1)
             Button { vault.closeTab(url) } label: {
@@ -62,14 +72,15 @@ private struct TabChip: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .opacity(isActive || hover ? 0.7 : 0)
+            .opacity(isActive || hover ? 0.6 : 0)
             .accessibilityLabel("Close \(name)")
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 12)
         .padding(.vertical, 5)
-        .frame(maxWidth: 200)
-        // Flat selected style (Obsidian/Notion): a subtle fill, no shadow/border.
-        .background(chipBackground, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .frame(maxWidth: 220)
+        // No fill (Notion style); a faint hover hint only on inactive tabs.
+        .background(hover && !isActive ? Color.primary.opacity(0.05) : .clear,
+                    in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         .contentShape(Rectangle())
         .onTapGesture { vault.select(url) }
         .onHover { hover = $0 }
@@ -83,11 +94,6 @@ private struct TabChip: View {
             Divider()
             Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
         }
-    }
-
-    private var chipBackground: Color {
-        if isActive { return Color.primary.opacity(0.09) }
-        return hover ? Color.primary.opacity(0.05) : .clear
     }
 }
 
