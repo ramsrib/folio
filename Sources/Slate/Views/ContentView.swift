@@ -123,12 +123,22 @@ struct ContentView: View {
                     .buttonStyle(.borderedProminent)
             }
         } else {
-            List(selection: Binding(get: { vault.selection }, set: { vault.select($0) })) {
-                ForEach(vault.tree) { node in
-                    FileTreeRow(node: node, expanded: $expandedDirs, startRename: startRename)
+            List {
+                ForEach(visibleItems) { item in
+                    SidebarRow(item: item, expanded: $expandedDirs,
+                               selected: vault.selection == item.node.id,
+                               onSelect: { vault.select(item.node.id) },
+                               onToggle: { toggleDir(item.node.id) },
+                               startRename: startRename)
+                        .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
                 }
             }
             .listStyle(.sidebar)
+            .environment(\.defaultMinListRowHeight, 26)
+            .scrollContentBackground(settings.sidebarBackground == nil ? .automatic : .hidden)
+            .background(settings.sidebarBackground ?? Color.clear)
             .onChange(of: vault.vaultURL) { expandedDirs.removeAll() }
             .overlay {
                 if vault.tree.isEmpty {
@@ -137,6 +147,24 @@ struct ContentView: View {
                 }
             }
         }
+    }
+
+    // MARK: Tree flattening (respecting expansion)
+
+    private var visibleItems: [SidebarItem] {
+        var rows: [SidebarItem] = []
+        func walk(_ nodes: [VaultNode], _ depth: Int) {
+            for n in nodes {
+                rows.append(SidebarItem(node: n, depth: depth))
+                if n.isDirectory, expandedDirs.contains(n.id), let c = n.children { walk(c, depth + 1) }
+            }
+        }
+        walk(vault.tree, 0)
+        return rows
+    }
+
+    private func toggleDir(_ id: URL) {
+        if expandedDirs.contains(id) { expandedDirs.remove(id) } else { expandedDirs.insert(id) }
     }
 
     // MARK: Rename

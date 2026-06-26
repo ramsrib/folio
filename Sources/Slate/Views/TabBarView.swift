@@ -2,7 +2,8 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// Horizontal bar of open notes (tabs): click to activate, ✕/⌘W to close,
-/// drag to reorder, right-click for close-others/all.
+/// drag to reorder, right-click for close-others/all. Scrolls when there are
+/// many tabs so it never overflows the title bar.
 struct TabBarView: View {
     @EnvironmentObject private var vault: VaultStore
     @State private var dragging: URL?
@@ -20,8 +21,7 @@ struct TabBarView: View {
                                 delegate: TabDropDelegate(item: url, dragging: $dragging, vault: vault))
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .padding(.vertical, 3)
             .animation(.snappy(duration: 0.2), value: vault.openTabs)
         }
     }
@@ -31,36 +31,43 @@ private struct TabChip: View {
     let url: URL
     let isActive: Bool
     @EnvironmentObject private var vault: VaultStore
+    @EnvironmentObject private var settings: AppSettings
     @State private var hover = false
 
     private var name: String { (url.lastPathComponent as NSString).deletingPathExtension }
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "doc.text").font(.system(size: 11)).foregroundStyle(.secondary)
-            Text(name).font(.system(size: 13)).lineLimit(1)
+            Image(systemName: "doc.text")
+                .font(.system(size: 11))
+                .foregroundStyle(isActive ? Color.primary : .secondary)
+            Text(name)
+                .font(.system(size: 12.5, weight: isActive ? .medium : .regular))
+                .foregroundStyle(isActive ? Color.primary : .secondary)
+                .lineLimit(1)
             Button { vault.closeTab(url) } label: {
                 Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .opacity(isActive || hover ? 1 : 0)
+            .opacity(isActive || hover ? 0.8 : 0)
             .accessibilityLabel("Close \(name)")
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(name)
-        .accessibilityAddTraits(isActive ? [.isSelected, .isButton] : .isButton)
         .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .padding(.vertical, 5)
         .frame(maxWidth: 200)
-        .background(isActive ? Color.primary.opacity(0.08) : .clear,
-                    in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous)
-            .strokeBorder(isActive ? Color.secondary.opacity(0.25) : .clear))
+        .background(chipBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(isActive ? Color.black.opacity(0.08) : .clear, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(isActive ? 0.12 : 0), radius: 2.5, y: 1)   // active tab "pops"
         .contentShape(Rectangle())
         .onTapGesture { vault.select(url) }
         .onHover { hover = $0 }
         .help(name)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
         .contextMenu {
             Button("Close") { vault.closeTab(url) }
             Button("Close Others") { vault.closeOtherTabs(keeping: url) }
@@ -68,6 +75,11 @@ private struct TabChip: View {
             Divider()
             Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
         }
+    }
+
+    private var chipBackground: Color {
+        if isActive { return settings.paneBackground ?? Color(nsColor: .textBackgroundColor) }
+        return hover ? Color.primary.opacity(0.06) : .clear
     }
 }
 
