@@ -12,8 +12,11 @@
 > task checkboxes, `==highlight==`, completed-task styling. **Reading mode done:** a fully-rendered,
 > Notion-style read view (⌘E) — headings, lists, real checkboxes, callout boxes, code blocks, tables,
 > dividers, images, no syntax symbols. **Reading is the default**; double-click the page (or ⌘E)
-> to write; navigation always opens in reading. **File search on ⌘K.**
-> Last updated 2026-06-25.
+> to write; navigation always opens in reading. **File search on ⌘K.** macOS v1 wrap-up essentially
+> complete: tabs (reorder/restore), Appearance settings (paper theme/font/size/width), recent vaults,
+> app icon, incremental link index, accessibility labels, code-block syntax highlighting, hover link
+> preview, `#tags` pane. Next: iOS bring-up (M5/M6).
+> Last updated 2026-06-26.
 
 A native, UX-first Markdown notes app that edits your **existing `.md` files in place** — built to
 replace Obsidian, starting on macOS.
@@ -140,20 +143,20 @@ Swapping Stage 1 → Stage 2 touches only `EditorPane`/`Editors/`, nothing else.
 - **M4 — Wrap up macOS v1** (the shippable finish line):
   - [x] **Live-reload the open note** when it changes on disk (cloud sync / another app / the iOS
         app) without clobbering unsaved edits. *(directly enables the synced dual-app story)*
-  - [x] **Tabs + reopen state:** multiple open notes as **tabs** (open/close, ⌘W, click to switch);
-        open tabs + active note are **restored per vault on relaunch** (Obsidian-style session).
-        Frontmatter now renders as a Properties panel in reading mode. *(mode not yet persisted —
-        restored notes open in reading mode; tab reordering & split panes still to do)*
-  - [~] **Settings (⌘,):** ✅ Appearance — theme (System/Light/Dark/**Paper warm**), reading font
-        (System/Serif/Mono), body font size, line width; applied live to reading + editor. Still:
-        recent vaults / switch-vault UI, per-vault appearance, link-color/accent.
-  - [ ] **App icon**, about, polished first-run empty state.
-  - [~] **Robustness:** ✅ ignore dependency/build dirs on scan (`node_modules`, `vendor`, `Pods`,
-        `build`, `dist`, `target`, … ; hidden dirs already skipped) so a code-project folder doesn't
-        crawl/index package READMEs. Still: large-vault incremental link index, accessibility pass,
-        optional user-configurable `.slateignore`/settings.
-  - [ ] *(stretch)* syntax highlighting in code blocks; hover link preview; tab reordering / split
-        panes; `#tags` pane; always-WYSIWYG concealment.
+  - [x] **Tabs + reopen state:** multiple open notes as **tabs** (open/close ⌘W, click to switch,
+        **drag-reorder**, ⌘⇧T reopen, ⌘⇧[ / ⌘⇧] cycle, close-others/all); open tabs + active note
+        **restored per vault on relaunch**. Frontmatter renders as a Properties panel in reading mode.
+        *(mode not persisted; split panes still to do)*
+  - [x] **Settings (⌘,):** Appearance — theme (System/Light/Dark/**Paper warm**), reading font
+        (System/Serif/Mono), body font size, line width; applied live. **Recent vaults** (File >
+        Open Recent). *(still: per-vault appearance, link-color/accent)*
+  - [x] **App icon** wired into packaging + set at runtime.
+  - [x] **Robustness:** ignore dependency/build dirs on scan; **incremental link index** (mtime
+        cache — only re-reads changed files); **accessibility labels** on icon-only controls.
+        *(still: full VoiceOver audit, optional `.slateignore`)*
+  - [x] **Stretch landed:** code-block **syntax highlighting** (reading mode), **hover link preview**
+        (wikilinks, editor), **`#tags` pane** (inline + frontmatter tags → notes).
+        *(remaining: split panes, always-WYSIWYG concealment, global content search)*
 - **M5 — Go multiplatform** (one-time restructure, kept ready by M4): xcodegen project with macOS +
   iOS targets sharing `Sources/`; factor a `#if`-bridged platform layer (color/font/image, file
   pick, watcher) so the shared core compiles on both. macOS behavior unchanged.
