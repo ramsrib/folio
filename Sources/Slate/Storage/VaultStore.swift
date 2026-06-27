@@ -27,6 +27,7 @@ final class VaultStore: ObservableObject {
     var allNoteNames: [String] { files.map(\.name) }
 
     private let vaultPathKey = "slate.vaultPath"
+    private let bookmarkKey = "slate.vaultBookmark"   // iOS: security-scoped bookmark
     private let tabsKey = "slate.tabsByVault"      // [vaultPath: [filePath]]
     private let activeKey = "slate.activeByVault"  // [vaultPath: filePath]
     private let recentKey = "slate.recentVaults"   // [vaultPath]
@@ -93,6 +94,13 @@ final class VaultStore: ObservableObject {
         flushSave()
         vaultURL = url
         UserDefaults.standard.set(url.path, forKey: vaultPathKey)
+        #if canImport(UIKit) && !targetEnvironment(macCatalyst)
+        // iOS: persist a security-scoped bookmark so we can reopen the (often
+        // iCloud Drive) folder across launches without re-prompting.
+        if let data = try? url.bookmarkData() {
+            UserDefaults.standard.set(data, forKey: bookmarkKey)
+        }
+        #endif
         addRecent(url)
         selection = nil; content = ""; loadedURL = nil
         outline = []; backlinks = []; openTabs = []
@@ -114,6 +122,18 @@ final class VaultStore: ObservableObject {
     }
 
     private func restoreVault() {
+        #if canImport(UIKit) && !targetEnvironment(macCatalyst)
+        // iOS: resolve the security-scoped bookmark and begin access before reading.
+        guard let data = UserDefaults.standard.data(forKey: bookmarkKey) else { return }
+        var stale = false
+        guard let url = try? URL(resolvingBookmarkData: data, bookmarkDataIsStale: &stale) else { return }
+        _ = url.startAccessingSecurityScopedResource()
+        vaultURL = url
+        addRecent(url)
+        refresh()
+        startWatching()           // no-op on iOS
+        restoreSession()
+        #else
         guard let path = UserDefaults.standard.string(forKey: vaultPathKey) else { return }
         let url = URL(fileURLWithPath: path, isDirectory: true)
         guard FileManager.default.fileExists(atPath: url.path) else { return }
@@ -122,6 +142,7 @@ final class VaultStore: ObservableObject {
         refresh()
         startWatching()
         restoreSession()
+        #endif
     }
 
     // MARK: - Session (tabs) persistence
