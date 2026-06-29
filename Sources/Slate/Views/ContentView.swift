@@ -142,7 +142,7 @@ struct ContentView: View {
                 .help("Browse Tags").accessibilityLabel("Browse tags").disabled(vault.vaultURL == nil)
             Button {
                 withAnimation(.smooth(duration: 0.2)) { ui.mode = ui.mode == .read ? .edit : .read }
-            } label: { Image(systemName: ui.mode == .read ? "pencil" : "eye") }
+            } label: { Image(systemName: ui.mode == .read ? "pencil.line" : "book") }
                 .help(ui.mode == .read ? "Writing Mode (⌘E)" : "Reading Mode (⌘E)")
                 .accessibilityLabel(ui.mode == .read ? "Switch to writing" : "Switch to reading")
                 .disabled(vault.selection == nil)
@@ -197,6 +197,7 @@ struct ContentView: View {
             .environment(\.defaultMinListRowHeight, 26)
             .scrollContentBackground(settings.sidebarBackground == nil ? .automatic : .hidden)
             .background(settings.sidebarBackground ?? Color.clear)
+            .background(ThinScrollers())   // thin, auto-hiding overlay scroller
             .onChange(of: vault.vaultURL) { expandedDirs.removeAll() }
             .overlay {
                 if vault.tree.isEmpty {

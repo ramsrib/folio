@@ -8,6 +8,13 @@ struct SlateApp: App {
     @StateObject private var ui = UIState()
     @StateObject private var settings = AppSettings()
 
+    init() {
+        // Use thin, auto-hiding overlay scrollbars everywhere, regardless of the
+        // system "Show scroll bars" setting. The app's own defaults domain takes
+        // precedence over the global one, so this also overrides "Always".
+        UserDefaults.standard.set("WhenScrolling", forKey: "AppleShowScrollBars")
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()

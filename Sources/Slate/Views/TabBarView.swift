@@ -14,9 +14,12 @@ struct TabBarView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 0) {
                 ForEach(Array(vault.openTabs.enumerated()), id: \.element) { idx, url in
-                    if idx > 0 {
+                    // Drop the separator entirely (not just hide it) next to the
+                    // active tab, so its bordered cell — or a hovered neighbor's
+                    // highlight — sits flush instead of leaving an empty gap.
+                    if idx > 0 && !dividerHidden(idx) {
                         Divider().frame(height: 14)
-                            .opacity(dividerHidden(idx) ? 0 : 0.5)
+                            .opacity(0.5)
                             .padding(.horizontal, 1)
                     }
                     TabChip(url: url, isActive: url == vault.selection)
@@ -94,14 +97,14 @@ private struct TabChip: View {
         // corners; the bottom is left open so it merges into the title-bar divider.
         .overlay {
             if isActive {
-                TabFrame(radius: 6).stroke(Color.secondary.opacity(0.45),
-                                           style: StrokeStyle(lineWidth: 1, lineJoin: .round))
+                TabFrame(radius: 6).stroke(Color.secondary.opacity(0.5),
+                                           style: StrokeStyle(lineWidth: 0.5, lineJoin: .round))
             }
         }
         .contentShape(Rectangle())
         .onTapGesture { vault.select(url) }
         .onHover { hover = $0 }
-        .help(name)
+        .help(url.lastPathComponent)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
         .contextMenu {

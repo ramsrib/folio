@@ -26,7 +26,7 @@ struct NoteScreen: View {
                         ui.mode = ui.mode == .edit ? .read : .edit
                     }
                 } label: {
-                    Image(systemName: ui.mode == .edit ? "eye" : "pencil")
+                    Image(systemName: ui.mode == .edit ? "book" : "pencil.line")
                 }
                 .accessibilityLabel(ui.mode == .edit ? "Reading mode" : "Edit")
             }
