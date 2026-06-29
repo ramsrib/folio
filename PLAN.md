@@ -1,6 +1,7 @@
 # Slate — a file-backed, Obsidian-replacing notes app
 
-> Working codename: **Slate**. Rename later (folder, bundle id, product name).
+> Working codename: **Slate**. **Chosen name: `Folio`** — rename deferred; still shipping as
+> "Slate" in code until we do the sweep (folder, bundle id, target/product name, app icon, docs).
 > Feature & behavior reference (the *what* we're building toward): [`SPEC.md`](SPEC.md).
 > Status: **M0–M2 done; M3 in progress.** Mac app builds & packages; opens a vault as a folder tree,
 > watches it (FSEvents), creates/renames/trashes notes, and edits with an Obsidian-style **Live
