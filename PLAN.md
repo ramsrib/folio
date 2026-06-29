@@ -18,8 +18,10 @@
 > preview, `#tags` pane. Next: iOS bring-up (M5/M6).
 > Last updated 2026-06-26.
 
-A native, UX-first Markdown notes app that edits your **existing `.md` files in place** — built to
-replace Obsidian, starting on macOS.
+A native, **read-optimized** Markdown app that opens your **existing `.md` files in place** — Obsidian
+reimagined for read-heavy use, starting on macOS. The expected workflow: agents author and edit most
+docs; Slate is the fast reader/editor for browsing a whole project's notes efficiently. Reading is the
+default path; writing is fully supported but secondary.
 
 ---
 

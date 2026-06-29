@@ -1,7 +1,24 @@
 # Slate
 
-A UX-first Markdown notes app for **macOS** (iOS later) that edits your **existing `.md` files in
-place** — built to replace Obsidian. Native Swift / SwiftUI, files-on-disk as the source of truth.
+A **read-optimized** Markdown app for **macOS** (iOS later) that opens your **existing `.md` files in
+place**. Think Obsidian, but tuned for *reading* a project's docs rather than authoring them. Native
+Swift / SwiftUI, files-on-disk as the source of truth.
+
+**The use case it's built for:** agents (Claude Code & friends) author, write, and edit most of the
+docs in a project; Slate is the fast, calm **reader** you use to browse and absorb all of them
+efficiently. Writing and editing are fully supported — but reading is the default, the most polished
+path, and what every interaction is optimized around.
+
+## Built for read-heavy use
+
+- **Reading is the default.** Opening a note, following a link, or switching tabs always lands you in
+  the fully-rendered Reading view; writing is one keystroke away (⌘E / double-click) but opt-in.
+- **Optimized for scanning many docs.** Tabs with session restore, quick switcher (⌘O), file search
+  (⌘K), `#tags` browser, backlinks, and a hover outline — built to move through a whole project's
+  notes quickly, not to sit in one document.
+- **Calm, low-chrome rendering.** Notion-style reading column, frontmatter shown as a typed
+  Properties panel, thin auto-hiding scrollbars, no syntax noise — so the docs, not the editor, are
+  what you look at.
 
 - **Feature & behavior reference:** [`SPEC.md`](SPEC.md) — the canonical *what Slate does* (the
   Obsidian-grade north star we build toward). No implementation or timeline.
