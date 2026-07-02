@@ -24,6 +24,13 @@ reimagined for read-heavy use, starting on macOS. The expected workflow: agents 
 docs; Slate is the fast reader/editor for browsing a whole project's notes efficiently. Reading is the
 default path; writing is fully supported but secondary.
 
+**Finding, searching, and navigating are the core value** of Slate — the whole point is locating and
+moving through content faster than anything else. Done so far: vim-style keyboard scrolling (reading),
+`⌘F` **in-page find** (reading *and* writing), quick switcher (⌘O), file-name search (⌘K), tag browser,
+backlinks, outline. **Next big rock:** cross-note / vault-wide **full-text search** (search across all
+pages, jump to hits), building on the in-page find primitives. Longer term: fuzzy/semantic search and
+richer in-doc navigation (heading jump, back/forward history).
+
 ---
 
 ## 1. What changed from v1 of this plan (read this first)

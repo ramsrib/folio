@@ -22,6 +22,9 @@ These are guarantees, not features — every behavior below must respect them.
   reader used to browse and absorb them. Reading mode is the default and the most polished path;
   writing is fully supported but secondary. Every interaction should make scanning and reading across
   many documents efficient and calm.
+- **Find, search, navigate — fast and everywhere.** Locating content and moving through it is the
+  core value, not a side feature. In-page find, cross-note/vault search, and keyboard navigation are
+  first-class in every view and must stay fast and keyboard-driven. When in doubt, invest here first.
 - **Your files are the truth.** A vault is an ordinary folder of `.md` files. Slate reads and writes
   those files in place; there is no hidden database that can drift from disk or lock you in.
 - **Lossless, always.** Opening, editing, and saving a note never reformats, normalizes, or drops
