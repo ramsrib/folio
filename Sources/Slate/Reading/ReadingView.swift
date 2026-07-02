@@ -9,6 +9,7 @@ import AppKit
 /// No syntax symbols — headings, lists, checkboxes, callouts, code, tables,
 /// dividers, and images are drawn as native views.
 struct ReadingView: View {
+    @ObservedObject var find: FindModel
     @EnvironmentObject private var vault: VaultStore
     @EnvironmentObject private var ui: UIState
     @EnvironmentObject private var settings: AppSettings
@@ -18,12 +19,20 @@ struct ReadingView: View {
     private var body0: CGFloat { settings.bodyFontSize }
     private var design: Font.Design { settings.readingFont.design }
 
+    // Ordered occurrences across searchable blocks. Maps the shared model's
+    // `current` index to a block (for scrolling) and its occurrence within that
+    // block (for the stronger current-match tint). `findScroll` triggers the scroll.
+    @State private var findMatches: [FindLoc] = []
+    @State private var findScroll: Int?
+
+    private struct FindLoc: Equatable { let block: Int; let occ: Int }
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
-                    ForEach(blocks) { block in
-                        view(for: block).id(anchorID(block))
+                    ForEach(Array(blocks.enumerated()), id: \.element.id) { i, block in
+                        view(for: block, index: i).id(anchorID(block))
                     }
                 }
                 .frame(maxWidth: settings.readableWidth, alignment: .leading)
@@ -33,12 +42,25 @@ struct ReadingView: View {
                 .padding(.vertical, 28)
                 // Double-click the page to start writing (like Notion).
                 .onTapGesture(count: 2) { withAnimation(.smooth(duration: 0.2)) { ui.mode = .edit } }
+                // Vim-style j/k/h/l scrolling (macOS only — AppKit-backed).
+                #if os(macOS)
+                .background(KeyboardScroller())
+                #endif
             }
-            .task(id: vault.content) { blocks = MarkdownParser.parse(vault.content) }
+            .task(id: vault.content) { blocks = MarkdownParser.parse(vault.content); recomputeMatches(); scrollToCurrent() }
             .onChange(of: vault.scrollRequest) {
                 if let req = vault.scrollRequest {
                     withAnimation(.smooth) { proxy.scrollTo(req, anchor: .top) }
                     vault.scrollRequest = nil
+                }
+            }
+            .onChange(of: find.query) { find.current = 0; recomputeMatches(); scrollToCurrent() }
+            .onChange(of: find.caseSensitive) { recomputeMatches(); scrollToCurrent() }
+            .onChange(of: find.active) { recomputeMatches(); scrollToCurrent() }
+            .onChange(of: find.current) { scrollToCurrent() }
+            .onChange(of: findScroll) {
+                if let anchor = findScroll {
+                    withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(anchor, anchor: .center) }
                 }
             }
         }
@@ -58,24 +80,91 @@ struct ReadingView: View {
         return -block.id.hashValue
     }
 
+    // MARK: - Find in page
+
+    /// The rendered text a block contributes to search — nil for blocks we don't
+    /// highlight yet (callouts, tables, properties, images).
+    private func searchAttr(_ block: Block) -> AttributedString? {
+        switch block.kind {
+        case let .heading(_, t, _):     return InlineMarkdown.render(t)
+        case let .paragraph(t):         return InlineMarkdown.render(t)
+        case let .listItem(_, _, _, t): return InlineMarkdown.render(t)
+        case let .task(_, _, t, _):     return InlineMarkdown.render(t)
+        case let .quote(t):             return InlineMarkdown.render(t)
+        case let .code(lang, t):        return CodeHighlighter.highlight(t, language: lang)
+        default:                        return nil
+        }
+    }
+
+    private func matchRanges(in attr: AttributedString, query: String) -> [Range<AttributedString.Index>] {
+        guard !query.isEmpty else { return [] }
+        var out: [Range<AttributedString.Index>] = []
+        let options = find.options
+        var start = attr.startIndex
+        while start < attr.endIndex, let r = attr[start..<attr.endIndex].range(of: query, options: options) {
+            out.append(r)
+            start = r.upperBound
+        }
+        return out
+    }
+
+    /// Tint every match in a block's text; the current match gets a stronger fill.
+    private func applyFindHighlight(_ attr: AttributedString, blockIndex: Int) -> AttributedString {
+        guard find.active, !find.query.isEmpty else { return attr }
+        var result = attr
+        let ranges = matchRanges(in: result, query: find.query)
+        guard !ranges.isEmpty else { return result }
+        let cur = findMatches.indices.contains(find.current) ? findMatches[find.current] : nil
+        for (k, r) in ranges.enumerated() {
+            let isCurrent = cur?.block == blockIndex && cur?.occ == k
+            result[r].backgroundColor = isCurrent ? Color.orange.opacity(0.9) : Color.yellow.opacity(0.4)
+            if isCurrent { result[r].foregroundColor = .black }
+        }
+        return result
+    }
+
+    private func recomputeMatches() {
+        guard find.active, !find.query.isEmpty else {
+            findMatches = []
+            if find.total != 0 { find.total = 0 }
+            return
+        }
+        var locs: [FindLoc] = []
+        for (i, block) in blocks.enumerated() {
+            guard let attr = searchAttr(block) else { continue }
+            let count = matchRanges(in: attr, query: find.query).count
+            for k in 0..<count { locs.append(FindLoc(block: i, occ: k)) }
+        }
+        findMatches = locs
+        if find.total != locs.count { find.total = locs.count }
+        if find.current >= locs.count { find.current = max(0, locs.count - 1) }
+    }
+
+    private func scrollToCurrent() {
+        guard find.active, findMatches.indices.contains(find.current) else { return }
+        findScroll = anchorID(blocks[findMatches[find.current].block])
+    }
+
     @ViewBuilder
-    private func view(for block: Block) -> some View {
+    private func view(for block: Block, index: Int) -> some View {
         switch block.kind {
         case let .properties(props):
             PropertiesView(props: props)
 
         case let .heading(level, text, _):
-            Text(InlineMarkdown.render(text))
+            Text(applyFindHighlight(InlineMarkdown.render(text), blockIndex: index))
                 .font(.system(size: headingSize(level), weight: level <= 2 ? .bold : .semibold, design: design))
                 .padding(.top, level <= 2 ? 18 : 8)
 
         case let .paragraph(text):
-            Text(InlineMarkdown.render(text)).font(.system(size: body0, design: design)).lineSpacing(body0 * 0.42)
+            Text(applyFindHighlight(InlineMarkdown.render(text), blockIndex: index))
+                .font(.system(size: body0, design: design)).lineSpacing(body0 * 0.42)
 
         case let .listItem(ordered, number, indent, text):
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(ordered ? "\(number)." : "•").font(.system(size: body0 - 0.5)).foregroundStyle(.secondary)
-                Text(InlineMarkdown.render(text)).font(.system(size: body0 - 0.5, design: design)).lineSpacing(body0 * 0.36)
+                Text(applyFindHighlight(InlineMarkdown.render(text), blockIndex: index))
+                    .font(.system(size: body0 - 0.5, design: design)).lineSpacing(body0 * 0.36)
             }
             .padding(.leading, CGFloat(indent) * 22)
 
@@ -89,7 +178,8 @@ struct ReadingView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(checked ? "Completed task" : "Incomplete task")
                 .accessibilityAddTraits(.isButton)
-                Text(InlineMarkdown.render(text)).font(.system(size: body0 - 0.5, design: design)).lineSpacing(body0 * 0.36)
+                Text(applyFindHighlight(InlineMarkdown.render(text), blockIndex: index))
+                    .font(.system(size: body0 - 0.5, design: design)).lineSpacing(body0 * 0.36)
                     .strikethrough(checked).foregroundStyle(checked ? .secondary : .primary)
             }
             .padding(.leading, CGFloat(indent) * 22)
@@ -97,7 +187,8 @@ struct ReadingView: View {
         case let .quote(text):
             HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 2).fill(.secondary.opacity(0.5)).frame(width: 3)
-                Text(InlineMarkdown.render(text)).font(.system(size: body0 - 0.5, design: design)).lineSpacing(body0 * 0.36)
+                Text(applyFindHighlight(InlineMarkdown.render(text), blockIndex: index))
+                    .font(.system(size: body0 - 0.5, design: design)).lineSpacing(body0 * 0.36)
                     .foregroundStyle(.secondary)
             }
 
@@ -106,7 +197,7 @@ struct ReadingView: View {
 
         case let .code(language, text):
             ScrollView(.horizontal, showsIndicators: false) {
-                Text(CodeHighlighter.highlight(text, language: language))
+                Text(applyFindHighlight(CodeHighlighter.highlight(text, language: language), blockIndex: index))
                     .textSelection(.enabled)
                     .padding(12)
             }

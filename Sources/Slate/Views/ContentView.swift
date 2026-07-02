@@ -133,7 +133,9 @@ struct ContentView: View {
         Button { withAnimation(.smooth(duration: 0.2)) { showSidebar.toggle() } } label: {
             Image(systemName: "sidebar.leading")
         }
-        .buttonStyle(.borderless).help("Toggle Sidebar").accessibilityLabel("Toggle sidebar")
+        .buttonStyle(.borderless)
+        .keyboardShortcut("s", modifiers: [.command, .control])   // macOS-standard Show/Hide Sidebar
+        .help("Toggle Sidebar (⌃⌘S)").accessibilityLabel("Toggle sidebar")
     }
 
     private var actionButtons: some View {
@@ -181,21 +183,23 @@ struct ContentView: View {
                     .buttonStyle(.borderedProminent)
             }
         } else {
-            List {
-                ForEach(visibleItems) { item in
-                    SidebarRow(item: item, expanded: $expandedDirs,
-                               selected: vault.selection == item.node.id,
-                               onSelect: { vault.select(item.node.id) },
-                               onToggle: { toggleDir(item.node.id) },
-                               startRename: startRename)
-                        .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
+            // A plain ScrollView + LazyVStack (not List): SwiftUI's List draws an
+            // uncustomizable blue context-menu highlight ring around the right-clicked
+            // row. We already provide our own selection/hover backgrounds and row
+            // chrome, so nothing is lost by dropping List.
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 1) {
+                    ForEach(visibleItems) { item in
+                        SidebarRow(item: item, expanded: $expandedDirs,
+                                   selected: vault.selection == item.node.id,
+                                   onSelect: { vault.select(item.node.id) },
+                                   onToggle: { toggleDir(item.node.id) },
+                                   startRename: startRename)
+                            .padding(.horizontal, 6)
+                    }
                 }
+                .padding(.vertical, 6)
             }
-            .listStyle(.sidebar)
-            .environment(\.defaultMinListRowHeight, 26)
-            .scrollContentBackground(settings.sidebarBackground == nil ? .automatic : .hidden)
             .background(settings.sidebarBackground ?? Color.clear)
             .background(ThinScrollers())   // thin, auto-hiding overlay scroller
             .onChange(of: vault.vaultURL) { expandedDirs.removeAll() }

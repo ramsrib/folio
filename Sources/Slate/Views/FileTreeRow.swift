@@ -18,6 +18,7 @@ struct SidebarRow: View {
     let onToggle: () -> Void
     let startRename: (URL) -> Void
     @EnvironmentObject private var vault: VaultStore
+    @EnvironmentObject private var settings: AppSettings
     @State private var hover = false
 
     private var node: VaultNode { item.node }
@@ -36,7 +37,7 @@ struct SidebarRow: View {
             }
             Image(systemName: node.isDirectory ? "folder" : "doc.text")
                 .font(.system(size: 12))
-                .foregroundStyle(selected ? Color.accentColor : .secondary)
+                .foregroundStyle(selected ? settings.selectionTint : .secondary)
             Text(node.name)
                 .font(.system(size: 13, weight: selected ? .medium : .regular))
                 .lineLimit(1)
@@ -61,10 +62,11 @@ struct SidebarRow: View {
                 Button("Move to Trash", role: .destructive) { vault.delete(node.id) }
             }
         }
+        .focusEffectDisabled()   // suppress the blue focus ring on right-click / focus
     }
 
     private var rowBackground: Color {
-        if selected { return Color.accentColor.opacity(0.18) }
+        if selected { return settings.selectionFill }
         if hover { return Color.primary.opacity(0.06) }
         return .clear
     }

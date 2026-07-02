@@ -32,6 +32,22 @@ struct ShortcutsView: View {
         ]),
         Group(title: "View", items: [
             Item(keys: "⌘E", label: "Toggle reading / writing mode"),
+            Item(keys: "⌃⌘S", label: "Toggle sidebar"),
+        ]),
+        Group(title: "Reading Mode (Vim)", items: [
+            Item(keys: "j / k", label: "Scroll down / up"),
+            Item(keys: "h / l", label: "Scroll left / right"),
+            Item(keys: "d / u", label: "Half-page down / up"),
+            Item(keys: "⌃F / Space", label: "Page down"),
+            Item(keys: "⌃B / ⇧Space", label: "Page up"),
+            Item(keys: "gg", label: "Jump to top"),
+            Item(keys: "G", label: "Jump to bottom"),
+        ]),
+        Group(title: "Find in Page", items: [
+            Item(keys: "⌘F", label: "Find in page (reading & writing)"),
+            Item(keys: "↩ / ⌘G", label: "Next match"),
+            Item(keys: "⌘⇧G", label: "Previous match"),
+            Item(keys: "esc", label: "Close find"),
         ]),
         Group(title: "Vault", items: [
             Item(keys: "⇧⌘O", label: "Open vault"),

@@ -14,6 +14,7 @@ struct LivePreviewEditor: NSViewRepresentable {
     var previewForLink: (URL) -> String? = { _ in nil }
     var background: NSColor = .textBackgroundColor
     var readableWidth: CGFloat = 720
+    @ObservedObject var find: FindModel
 
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView()
@@ -46,6 +47,7 @@ struct LivePreviewEditor: NSViewRepresentable {
         tv.noteNames = noteNames
         tv.onClickLink = onOpenLink
         tv.previewProvider = previewForLink
+        tv.onFind = { [find] in find.open() }
         tv.string = text
 
         scroll.documentView = tv
@@ -79,6 +81,9 @@ struct LivePreviewEditor: NSViewRepresentable {
             context.coordinator.highlight()
             DispatchQueue.main.async { scrollTo = nil }
         }
+
+        tv.onFind = { [find] in find.open() }
+        context.coordinator.applyFind(find, to: tv)
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -87,6 +92,76 @@ struct LivePreviewEditor: NSViewRepresentable {
         var parent: LivePreviewEditor
         weak var textView: MarkdownTextView?
         init(_ parent: LivePreviewEditor) { self.parent = parent }
+
+        // MARK: Find (driven by the shared FindModel)
+        private var findRanges: [NSRange] = []
+        private var lastHighlightKey: String?   // query + case + text length → recompute + highlight
+        private var lastRevealKey: String?      // query + case + current → move selection
+
+        /// Sync the editor with the shared find state: (re)highlight all matches when
+        /// the query/case/text changes, and reveal the current match only when the
+        /// user actually navigates — never yanking the caret while they're editing.
+        func applyFind(_ find: FindModel, to tv: MarkdownTextView) {
+            guard find.active, !find.query.isEmpty else {
+                if !findRanges.isEmpty { clearFindHighlight(tv); findRanges = [] }
+                lastHighlightKey = nil; lastRevealKey = nil
+                if find.total != 0 { DispatchQueue.main.async { find.total = 0 } }
+                return
+            }
+            let text = tv.string as NSString
+            let highlightKey = "\(find.caseSensitive)|\(text.length)|\(find.query)"
+            if highlightKey != lastHighlightKey {
+                lastHighlightKey = highlightKey
+                findRanges = ranges(of: find.query, in: text, options: find.options)
+                highlightAll(tv, ranges: findRanges)
+                let count = findRanges.count
+                DispatchQueue.main.async {
+                    if find.total != count { find.total = count }
+                    if find.current >= count { find.current = max(0, count - 1) }
+                }
+            }
+            let revealKey = "\(find.caseSensitive)|\(find.query)|\(find.current)"
+            if revealKey != lastRevealKey, findRanges.indices.contains(find.current) {
+                lastRevealKey = revealKey
+                let r = findRanges[find.current]
+                tv.setSelectedRange(r)
+                tv.scrollRangeToVisible(r)
+                tv.showFindIndicator(for: r)
+            }
+        }
+
+        private func ranges(of query: String, in text: NSString, options: NSString.CompareOptions) -> [NSRange] {
+            guard !query.isEmpty, text.length > 0 else { return [] }
+            var result: [NSRange] = []
+            var searchRange = NSRange(location: 0, length: text.length)
+            while searchRange.length > 0 {
+                let r = text.range(of: query, options: options, range: searchRange)
+                if r.location == NSNotFound { break }
+                result.append(r)
+                let nextLoc = r.location + max(r.length, 1)
+                if nextLoc >= text.length { break }
+                searchRange = NSRange(location: nextLoc, length: text.length - nextLoc)
+            }
+            return result
+        }
+
+        /// Non-destructive highlight via layout-manager temporary attributes, so it
+        /// never touches the text storage (keeps the buffer lossless) and coexists
+        /// with the Markdown syntax highlighting.
+        private func highlightAll(_ tv: NSTextView, ranges: [NSRange]) {
+            guard let lm = tv.layoutManager else { return }
+            clearFindHighlight(tv)
+            for r in ranges {
+                lm.addTemporaryAttributes([.backgroundColor: NSColor.systemYellow.withAlphaComponent(0.4)],
+                                          forCharacterRange: r)
+            }
+        }
+
+        private func clearFindHighlight(_ tv: NSTextView) {
+            guard let lm = tv.layoutManager else { return }
+            lm.removeTemporaryAttribute(.backgroundColor,
+                                        forCharacterRange: NSRange(location: 0, length: (tv.string as NSString).length))
+        }
 
         func textDidChange(_ notification: Notification) {
             guard let tv = textView else { return }

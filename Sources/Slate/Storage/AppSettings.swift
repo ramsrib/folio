@@ -76,6 +76,16 @@ final class AppSettings: ObservableObject {
         return AnyShapeStyle(.regularMaterial)
     }
 
+    /// Tint for selection highlights across lists/palettes (sidebar, command palette,
+    /// quick switcher, tags). Paper uses a warm sepia so selections match the cream
+    /// instead of a system-blue pop; other themes use the system accent.
+    var selectionTint: Color { theme == .paper ? Color(platform: Self.paperSelection) : .accentColor }
+    /// Background fill for a selected row (the tint at a theme-tuned opacity).
+    var selectionFill: Color {
+        theme == .paper ? Color(platform: Self.paperSelection).opacity(0.28) : Color.accentColor.opacity(0.20)
+    }
+
     private static let paper = PlatformColor(red: 0.98, green: 0.96, blue: 0.90, alpha: 1)
     private static let paperSidebar = PlatformColor(red: 0.96, green: 0.93, blue: 0.84, alpha: 1)
+    private static let paperSelection = PlatformColor(red: 0.55, green: 0.40, blue: 0.20, alpha: 1)
 }

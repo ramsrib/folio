@@ -33,6 +33,20 @@ final class MarkdownTextView: NSTextView {
         }
     }
 
+    /// Invoked on ⌘F so the editor opens the *same* shared find bar as Reading mode
+    /// (this SwiftUI app has no Edit▸Find menu that would route the shortcut, and we
+    /// want one consistent finder across both modes rather than the native one).
+    var onFind: () -> Void = {}
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+           event.charactersIgnoringModifiers == "f" {
+            onFind()
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
     /// Restrict the completion "partial word" to the text typed after `[[`, so
     /// note names with spaces complete correctly.
     override var rangeForUserCompletion: NSRange {

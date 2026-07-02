@@ -1,20 +1,36 @@
 import SwiftUI
 
-/// Notion-style large page title at the top of a note. Editing it renames the
-/// file (and updates links across the vault) on commit.
+/// Notion-style large page title at the top of a note. In Writing mode it's an
+/// editable field — editing it renames the file (and updates links across the
+/// vault) on commit. In Reading mode it's plain, non-focusable text, so clicking
+/// it never steals keyboard focus from the page.
 struct NoteTitleField: View {
     @EnvironmentObject private var vault: VaultStore
+    @EnvironmentObject private var ui: UIState
     @State private var title = ""
     @FocusState private var focused: Bool
 
+    private let titleFont = Font.system(size: 30, weight: .bold, design: .rounded)
+
     var body: some View {
-        TextField("Untitled", text: $title)
-            .textFieldStyle(.plain)
-            .font(.system(size: 30, weight: .bold, design: .rounded))
-            .focused($focused)
-            .onSubmit(commit)
-            .onChange(of: vault.selection) { load() }
-            .onAppear(perform: load)
+        Group {
+            if ui.mode == .read {
+                Text(title.isEmpty ? "Untitled" : title)
+                    .font(titleFont)
+                    .foregroundStyle(title.isEmpty ? .secondary : .primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                TextField("Untitled", text: $title)
+                    .textFieldStyle(.plain)
+                    .font(titleFont)
+                    .focused($focused)
+                    .onSubmit(commit)
+            }
+        }
+        .onChange(of: vault.selection) { load() }
+        .onAppear(perform: load)
     }
 
     private func load() {

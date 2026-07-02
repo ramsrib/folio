@@ -5,6 +5,7 @@ import SwiftUI
 struct TagsView: View {
     @EnvironmentObject private var vault: VaultStore
     @EnvironmentObject private var ui: UIState
+    @EnvironmentObject private var settings: AppSettings
     @State private var query = ""
     @State private var selected = 0
     @State private var selectedTag: String?
@@ -114,7 +115,7 @@ struct TagsView: View {
 
     private func rowBackground(_ idx: Int) -> some View {
         RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .fill(idx == selected ? Color.accentColor.opacity(0.22) : .clear)
+            .fill(idx == selected ? settings.selectionFill : .clear)
     }
 
     private func move(_ delta: Int) {

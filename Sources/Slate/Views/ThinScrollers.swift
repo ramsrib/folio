@@ -1,13 +1,15 @@
 import SwiftUI
 import AppKit
 
-/// Forces thin, auto-hiding *overlay* scrollers on every scroll view in the window.
+/// Two bits of AppKit polish SwiftUI can't express, applied by walking the window:
+///  1. Thin, auto-hiding *overlay* scrollers on every scroll view (the system
+///     "Show scroll bars: Always" setting otherwise renders a heavy legacy bar).
+///  2. No focus ring on list tables — SwiftUI `List` rows draw a blue AppKit focus
+///     ring around themselves on right-click, which `.focusEffectDisabled()` can't
+///     reach; setting `focusRingType = .none` on the table + its rows removes it.
 ///
-/// When the system "Show scroll bars" setting is "Always", AppKit renders a thick,
-/// opaque *legacy* scroller — visually heavy and distracting. Setting
-/// `scrollerStyle = .overlay` per scroll view overrides that, giving the thin
-/// translucent bar that fades when idle. Attached once in the main window, it scans
-/// the whole view tree so the sidebar list, reading view, and editor all match.
+/// Attached once in the main window; re-runs on updates so freshly-created rows and
+/// palettes are covered too.
 struct ThinScrollers: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let v = NSView()
@@ -30,6 +32,15 @@ struct ThinScrollers: NSViewRepresentable {
             scroll.verticalScroller?.controlSize = .small
             scroll.horizontalScroller?.controlSize = .small
         }
+        if let table = view as? NSTableView {
+            disableFocusRing(in: table)   // kills the blue right-click ring on List rows
+        }
         view.subviews.forEach(styleScrollers)
+    }
+
+    /// Suppress the focus ring on a table and every row/cell view inside it.
+    private func disableFocusRing(in view: NSView) {
+        view.focusRingType = .none
+        view.subviews.forEach(disableFocusRing)
     }
 }

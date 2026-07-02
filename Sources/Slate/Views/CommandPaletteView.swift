@@ -12,6 +12,7 @@ struct AppCommand: Identifiable {
 struct CommandPaletteView: View {
     @EnvironmentObject private var vault: VaultStore
     @EnvironmentObject private var ui: UIState
+    @EnvironmentObject private var settings: AppSettings
     @State private var query = ""
     @State private var selected = 0
     @FocusState private var focused: Bool
@@ -70,7 +71,7 @@ struct CommandPaletteView: View {
                     .listRowSeparator(.hidden)
                     .listRowBackground(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(idx == selected ? Color.accentColor.opacity(0.22) : .clear)
+                            .fill(idx == selected ? settings.selectionFill : .clear)
                     )
                 }
             }

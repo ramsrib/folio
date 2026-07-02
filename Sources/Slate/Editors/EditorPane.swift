@@ -8,6 +8,7 @@ struct EditorPane: View {
     @EnvironmentObject private var vault: VaultStore
     @EnvironmentObject private var ui: UIState
     @EnvironmentObject private var settings: AppSettings
+    @StateObject private var find = FindModel()
 
     var body: some View {
         if vault.selection != nil {
@@ -19,6 +20,7 @@ struct EditorPane: View {
                     BacklinksBar().frame(maxWidth: .infinity)
                 }
                 .background(settings.paneBackground ?? Color(nsColor: .textBackgroundColor))
+                .background { findShortcuts }
         } else {
             ContentUnavailableView("Select a note", systemImage: "doc.text",
                 description: Text("Pick a note from the sidebar to start writing."))
@@ -27,13 +29,23 @@ struct EditorPane: View {
 
     private var noteBody: some View {
         VStack(spacing: 0) {
+            // Find bar is docked into the layout (below the tab bar, above the title)
+            // so it's part of the page rather than floating over the content.
+            if find.active {
+                FindBar(find: find)
+                    .frame(maxWidth: max(settings.readableWidth, 640))
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 12)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
             NoteTitleField()
                 .frame(maxWidth: 720, alignment: .leading)
                 .frame(maxWidth: .infinity)
-                .padding(.top, 28)
+                .padding(.top, find.active ? 10 : 28)
                 .padding(.bottom, 2)
             if ui.mode == .read {
-                ReadingView()
+                ReadingView(find: find)
             } else {
                 LivePreviewEditor(
                     text: $vault.content,
@@ -44,10 +56,22 @@ struct EditorPane: View {
                     onOpenLink: openLink,
                     previewForLink: previewForLink,
                     background: settings.nsPaneBackground,
-                    readableWidth: settings.readableWidth
+                    readableWidth: settings.readableWidth,
+                    find: find
                 )
             }
         }
+        .animation(.smooth(duration: 0.18), value: find.active)
+    }
+
+    /// Invisible buttons carrying the find keyboard shortcuts, present in both modes.
+    private var findShortcuts: some View {
+        ZStack {
+            Button("") { find.open() }.keyboardShortcut("f", modifiers: .command)
+            Button("") { find.next() }.keyboardShortcut("g", modifiers: .command)
+            Button("") { find.prev() }.keyboardShortcut("g", modifiers: [.command, .shift])
+        }
+        .opacity(0).allowsHitTesting(false).accessibilityHidden(true)
     }
 
     /// Route a clicked link: `slate://wikilink?target=…` navigates/creates;

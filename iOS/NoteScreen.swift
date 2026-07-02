@@ -7,13 +7,14 @@ struct NoteScreen: View {
     @EnvironmentObject private var vault: VaultStore
     @EnvironmentObject private var ui: UIState
     @EnvironmentObject private var settings: AppSettings
+    @StateObject private var find = FindModel()   // find bar not yet wired on iOS
 
     var body: some View {
         Group {
             if ui.mode == .edit {
                 MarkdownEditScreen()
             } else {
-                ReadingView()
+                ReadingView(find: find)
             }
         }
         .background(settings.paneBackground ?? Color(.systemBackground))
