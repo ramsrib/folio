@@ -6,14 +6,15 @@ import AppKit
 #endif
 
 enum AppTheme: String, CaseIterable, Identifiable {
-    case system, light, dark, paper
+    case system, light, dark, paper, frosted
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .system: return "System"
-        case .light:  return "Light"
-        case .dark:   return "Dark"
-        case .paper:  return "Paper (warm)"
+        case .system:  return "System"
+        case .light:   return "Light"
+        case .dark:    return "Dark"
+        case .paper:   return "Paper (warm)"
+        case .frosted: return "Frosted (glass)"
         }
     }
 }
@@ -58,11 +59,15 @@ final class AppSettings: ObservableObject {
 
     var colorScheme: ColorScheme? {
         switch theme {
-        case .system:         return nil
-        case .light, .paper:  return .light
-        case .dark:           return .dark
+        case .system, .frosted: return nil    // frosted glass adapts to light/dark
+        case .light, .paper:    return .light
+        case .dark:             return .dark
         }
     }
+
+    /// Frosted theme: a translucent vibrancy sidebar over a see-through window.
+    var usesVibrantSidebar: Bool { theme == .frosted }
+    var windowIsTranslucent: Bool { theme == .frosted }
     var paneBackground: Color? { theme == .paper ? Color(platform: Self.paper) : nil }
     var nsPaneBackground: PlatformColor { theme == .paper ? Self.paper : .pTextBackground }
     /// Top-bar (title-bar) tint; falls back to the standard window chrome color.

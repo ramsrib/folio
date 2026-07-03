@@ -26,7 +26,8 @@ struct ContentView: View {
             }
         }
         .ignoresSafeArea(.container, edges: .top)   // let the title-bar row reach the traffic-light line
-        .background(WindowConfigurator(background: settings.nsWindowBackground))
+        .background(WindowConfigurator(background: settings.nsWindowBackground,
+                                       translucent: settings.windowIsTranslucent))
         .overlay { paletteOverlay }
         .animation(.easeOut(duration: 0.14), value: paletteShown)
         .onChange(of: vault.selection) {
@@ -87,7 +88,7 @@ struct ContentView: View {
             if showSidebar {
                 sidebarTitleArea
                     .frame(width: sidebarWidth, height: 42)
-                    .background(settings.sidebarBackground ?? Color(nsColor: .windowBackgroundColor))
+                    .background(sidebarBackdrop)
                 Divider()
             }
             contentTitleArea
@@ -127,6 +128,16 @@ struct ContentView: View {
         }
         .padding(.leading, showSidebar ? 12 : 78)   // clear traffic lights only when sidebar is off
         .padding(.trailing, 12)
+    }
+
+    /// Sidebar/backdrop fill: native vibrancy in the Frosted theme, otherwise the
+    /// theme's sidebar tint (or clear → the window color shows through).
+    @ViewBuilder private var sidebarBackdrop: some View {
+        if settings.usesVibrantSidebar {
+            VisualEffectView(material: .sidebar, blending: .behindWindow)
+        } else {
+            settings.sidebarBackground ?? Color.clear
+        }
     }
 
     private var toggleButton: some View {
@@ -200,7 +211,7 @@ struct ContentView: View {
                 }
                 .padding(.vertical, 6)
             }
-            .background(settings.sidebarBackground ?? Color.clear)
+            .background(sidebarBackdrop)
             .background(ThinScrollers())   // thin, auto-hiding overlay scroller
             .onChange(of: vault.vaultURL) { expandedDirs.removeAll() }
             .overlay {

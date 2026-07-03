@@ -5,6 +5,9 @@ import AppKit
 /// title, allow background dragging, and tint the window to the theme color.
 struct WindowConfigurator: NSViewRepresentable {
     var background: NSColor?
+    /// When true, the window is see-through so a vibrancy sidebar can blur the
+    /// desktop behind it (the Frosted theme); opaque content still hides it elsewhere.
+    var translucent: Bool = false
 
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
@@ -24,7 +27,13 @@ struct WindowConfigurator: NSViewRepresentable {
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.isMovableByWindowBackground = true
-        window.backgroundColor = background ?? .windowBackgroundColor
+        if translucent {
+            window.isOpaque = false
+            window.backgroundColor = .clear
+        } else {
+            window.isOpaque = true
+            window.backgroundColor = background ?? .windowBackgroundColor
+        }
         centerTrafficLights(window, barHeight: 42)
     }
 
