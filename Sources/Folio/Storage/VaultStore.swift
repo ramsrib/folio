@@ -26,11 +26,11 @@ final class VaultStore: ObservableObject {
 
     var allNoteNames: [String] { files.map(\.name) }
 
-    private let vaultPathKey = "slate.vaultPath"
-    private let bookmarkKey = "slate.vaultBookmark"   // iOS: security-scoped bookmark
-    private let tabsKey = "slate.tabsByVault"      // [vaultPath: [filePath]]
-    private let activeKey = "slate.activeByVault"  // [vaultPath: filePath]
-    private let recentKey = "slate.recentVaults"   // [vaultPath]
+    private let vaultPathKey = "folio.vaultPath"
+    private let bookmarkKey = "folio.vaultBookmark"   // iOS: security-scoped bookmark
+    private let tabsKey = "folio.tabsByVault"      // [vaultPath: [filePath]]
+    private let activeKey = "folio.activeByVault"  // [vaultPath: filePath]
+    private let recentKey = "folio.recentVaults"   // [vaultPath]
     private let mdExtensions: Set<String> = ["md", "markdown", "mdown", "mkd"]
     /// Dependency/build directories never worth scanning (so pointing a vault at a
     /// code project doesn't crawl node_modules and index package READMEs). Hidden

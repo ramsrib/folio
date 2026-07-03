@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 @main
-struct SlateApp: App {
+struct FolioApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var vault = VaultStore()
     @StateObject private var ui = UIState()
@@ -84,9 +84,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     private func configureAppIcon() {
-        let bundledIcon = Bundle.main.url(forResource: "Slate", withExtension: "icns")
+        let bundledIcon = Bundle.main.url(forResource: "Folio", withExtension: "icns")
         let sourceIcon = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-            .appendingPathComponent("Resources/AppIcon/SlateAppIcon-mac.png")
+            .appendingPathComponent("Resources/AppIcon/FolioAppIcon-mac.png")
 
         for url in [bundledIcon, sourceIcon].compactMap({ $0 }) {
             if let image = NSImage(contentsOf: url) {

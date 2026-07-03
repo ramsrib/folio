@@ -121,7 +121,7 @@ final class MarkdownTextView: NSTextView {
         guard idx >= 0, idx < storage.length,
               let value = storage.attribute(.link, at: idx, effectiveRange: nil),
               let url = (value as? URL) ?? (value as? String).flatMap({ URL(string: $0) }),
-              url.scheme == "slate", url.host == "wikilink" else { dismissHover(); return }
+              url.scheme == "folio", url.host == "wikilink" else { dismissHover(); return }
 
         let key = url.absoluteString
         if key == hoveredKey { return }                 // already previewing this link

@@ -117,7 +117,7 @@ enum MarkdownHighlighter {
 
     private static func wikilinkURL(_ inner: String) -> URL? {
         var comps = URLComponents()
-        comps.scheme = "slate"
+        comps.scheme = "folio"
         comps.host = "wikilink"
         comps.queryItems = [URLQueryItem(name: "target", value: inner)]
         return comps.url

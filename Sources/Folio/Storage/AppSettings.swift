@@ -47,8 +47,8 @@ final class AppSettings: ObservableObject {
     @Published var readableWidth: Double { didSet { d.set(readableWidth, forKey: kWidth) } }
 
     private let d = UserDefaults.standard
-    private let kTheme = "slate.theme", kFont = "slate.readingFont"
-    private let kSize = "slate.bodyFontSize", kWidth = "slate.readableWidth"
+    private let kTheme = "folio.theme", kFont = "folio.readingFont"
+    private let kSize = "folio.bodyFontSize", kWidth = "folio.readableWidth"
 
     init() {
         theme = AppTheme(rawValue: d.string(forKey: kTheme) ?? "") ?? .system

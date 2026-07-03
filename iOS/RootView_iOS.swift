@@ -21,7 +21,7 @@ struct RootView_iOS: View {
                     VaultBrowser()
                 }
             }
-            .navigationTitle(vault.vaultURL?.lastPathComponent ?? "Slate")
+            .navigationTitle(vault.vaultURL?.lastPathComponent ?? "Folio")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: MarkdownFile.self) { NoteScreen(file: $0) }
             .toolbar {

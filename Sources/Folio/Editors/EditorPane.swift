@@ -74,10 +74,10 @@ struct EditorPane: View {
         .opacity(0).allowsHitTesting(false).accessibilityHidden(true)
     }
 
-    /// Route a clicked link: `slate://wikilink?target=…` navigates/creates;
+    /// Route a clicked link: `folio://wikilink?target=…` navigates/creates;
     /// http(s) opens in the browser.
     private func openLink(_ url: URL) -> Bool {
-        if url.scheme == "slate", url.host == "wikilink" {
+        if url.scheme == "folio", url.host == "wikilink" {
             let target = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                 .queryItems?.first(where: { $0.name == "target" })?.value ?? ""
             vault.openWikilink(target)
@@ -92,7 +92,7 @@ struct EditorPane: View {
 
     /// Peek text for a hovered wikilink: the first ~800 chars of the target note.
     private func previewForLink(_ url: URL) -> String? {
-        guard url.scheme == "slate", url.host == "wikilink" else { return nil }
+        guard url.scheme == "folio", url.host == "wikilink" else { return nil }
         let target = URLComponents(url: url, resolvingAgainstBaseURL: false)?
             .queryItems?.first(where: { $0.name == "target" })?.value ?? ""
         guard let dest = vault.resolve(target),

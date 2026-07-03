@@ -106,7 +106,7 @@ struct ContentView: View {
             // Vault title centered in the sidebar column, growing symmetrically on
             // both sides. The 78pt horizontal clearance keeps it clear of the
             // traffic lights (left) and the trailing controls (right) when long.
-            Text(vault.vaultURL?.lastPathComponent ?? "Slate")
+            Text(vault.vaultURL?.lastPathComponent ?? "Folio")
                 .font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
                 .lineLimit(1).truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .center)

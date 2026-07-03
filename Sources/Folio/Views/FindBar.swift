@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The one find-in-page bar, shared by Reading and Writing modes. Wide and
-/// prominent — find is a primary action in Slate — bound entirely to `FindModel`.
+/// prominent — find is a primary action in Folio — bound entirely to `FindModel`.
 /// It's docked into the note layout (above the title) by its host, not floated
 /// over content.
 struct FindBar: View {

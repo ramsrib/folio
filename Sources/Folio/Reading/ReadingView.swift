@@ -65,7 +65,7 @@ struct ReadingView: View {
             }
         }
         .environment(\.openURL, OpenURLAction { url in
-            if url.scheme == "slate", url.host == "wikilink" {
+            if url.scheme == "folio", url.host == "wikilink" {
                 let target = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                     .queryItems?.first(where: { $0.name == "target" })?.value ?? ""
                 vault.openWikilink(target); return .handled

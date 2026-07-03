@@ -1,11 +1,11 @@
-# Slate
+# Folio
 
 A **read-optimized** Markdown app for **macOS** (iOS later) that opens your **existing `.md` files in
 place**. Think Obsidian, but tuned for *reading* a project's docs rather than authoring them. Native
 Swift / SwiftUI, files-on-disk as the source of truth.
 
 **The use case it's built for:** agents (Claude Code & friends) author, write, and edit most of the
-docs in a project; Slate is the fast, calm **reader** you use to browse and absorb all of them
+docs in a project; Folio is the fast, calm **reader** you use to browse and absorb all of them
 efficiently. Writing and editing are fully supported — but reading is the default, the most polished
 path, and what every interaction is optimized around.
 
@@ -20,7 +20,7 @@ path, and what every interaction is optimized around.
   Properties panel, thin auto-hiding scrollbars, no syntax noise — so the docs, not the editor, are
   what you look at.
 
-- **Feature & behavior reference:** [`SPEC.md`](SPEC.md) — the canonical *what Slate does* (the
+- **Feature & behavior reference:** [`SPEC.md`](SPEC.md) — the canonical *what Folio does* (the
   Obsidian-grade north star we build toward). No implementation or timeline.
 - **The plan:** [`PLAN.md`](PLAN.md) — architecture, the editor strategy, roadmap, open decisions
   (the *how* and *when*).
@@ -43,7 +43,7 @@ path, and what every interaction is optimized around.
 
 ```bash
 make run        # dev loop (launches the app via SwiftPM)
-make open       # build + package Slate.app and launch it
+make open       # build + package Folio.app and launch it
 make install    # build + install to /Applications
 ```
 
@@ -60,4 +60,4 @@ byte-for-byte lossless. See `PLAN.md` for the full rationale.
 ## Layout
 
 SwiftPM executable (mirrors the `recall-app` pattern), not an Xcode project — fully scriptable, no
-manual setup. Source under `Sources/Slate/` (`Models/`, `Storage/`, `Views/`, `Editors/`).
+manual setup. Source under `Sources/Folio/` (`Models/`, `Storage/`, `Views/`, `Editors/`).

@@ -1,6 +1,6 @@
-# Slate — Feature & Behavior Reference
+# Folio — Feature & Behavior Reference
 
-> The canonical description of **what Slate does and how it behaves**, from the user's point of view.
+> The canonical description of **what Folio does and how it behaves**, from the user's point of view.
 > This is the north star we build toward gradually.
 >
 > **Scope of this document:** features and behaviors only — no implementation details, no timelines,
@@ -8,8 +8,8 @@
 > disagree, this document describes the intended end state and `PLAN.md` describes current progress
 > toward it.
 >
-> Reference point: Obsidian's experience, adapted to Slate's principles (files-on-disk, UX-first,
-> native macOS + iOS). Where Slate intentionally differs from Obsidian, it is called out.
+> Reference point: Obsidian's experience, adapted to Folio's principles (files-on-disk, UX-first,
+> native macOS + iOS). Where Folio intentionally differs from Obsidian, it is called out.
 
 ---
 
@@ -17,22 +17,22 @@
 
 These are guarantees, not features — every behavior below must respect them.
 
-- **Read-first.** Slate is optimized for *reading* a project's docs, not authoring them. The working
-  assumption is that agents and tools write and edit most notes; Slate is the fast, low-friction
+- **Read-first.** Folio is optimized for *reading* a project's docs, not authoring them. The working
+  assumption is that agents and tools write and edit most notes; Folio is the fast, low-friction
   reader used to browse and absorb them. Reading mode is the default and the most polished path;
   writing is fully supported but secondary. Every interaction should make scanning and reading across
   many documents efficient and calm.
 - **Find, search, navigate — fast and everywhere.** Locating content and moving through it is the
   core value, not a side feature. In-page find, cross-note/vault search, and keyboard navigation are
   first-class in every view and must stay fast and keyboard-driven. When in doubt, invest here first.
-- **Your files are the truth.** A vault is an ordinary folder of `.md` files. Slate reads and writes
+- **Your files are the truth.** A vault is an ordinary folder of `.md` files. Folio reads and writes
   those files in place; there is no hidden database that can drift from disk or lock you in.
 - **Lossless, always.** Opening, editing, and saving a note never reformats, normalizes, or drops
   content the user didn't explicitly change — including YAML frontmatter, unusual whitespace, and any
-  Markdown/Obsidian syntax Slate doesn't yet understand. Smart-quote/dash/auto-replace substitutions
+  Markdown/Obsidian syntax Folio doesn't yet understand. Smart-quote/dash/auto-replace substitutions
   never silently alter file bytes.
 - **Plain Markdown, portable.** Notes remain readable and editable in any other Markdown app
-  (including Obsidian) with no conversion step. Slate-specific features degrade gracefully to plain
+  (including Obsidian) with no conversion step. Folio-specific features degrade gracefully to plain
   text elsewhere.
 - **Local-first.** Fully functional offline, with no account and no required cloud service. Sync is
   whatever the vault folder already uses.
@@ -55,7 +55,7 @@ These are guarantees, not features — every behavior below must respect them.
   and scroll/cursor positions.
 - **Attachments & non-Markdown files:** images, PDFs, and other files inside the vault are part of it
   (for embedding and management) even though they aren't notes.
-- **Live external changes:** if files are added, edited, renamed, moved, or deleted outside Slate
+- **Live external changes:** if files are added, edited, renamed, moved, or deleted outside Folio
   (git pull, Obsidian, Finder, another device's sync), the vault reflects it without a manual reload.
 
 ## 3. File explorer & file management
@@ -92,7 +92,7 @@ Three ways to view/edit the same note. Switching modes is instant and never alte
 
 ## 5. Markdown elements (rendering & editing catalog)
 
-Slate understands and renders all of the following. In Live Preview each renders visually while the
+Folio understands and renders all of the following. In Live Preview each renders visually while the
 underlying text stays plain Markdown.
 
 - **Headings** `#`–`######`, with size hierarchy; foldable (collapse a heading's section).
@@ -303,7 +303,7 @@ Organized, searchable preferences covering at least:
 ## 23. Sync & multi-device
 
 - **Folder-based sync:** because the vault is just files, it syncs through whatever the folder uses
-  (iCloud Drive, git, Dropbox, etc.). Slate adds no proprietary sync requirement.
+  (iCloud Drive, git, Dropbox, etc.). Folio adds no proprietary sync requirement.
 - **macOS** can open a vault anywhere on disk (e.g. `~/Projects/...`). **iOS** works with
   **cloud-synced vaults** — practically iCloud Drive — opened via the system document picker and
   remembered with a security-scoped bookmark; iOS does not browse the local filesystem.
@@ -312,11 +312,11 @@ Organized, searchable preferences covering at least:
 - **Conflict behavior:** concurrent edits never silently lose data; conflicting versions are
   preserved and surfaced for the user to resolve.
 - **External edits mid-session** are detected and reconciled without clobbering unsaved local edits —
-  including edits made by the other Slate app over iCloud.
+  including edits made by the other Folio app over iCloud.
 
 ## 24. Platform behaviors
 
-Slate ships as **two apps that launch together**: a full macOS editor and an iOS companion. Data and
+Folio ships as **two apps that launch together**: a full macOS editor and an iOS companion. Data and
 behavior are consistent across both; only interaction style and editing depth differ.
 
 - **macOS (full editor):** menu bar, full keyboard control, multiple/pop-out windows, drag-and-drop
@@ -325,7 +325,7 @@ behavior are consistent across both; only interaction style and editing depth di
   view** — browse the vault, follow `[[links]]`, search by name, see backlinks/outline — over a
   **cloud-synced (iCloud Drive) vault** chosen through the document picker. Editing is optional:
   tap-to-edit with a touch editor + on-screen formatting toolbar, lossless writes back to the synced
-  file. Touch-first interactions, swipe actions, share-sheet "send to Slate," hardware-keyboard
+  file. Touch-first interactions, swipe actions, share-sheet "send to Folio," hardware-keyboard
   shortcuts on iPad, split view / Stage Manager friendliness; `NavigationSplitView` collapses to a
   drill-down stack on iPhone.
 
@@ -355,8 +355,8 @@ behavior are consistent across both; only interaction style and editing depth di
 
 ## 28. Privacy & data ownership
 
-- **No account, no telemetry, no tracking.** Nothing about the user's notes is transmitted by Slate.
-- **Total data ownership:** notes are the user's files in the user's folder; uninstalling Slate leaves
+- **No account, no telemetry, no tracking.** Nothing about the user's notes is transmitted by Folio.
+- **Total data ownership:** notes are the user's files in the user's folder; uninstalling Folio leaves
   every note intact and usable elsewhere.
 - Any future optional online feature is strictly opt-in and clearly disclosed.
 
@@ -369,7 +369,7 @@ behavior are consistent across both; only interaction style and editing depth di
 
 ## 30. Non-goals
 
-To keep Slate focused, it explicitly does **not** aim to:
+To keep Folio focused, it explicitly does **not** aim to:
 
 - Store notes in a proprietary or binary format, or require import/export to interoperate.
 - Require an account, subscription, or cloud service to function.

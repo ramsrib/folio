@@ -1,27 +1,27 @@
 #!/usr/bin/env bash
-# Build the SwiftPM executable and wrap it into a double-clickable "Slate.app"
+# Build the SwiftPM executable and wrap it into a double-clickable "Folio.app"
 # with the right bundle identifier. Run from the repo root: make app
 set -euo pipefail
 
-APP_NAME="Slate"
-BUNDLE_ID="io.github.ramsrib.slate"
+APP_NAME="Folio"
+BUNDLE_ID="com.sriramb.folio"
 VERSION="0.1.0"
 CONFIG="${1:-release}"
 
 if [[ ! -f Package.swift ]]; then
-    echo "error: run this from the slate repo root (try: make app)" >&2
+    echo "error: run this from the folio repo root (try: make app)" >&2
     exit 1
 fi
 
 echo "› swift build -c $CONFIG"
 swift build -c "$CONFIG"
-BIN="$(swift build -c "$CONFIG" --show-bin-path)/Slate"
+BIN="$(swift build -c "$CONFIG" --show-bin-path)/Folio"
 
 APP="build/$APP_NAME.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN" "$APP/Contents/MacOS/Slate"
-cp "Resources/AppIcon/Slate.icns" "$APP/Contents/Resources/Slate.icns"
+cp "$BIN" "$APP/Contents/MacOS/Folio"
+cp "Resources/AppIcon/Folio.icns" "$APP/Contents/Resources/Folio.icns"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -31,8 +31,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundleName</key><string>${APP_NAME}</string>
     <key>CFBundleDisplayName</key><string>${APP_NAME}</string>
     <key>CFBundleIdentifier</key><string>${BUNDLE_ID}</string>
-    <key>CFBundleExecutable</key><string>Slate</string>
-    <key>CFBundleIconFile</key><string>Slate.icns</string>
+    <key>CFBundleExecutable</key><string>Folio</string>
+    <key>CFBundleIconFile</key><string>Folio.icns</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>${VERSION}</string>
     <key>CFBundleVersion</key><string>1</string>

@@ -34,7 +34,7 @@ enum InlineMarkdown {
         var s = highlight.stringByReplacingMatches(
             in: raw, range: NSRange(location: 0, length: (raw as NSString).length), withTemplate: "$1")
 
-        // [[target|alias]] / [[target#heading]] -> [display](slate://wikilink?target=…)
+        // [[target|alias]] / [[target#heading]] -> [display](folio://wikilink?target=…)
         let ns = s as NSString
         let matches = wiki.matches(in: s, range: NSRange(location: 0, length: ns.length))
         guard !matches.isEmpty else { return s }
@@ -46,9 +46,9 @@ enum InlineMarkdown {
             let rawTarget = parts.first ?? inner
             let target = rawTarget.split(separator: "#").first.map(String.init) ?? rawTarget
             let display = parts.count > 1 ? parts[1] : rawTarget
-            var comps = URLComponents(); comps.scheme = "slate"; comps.host = "wikilink"
+            var comps = URLComponents(); comps.scheme = "folio"; comps.host = "wikilink"
             comps.queryItems = [URLQueryItem(name: "target", value: target)]
-            out += "[\(display)](\(comps.url?.absoluteString ?? "slate://wikilink"))"
+            out += "[\(display)](\(comps.url?.absoluteString ?? "folio://wikilink"))"
             last = m.range.location + m.range.length
         }
         out += ns.substring(from: last)

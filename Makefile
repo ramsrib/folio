@@ -1,4 +1,4 @@
-APP_NAME := Slate
+APP_NAME := Folio
 APP := build/$(APP_NAME).app
 DEST := /Applications/$(APP_NAME).app
 
@@ -10,7 +10,7 @@ build: ## Compile the SwiftPM target
 run: ## Run straight from SwiftPM (dev loop)
 	swift run
 
-app: ## Package build/Slate.app with the bundle id
+app: ## Package build/Folio.app with the bundle id
 	./scripts/package-app.sh release
 
 open: app ## Package then launch the .app
@@ -19,7 +19,7 @@ open: app ## Package then launch the .app
 LSREGISTER := /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 
 install: app ## Build, package, and install to /Applications
-	@pkill -9 -x Slate 2>/dev/null || true
+	@pkill -9 -x Folio 2>/dev/null || true
 	@pkill -9 -f "$(APP_NAME).app" 2>/dev/null || true
 	@rm -rf "$(DEST)"
 	@ditto "$(APP)" "$(DEST)"

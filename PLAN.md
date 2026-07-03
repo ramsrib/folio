@@ -1,7 +1,7 @@
-# Slate — a file-backed, Obsidian-replacing notes app
+# Folio — a file-backed, Obsidian-replacing notes app
 
-> Working codename: **Slate**. **Chosen name: `Folio`** — rename deferred; still shipping as
-> "Slate" in code until we do the sweep (folder, bundle id, target/product name, app icon, docs).
+> Working codename: **Folio**. **Chosen name: `Folio`** — rename deferred; still shipping as
+> "Folio" in code until we do the sweep (folder, bundle id, target/product name, app icon, docs).
 > Feature & behavior reference (the *what* we're building toward): [`SPEC.md`](SPEC.md).
 > Status: **M0–M2 done; M3 in progress.** Mac app builds & packages; opens a vault as a folder tree,
 > watches it (FSEvents), creates/renames/trashes notes, and edits with an Obsidian-style **Live
@@ -21,10 +21,10 @@
 
 A native, **read-optimized** Markdown app that opens your **existing `.md` files in place** — Obsidian
 reimagined for read-heavy use, starting on macOS. The expected workflow: agents author and edit most
-docs; Slate is the fast reader/editor for browsing a whole project's notes efficiently. Reading is the
+docs; Folio is the fast reader/editor for browsing a whole project's notes efficiently. Reading is the
 default path; writing is fully supported but secondary.
 
-**Finding, searching, and navigating are the core value** of Slate — the whole point is locating and
+**Finding, searching, and navigating are the core value** of Folio — the whole point is locating and
 moving through content faster than anything else. Done so far: vim-style keyboard scrolling (reading),
 `⌘F` **in-page find** (reading *and* writing), quick switcher (⌘O), file-name search (⌘K), tag browser,
 backlinks, outline. **Next big rock:** cross-note / vault-wide **full-text search** (search across all
@@ -66,7 +66,7 @@ This machine: macOS **26.4.1**, Xcode **26.5**, Swift **6.3.2**.
 | Layer | Choice | Notes |
 |---|---|---|
 | Language / UI | Swift 6.3 + SwiftUI | + AppKit (`NSViewRepresentable`) for the real editor |
-| Project | **SwiftPM executable** (`Package.swift`, tools 6.2, `.macOS(.v26)`) | Mirrors your `recall-app`; fully scriptable, **zero manual steps**. `make build/run/app/install`, `scripts/package-app.sh` bundles & ad-hoc-signs `Slate.app`. |
+| Project | **SwiftPM executable** (`Package.swift`, tools 6.2, `.macOS(.v26)`) | Mirrors your `recall-app`; fully scriptable, **zero manual steps**. `make build/run/app/install`, `scripts/package-app.sh` bundles & ad-hoc-signs `Folio.app`. |
 | Storage | **The file system** | `VaultStore` enumerates `*.md` under the chosen folder; reads/writes UTF-8. |
 | Search index (later) | SQLite FTS5 (throwaway, rebuilt from disk) | Truth stays on disk; index is a cache. |
 | Sync | None built — folder location provides it | macOS reads `~/Projects/...` directly. |
@@ -108,8 +108,8 @@ Kept only as a possible *separate* "rich compose" mode far down the line, never 
 ## 5. Architecture (as built)
 
 ```
-Sources/Slate/
-  SlateApp.swift            @main App + AppDelegate; ⇧⌘O open vault, ⇧⌘R reload
+Sources/Folio/
+  FolioApp.swift            @main App + AppDelegate; ⇧⌘O open vault, ⇧⌘R reload
   Models/MarkdownFile.swift file identity = its URL (no DB row)
   Storage/VaultStore.swift  @MainActor: vault URL, file list, open note text, debounced lossless save
   Views/ContentView.swift   NavigationSplitView: file-list sidebar │ editor; empty-states
@@ -163,7 +163,7 @@ Swapping Stage 1 → Stage 2 touches only `EditorPane`/`Editors/`, nothing else.
   - [x] **App icon** wired into packaging + set at runtime.
   - [x] **Robustness:** ignore dependency/build dirs on scan; **incremental link index** (mtime
         cache — only re-reads changed files); **accessibility labels** on icon-only controls.
-        *(still: full VoiceOver audit, optional `.slateignore`)*
+        *(still: full VoiceOver audit, optional `.folioignore`)*
   - [x] **Stretch landed:** code-block **syntax highlighting** (reading mode), **hover link preview**
         (wikilinks, editor), **`#tags` pane** (inline + frontmatter tags → notes).
         *(remaining: split panes, always-WYSIWYG concealment, global content search)*
@@ -208,7 +208,7 @@ isn't disrupted; meanwhile macOS code is kept portable.
 ```bash
 cd ~/Projects/scratch/slate
 make run                      # dev loop (launches the app)
-# or:  make open              # build + package Slate.app and launch it
+# or:  make open              # build + package Folio.app and launch it
 # or:  make install           # build + install to /Applications
 ```
 In the app: **⇧⌘O** → pick any folder of Markdown (e.g. an Obsidian vault or a `~/Projects/*/docs`
@@ -219,5 +219,5 @@ dir). Files list in the sidebar; click one to edit; changes autosave to disk aft
 - [ ] iOS sync-location: **iCloud Drive vault** (recommended, Obsidian-standard) vs git vs Dropbox. §7.
 - [ ] Multiple vaults at once, or one-at-a-time (Obsidian is one-at-a-time per window)?
 - [ ] Frontmatter: edit raw, or a structured properties UI (Obsidian Properties)?
-- [ ] Product name (Slate is a placeholder).
+- [ ] Product name (Folio is a placeholder).
 - [ ] When to sandbox (needed for any future Mac App Store; changes file-access to bookmarks).
