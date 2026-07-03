@@ -14,8 +14,11 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Divider drawn as an overlay on the title bar's bottom edge (not a
+            // separate row) so it sits on the bar's own background — otherwise, in
+            // the see-through Frosted window, that 1pt seam shows the desktop.
             titleBar
-            Divider()
+                .overlay(alignment: .bottom) { Divider() }
             HStack(spacing: 0) {
                 if showSidebar {
                     sidebar.frame(width: sidebarWidth)
@@ -166,6 +169,7 @@ struct ContentView: View {
 
     private var resizeDivider: some View {
         Divider()
+            .background(Color(nsColor: .windowBackgroundColor))   // opaque: the Frosted window is see-through
             .overlay(
                 Color.clear.frame(width: 8).contentShape(Rectangle())
                     .onHover { inside in
