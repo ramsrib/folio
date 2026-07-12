@@ -4,169 +4,169 @@
       "idiom": "iphone",
       "size": "20x20",
       "scale": "2x",
-      "filename": "slate-iphone-20@2x.png"
+      "filename": "folio-iphone-20@2x.png"
     },
     {
       "idiom": "iphone",
       "size": "20x20",
       "scale": "3x",
-      "filename": "slate-iphone-20@3x.png"
+      "filename": "folio-iphone-20@3x.png"
     },
     {
       "idiom": "iphone",
       "size": "29x29",
       "scale": "2x",
-      "filename": "slate-iphone-29@2x.png"
+      "filename": "folio-iphone-29@2x.png"
     },
     {
       "idiom": "iphone",
       "size": "29x29",
       "scale": "3x",
-      "filename": "slate-iphone-29@3x.png"
+      "filename": "folio-iphone-29@3x.png"
     },
     {
       "idiom": "iphone",
       "size": "40x40",
       "scale": "2x",
-      "filename": "slate-iphone-40@2x.png"
+      "filename": "folio-iphone-40@2x.png"
     },
     {
       "idiom": "iphone",
       "size": "40x40",
       "scale": "3x",
-      "filename": "slate-iphone-40@3x.png"
+      "filename": "folio-iphone-40@3x.png"
     },
     {
       "idiom": "iphone",
       "size": "60x60",
       "scale": "2x",
-      "filename": "slate-iphone-60@2x.png"
+      "filename": "folio-iphone-60@2x.png"
     },
     {
       "idiom": "iphone",
       "size": "60x60",
       "scale": "3x",
-      "filename": "slate-iphone-60@3x.png"
+      "filename": "folio-iphone-60@3x.png"
     },
     {
       "idiom": "ipad",
       "size": "20x20",
       "scale": "1x",
-      "filename": "slate-ipad-20@1x.png"
+      "filename": "folio-ipad-20@1x.png"
     },
     {
       "idiom": "ipad",
       "size": "20x20",
       "scale": "2x",
-      "filename": "slate-ipad-20@2x.png"
+      "filename": "folio-ipad-20@2x.png"
     },
     {
       "idiom": "ipad",
       "size": "29x29",
       "scale": "1x",
-      "filename": "slate-ipad-29@1x.png"
+      "filename": "folio-ipad-29@1x.png"
     },
     {
       "idiom": "ipad",
       "size": "29x29",
       "scale": "2x",
-      "filename": "slate-ipad-29@2x.png"
+      "filename": "folio-ipad-29@2x.png"
     },
     {
       "idiom": "ipad",
       "size": "40x40",
       "scale": "1x",
-      "filename": "slate-ipad-40@1x.png"
+      "filename": "folio-ipad-40@1x.png"
     },
     {
       "idiom": "ipad",
       "size": "40x40",
       "scale": "2x",
-      "filename": "slate-ipad-40@2x.png"
+      "filename": "folio-ipad-40@2x.png"
     },
     {
       "idiom": "ipad",
       "size": "76x76",
       "scale": "1x",
-      "filename": "slate-ipad-76@1x.png"
+      "filename": "folio-ipad-76@1x.png"
     },
     {
       "idiom": "ipad",
       "size": "76x76",
       "scale": "2x",
-      "filename": "slate-ipad-76@2x.png"
+      "filename": "folio-ipad-76@2x.png"
     },
     {
       "idiom": "ipad",
       "size": "83.5x83.5",
       "scale": "2x",
-      "filename": "slate-ipad-83_5@2x.png"
+      "filename": "folio-ipad-83_5@2x.png"
     },
     {
       "idiom": "ios-marketing",
       "size": "1024x1024",
       "scale": "1x",
-      "filename": "slate-ios-marketing-1024.png"
+      "filename": "folio-ios-marketing-1024.png"
     },
     {
       "idiom": "mac",
       "size": "16x16",
       "scale": "1x",
-      "filename": "slate-mac-16@1x.png"
+      "filename": "folio-mac-16@1x.png"
     },
     {
       "idiom": "mac",
       "size": "16x16",
       "scale": "2x",
-      "filename": "slate-mac-16@2x.png"
+      "filename": "folio-mac-16@2x.png"
     },
     {
       "idiom": "mac",
       "size": "32x32",
       "scale": "1x",
-      "filename": "slate-mac-32@1x.png"
+      "filename": "folio-mac-32@1x.png"
     },
     {
       "idiom": "mac",
       "size": "32x32",
       "scale": "2x",
-      "filename": "slate-mac-32@2x.png"
+      "filename": "folio-mac-32@2x.png"
     },
     {
       "idiom": "mac",
       "size": "128x128",
       "scale": "1x",
-      "filename": "slate-mac-128@1x.png"
+      "filename": "folio-mac-128@1x.png"
     },
     {
       "idiom": "mac",
       "size": "128x128",
       "scale": "2x",
-      "filename": "slate-mac-128@2x.png"
+      "filename": "folio-mac-128@2x.png"
     },
     {
       "idiom": "mac",
       "size": "256x256",
       "scale": "1x",
-      "filename": "slate-mac-256@1x.png"
+      "filename": "folio-mac-256@1x.png"
     },
     {
       "idiom": "mac",
       "size": "256x256",
       "scale": "2x",
-      "filename": "slate-mac-256@2x.png"
+      "filename": "folio-mac-256@2x.png"
     },
     {
       "idiom": "mac",
       "size": "512x512",
       "scale": "1x",
-      "filename": "slate-mac-512@1x.png"
+      "filename": "folio-mac-512@1x.png"
     },
     {
       "idiom": "mac",
       "size": "512x512",
       "scale": "2x",
-      "filename": "slate-mac-512@2x.png"
+      "filename": "folio-mac-512@2x.png"
     }
   ],
   "info": {

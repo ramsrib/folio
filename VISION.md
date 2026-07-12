@@ -1,21 +1,31 @@
-# Folio — Feature & Behavior Reference
+# Folio — Vision
 
-> The canonical description of **what Folio does and how it behaves**, from the user's point of view.
-> This is the north star we build toward gradually.
+> ## ⚠️ This is the north star, not the product.
 >
-> **Scope of this document:** features and behaviors only — no implementation details, no timelines,
-> no milestones. The *how* and *when* live in [`PLAN.md`](PLAN.md); the *what* lives here. When the two
-> disagree, this document describes the intended end state and `PLAN.md` describes current progress
-> toward it.
+> **Nothing in this document should be read as a description of what Folio currently does.**
+> It describes the app Folio is being *built toward* — the intended end state, most of which is
+> **not implemented**. Whole sections here (graph view, vault-wide search, transclusion, daily notes,
+> templates, bookmarks, split panes, math, plugins) have **no code behind them at all**.
+>
+> For an accurate, verified account of what actually works today — and what doesn't — see the
+> [README](README.md). Where the README and this document disagree, **the README is right** and this
+> document is describing an aspiration.
+>
+> Read this as a design brief: it explains what Folio is *for* and what "done" would look like, so
+> that individual features can be judged against a coherent whole.
+
+> **Scope:** features and behaviors only — no implementation details, no timelines, no milestones.
 >
 > Reference point: Obsidian's experience, adapted to Folio's principles (files-on-disk, UX-first,
 > native macOS + iOS). Where Folio intentionally differs from Obsidian, it is called out.
 
 ---
 
-## 1. Product principles (behavioral contract)
+## 1. Product principles
 
-These are guarantees, not features — every behavior below must respect them.
+These are the commitments the rest of the document is written against — the things Folio should never
+trade away as it grows. They are design constraints on future work, not claims about current
+behavior.
 
 - **Read-first.** Folio is optimized for *reading* a project's docs, not authoring them. The working
   assumption is that agents and tools write and edit most notes; Folio is the fast, low-friction
@@ -58,6 +68,11 @@ These are guarantees, not features — every behavior below must respect them.
 - **Live external changes:** if files are added, edited, renamed, moved, or deleted outside Folio
   (git pull, Obsidian, Finder, another device's sync), the vault reflects it without a manual reload.
 
+> **Today:** open a folder, recent-vaults menu, and live external-change detection (FSEvents)
+> all work on macOS. **Not built:** independent multi-vault windows, and restoration of pane layout
+> or scroll/cursor position (only open tabs and the active note are restored). Non-Markdown files
+> are not surfaced. On iOS there is no watcher — pull to refresh.
+
 ## 3. File explorer & file management
 
 - **Folder tree:** notes and folders shown as a collapsible tree mirroring the folder structure on
@@ -76,13 +91,19 @@ These are guarantees, not features — every behavior below must respect them.
 - **Filtering:** quickly filter the explorer by typed text.
 - Optional: show non-Markdown files; show/hide file extensions; show/hide hidden files.
 
+> **Today:** collapsible folder tree, name sort (folders first), new note, rename (updates wikilinks),
+> Move to Trash, and Reveal in Finder. **Not built:** folder create/rename/delete, drag-and-drop move,
+> copy path/link, delete confirmation, explorer filtering, sort options, and hidden/non-Markdown
+> display toggles. Folder expansion is not persisted across vault switches.
+
 ## 4. The editor — modes
 
-Three ways to view/edit the same note. Switching modes is instant and never alters file content.
+Three ways to view/edit the same note. Switching modes should be instant and never alter file
+content.
 
-- **Live Preview (default):** a WYSIWYG-feel editor over the literal Markdown. Formatting renders in
+- **Live Preview:** a WYSIWYG-feel editor over the literal Markdown. Formatting renders in
   place (headings large, **bold** bold, lists with bullets, etc.); the syntax markers for the element
-  the cursor is on are revealed for editing and concealed elsewhere. This is the primary experience.
+  the cursor is on are revealed for editing and concealed elsewhere.
 - **Source mode:** shows raw Markdown with light syntax styling, nothing concealed — for precise
   control and for users who think in Markdown.
 - **Reading mode:** a fully rendered, read-only view (like a published page) with no editing
@@ -90,10 +111,22 @@ Three ways to view/edit the same note. Switching modes is instant and never alte
 - **Per-note and global defaults:** the user can set a default mode and toggle the current note's
   mode with a shortcut/control. New notes can default to a chosen mode.
 
+> **Today:** only two modes exist — Reading (the default) and a Live Preview writing mode, toggled
+> with ⌘E. Live Preview *dims* syntax markers rather than concealing them (true zero-width
+> concealment needs custom TextKit 2 layout). There is no Source mode and no configurable default
+> mode.
+
 ## 5. Markdown elements (rendering & editing catalog)
 
-Folio understands and renders all of the following. In Live Preview each renders visually while the
-underlying text stays plain Markdown.
+The catalog Folio aims to understand and render. In Live Preview each should render visually while
+the underlying text stays plain Markdown.
+
+> **Today:** Reading mode renders headings, emphasis, strikethrough, `==highlight==`, nested lists,
+> standard `- [ ]`/`- [x]` tasks, blockquotes, callouts, fenced code (with a language-agnostic
+> highlighter), tables, rules, Markdown links, wikilinks, and local/remote images. Everything below
+> that isn't in that list — folding, custom checkbox states, collapsible callouts, copy-code,
+> assisted table editing, transclusion, footnotes, math, comments, emoji shortcodes, Mermaid — is
+> **not implemented**.
 
 - **Headings** `#`–`######`, with size hierarchy; foldable (collapse a heading's section).
 - **Emphasis:** bold, italic, bold-italic, ~~strikethrough~~, ==highlight==.
@@ -137,6 +170,12 @@ underlying text stays plain Markdown.
 - **Undo/redo** with sensible granularity; never loses content across mode switches.
 - **Word/character/reading-time count** for the note or selection.
 
+> **Today:** the editor gives you undo, standard system text behavior, `[[` note-name autocomplete,
+> and lossless saves (smart quotes/dashes/auto-replace are disabled so typing never mutates the
+> file). **Essentially none of the rest of this section is implemented** — no smart list continuation,
+> no auto-pairing, no Markdown typing transforms, no ⌘B/⌘I formatting commands, no paste behaviors,
+> no multiple cursors, no find-and-replace or regex, no line commands, no word count.
+
 ## 7. Links & references
 
 The connective tissue — must feel effortless and stay correct.
@@ -156,7 +195,15 @@ The connective tissue — must feel effortless and stay correct.
 - **External links** open in the default browser; optional confirmation for untrusted URLs.
 - **Copy link to note / heading / block** from context menus.
 
-## 8. Embeds & transclusion
+> **Today:** `[[wikilinks]]` resolve (by basename or path), render as resolved/unresolved, click to
+> open, create-on-click when unresolved, and `[[` autocompletes **note names**. Renaming a note
+> rewrites `[[old]]`, `[[old|alias]]`, and `[[old#heading]]` across the vault. **Caveats:** the rename
+> updater does *not* fix path-qualified wikilinks (`[[folder/Note]]`) or Markdown-style links, and
+> reports no count. `[[Note#Heading]]` navigates to the note but does **not** scroll to the heading.
+> **Not built:** block links, alias resolution from frontmatter, heading/block autocomplete,
+> modifier-click-to-new-pane, create confirmation, copy-link commands.
+
+## 8. Embeds & transclusion — *not implemented*
 
 - **Embed a note:** `![[Note]]` renders that note's content inline.
 - **Embed a section or block:** `![[Note#Heading]]`, `![[Note#^blockId]]`.
@@ -174,6 +221,10 @@ The connective tissue — must feel effortless and stay correct.
 - **Rename a tag** across the vault.
 - Tags are searchable and usable as filters everywhere.
 
+> **Today:** inline `#tags` and frontmatter `tags:` are indexed into a browsable tag pane (⇧⌘Y) with
+> counts; click a tag to see its notes. **Not built:** tag autocomplete, hierarchical display of
+> nested tags, tag rename, and tag filters elsewhere in the app.
+
 ## 10. Properties / frontmatter
 
 - **YAML frontmatter** at the top of a note is recognized and editable as **properties**: typed
@@ -185,6 +236,12 @@ The connective tissue — must feel effortless and stay correct.
   is possible.
 - Frontmatter the user hand-writes is never reordered or stripped.
 
+> **Today:** YAML frontmatter renders as a **read-only** Properties card in Reading mode, with an
+> icon and formatting inferred per key (dates, tag chips, links). It is parsed by a small line-based
+> heuristic, **not a real YAML parser** — multiline values, quoting, comments, and nested mappings are
+> not faithfully represented. **Not built:** editing properties, property search/queries, vault-wide
+> property views.
+
 ## 11. Backlinks & outgoing links
 
 - **Backlinks panel:** for the current note, all notes that link to it ("linked mentions"), with a
@@ -194,7 +251,10 @@ The connective tissue — must feel effortless and stay correct.
 - **Outgoing links panel:** all links the current note points to, including unresolved ones.
 - Counts surface at a glance (e.g., a backlink count on the note).
 
-## 12. Graph view
+> **Today:** a collapsible backlinks section at the bottom of a note lists inbound links with a line
+> of context. **Not built:** unlinked mentions and the outgoing-links panel.
+
+## 12. Graph view — *not implemented*
 
 - **Global graph:** notes as nodes, links as edges; pan/zoom; click a node to open it.
 - **Local graph:** the neighborhood around the current note to a chosen depth.
@@ -213,6 +273,14 @@ The connective tissue — must feel effortless and stay correct.
 - **Saved searches / bookmarks** of queries (see §15).
 - Search is case-insensitive by default with an option for case sensitivity.
 
+> **Today:** in-note find (⌘F) works in both Reading and Writing mode, with case sensitivity and
+> next/previous. In Reading mode it searches headings, paragraphs, lists, tasks, quotes, and code —
+> it does **not** search callouts, tables, properties, or image alt text.
+>
+> **There is no vault-wide / full-text search at all.** ⌘K searches *file names only*. No operators,
+> no regex, no snippets, no saved searches. This is the single largest gap between this document and
+> the app.
+
 ## 14. Navigation
 
 - **Quick switcher:** fuzzy "open note by name" with keyboard; create-on-miss; recent-weighted.
@@ -223,7 +291,13 @@ The connective tissue — must feel effortless and stay correct.
 - **Go to heading/block** within a note; **scroll to top/bottom**.
 - **"Open random note"** and **"open today's daily note"** quick actions.
 
-## 15. Bookmarks
+> **Today:** ⌘K opens a file-name switcher (**substring** match, not fuzzy, no recent-weighting, no
+> create-on-miss); ⌘P opens a command palette with a **small hardcoded list** of commands, not every
+> action; a hover-reveal outline of the current note's headings scrolls on click; and Reading mode has
+> vim-style scrolling (j/k/h/l, d/u, gg/G, space). **Not built:** back/forward history, breadcrumbs,
+> go-to-heading/block, random note, daily note.
+
+## 15. Bookmarks — *not implemented*
 
 - **Bookmark** notes, folders, headings, blocks, searches, and graph states.
 - **Bookmarks panel** to organize them (groups/folders), reorder, rename.
@@ -243,6 +317,11 @@ The connective tissue — must feel effortless and stay correct.
 - **Pop-out windows:** tear a note/pane into its own window (macOS).
 - **Workspace memory:** layout persists across launches; optional named/saved layouts.
 
+> **Today:** tabs work — open, close (⌘W), drag-reorder, close-others/all, reopen closed (⇧⌘T),
+> cycle (⌃⇥ / ⌃⇧⇥) — and are restored per vault on relaunch. There is one resizable, collapsible
+> sidebar (⌃⌘S). **Not built:** pinned tabs, split panes, linked panes, stacked tabs, rearrangeable
+> panels, pop-out windows, saved workspaces, scroll/cursor restoration.
+
 ## 17. Reading & preview behaviors
 
 - **Reading mode** renders the note fully (see §4/§5).
@@ -251,7 +330,11 @@ The connective tissue — must feel effortless and stay correct.
 - **Clickable everything:** links, tags, checkboxes, footnotes, embeds, headings (for permalinks).
 - **Image behaviors:** click to zoom; respect width/alignment hints; lazy/comfortable loading.
 
-## 18. Daily notes & templates
+> **Today:** Reading mode renders the note; links, tags, and checkboxes are clickable. Hover preview
+> of a wikilink exists **only in the writing editor**, not in Reading mode. **Not built:** image zoom,
+> width/alignment hints, footnote and heading-permalink behaviors.
+
+## 18. Daily notes & templates — *not implemented*
 
 - **Daily notes:** one-key "open/create today's note" using a configured folder and filename date
   format; navigation to previous/next day's note.
@@ -261,7 +344,7 @@ The connective tissue — must feel effortless and stay correct.
   folder).
 - (Aspirational) periodic notes: weekly/monthly/yearly equivalents.
 
-## 19. Attachments & media
+## 19. Attachments & media — *not implemented*
 
 - **Attachment handling:** pasting/dragging an image or file into a note stores it in a configured
   attachments location and inserts the appropriate embed/link.
@@ -281,12 +364,20 @@ The connective tissue — must feel effortless and stay correct.
 - **Focus/typewriter/zen** writing modes (dim non-active lines, center the active line, hide chrome).
 - Per-note appearance hints honored from properties (e.g., width, reading styles).
 
+> **Today:** five themes (System, Light, Dark, Paper, Frosted), reading-font choice (System/Serif/
+> Mono), body font size, and readable line width — all applied live. **Not built:** accent color,
+> configurable editor/monospace fonts, custom themes or CSS snippets, focus/typewriter/zen modes,
+> per-note appearance hints.
+
 ## 21. Command system & keyboard
 
 - **Every action is a command** discoverable in the command palette.
 - **Customizable hotkeys:** view, add, change, and reset keyboard shortcuts; detect conflicts.
 - **Native menu bar** (macOS) mirrors key commands; standard system shortcuts behave as expected.
 - Common defaults align with platform conventions and, where sensible, with Obsidian's muscle memory.
+
+> **Today:** a native menu bar, a ⌘/ shortcut cheat sheet, and a command palette carrying a handful of
+> commands. **Not built:** every action registered as a command, and customizable/rebindable hotkeys.
 
 ## 22. Settings / preferences
 
@@ -300,19 +391,28 @@ Organized, searchable preferences covering at least:
 - **Daily notes / templates:** folders and formats.
 - **About / data:** vault location, storage info, no-account confirmation.
 
+> **Today:** Settings (⌘,) covers **Appearance only** — theme, reading font, font size, line width.
+> None of the other settings groups listed above exist.
+
 ## 23. Sync & multi-device
 
 - **Folder-based sync:** because the vault is just files, it syncs through whatever the folder uses
   (iCloud Drive, git, Dropbox, etc.). Folio adds no proprietary sync requirement.
-- **macOS** can open a vault anywhere on disk (e.g. `~/Projects/...`). **iOS** works with
-  **cloud-synced vaults** — practically iCloud Drive — opened via the system document picker and
-  remembered with a security-scoped bookmark; iOS does not browse the local filesystem.
+- **macOS** can open a vault anywhere on disk. **iOS** works with **cloud-synced vaults** —
+  practically iCloud Drive — opened via the system document picker and remembered with a
+  security-scoped bookmark; iOS does not browse the local filesystem.
 - **Cross-device consistency:** the same vault opened on macOS and iOS shows the same notes, links,
   tags, and structure.
-- **Conflict behavior:** concurrent edits never silently lose data; conflicting versions are
-  preserved and surfaced for the user to resolve.
-- **External edits mid-session** are detected and reconciled without clobbering unsaved local edits —
-  including edits made by the other Folio app over iCloud.
+- **Conflict behavior:** concurrent edits should never silently lose data; conflicting versions
+  should be preserved and surfaced for the user to resolve.
+- **External edits mid-session** should be detected and reconciled without clobbering unsaved local
+  edits — including edits made by the other Folio app over iCloud.
+
+> **Today:** the iOS security-scoped bookmark works, and macOS reloads an open note when it changes
+> on disk (unless a local save is pending). **There is no conflict-resolution system of any kind** —
+> no version preservation, no conflict UI, no file coordination (`NSFilePresenter`/`NSMetadataQuery`).
+> A local save can still overwrite an external change that landed during the debounce window. Do not
+> rely on Folio to arbitrate simultaneous edits from two devices.
 
 ## 24. Platform behaviors
 
@@ -331,15 +431,21 @@ behavior are consistent across both; only interaction style and editing depth di
 
 ## 25. Performance & reliability
 
-- **Responsiveness:** opening notes, typing, search, and switching are instant on large vaults
+- **Responsiveness:** opening notes, typing, search, and switching should be instant on large vaults
   (thousands of notes) and large notes; no perceptible lag while typing.
-- **Crash safety:** in-progress edits are never lost to a crash; autosave is continuous and
-  invisible.
-- **Integrity:** no operation ever corrupts a file; writes are atomic; partial writes can't leave a
+- **Crash safety:** in-progress edits should not be lost to a crash; autosave should be continuous
+  and invisible.
+- **Integrity:** no operation should corrupt a file; writes are atomic; partial writes can't leave a
   note truncated.
 - **Graceful degradation:** unknown/large/binary content is handled without freezing or breaking.
 
-## 26. Import & export
+> **Today:** writes go through `write(to:atomically:)`, so a note is never left half-written.
+> But autosave is **debounced by 500 ms**, so the last half-second of typing can be lost to a crash
+> — "never lost" is a goal, not a current property. There are no benchmarks behind the performance
+> targets, no test suite, and filesystem errors are largely swallowed rather than surfaced. Treat
+> the numbers above as targets and keep backups.
+
+## 26. Import & export — *not implemented*
 
 - **Export** a note (or selection) to PDF, HTML, and clean Markdown; print.
 - **Copy as** Markdown/HTML/plain text.
@@ -353,14 +459,24 @@ behavior are consistent across both; only interaction style and editing depth di
 - **Keyboard-only** operation for everything; visible focus.
 - Sufficient color contrast in all themes; never color as the only signal.
 
+> **Today:** icon-only controls carry accessibility labels, and most of the app is keyboard-driven.
+> No VoiceOver audit, Dynamic Type verification, reduce-motion handling, or contrast audit has been
+> done. This section is entirely aspirational.
+
 ## 28. Privacy & data ownership
 
-- **No account, no telemetry, no tracking.** Nothing about the user's notes is transmitted by Folio.
+- **No account, no telemetry, no tracking.** Folio does not transmit anything about the user's notes.
 - **Total data ownership:** notes are the user's files in the user's folder; uninstalling Folio leaves
   every note intact and usable elsewhere.
 - Any future optional online feature is strictly opt-in and clearly disclosed.
 
-## 29. Extensibility (aspirational)
+> **Today:** true — there is no telemetry, no analytics, and no account, and Folio makes no network
+> requests of its own. **One caveat:** Reading mode renders remote images (`![](https://…)`) with
+> `AsyncImage`, so a note containing a remote image URL causes a request to that host, disclosing
+> your IP and the requested URL. Notes you author yourself won't do this unless you put a remote
+> image in them, but it is not currently opt-in.
+
+## 29. Extensibility — *not implemented*
 
 - **Custom styling/snippets** for advanced visual tweaks.
 - **A plugin/automation surface** so power users can extend behavior, with clear sandboxing and the

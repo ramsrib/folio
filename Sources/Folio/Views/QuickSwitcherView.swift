@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// ⌘O — fuzzy "open note by name" overlay, styled as a floating rounded palette.
+/// ⌘K — "open note by name" overlay (substring match on name/path), styled as a
+/// floating rounded palette.
 struct QuickSwitcherView: View {
     @EnvironmentObject private var vault: VaultStore
     @EnvironmentObject private var ui: UIState
