@@ -2,7 +2,7 @@ APP_NAME := Folio
 APP := build/$(APP_NAME).app
 DEST := /Applications/$(APP_NAME).app
 
-.PHONY: build run app open install clean
+.PHONY: build run app open install release clean
 
 build: ## Compile the SwiftPM target
 	swift build
@@ -27,5 +27,8 @@ install: app ## Build, package, and install to /Applications
 	@"$(LSREGISTER)" -f "$(DEST)" 2>/dev/null || true
 	@echo "✓ installed → $(DEST)"
 
+release: ## Build, sign, notarize, package, tag, and publish (make release VERSION=v0.1.0)
+	@APP_NAME="$(APP_NAME)" VERSION="$(VERSION)" ./scripts/release.sh
+
 clean: ## Remove build artifacts
-	rm -rf .build build
+	rm -rf .build build dist

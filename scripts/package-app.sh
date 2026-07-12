@@ -5,7 +5,9 @@ set -euo pipefail
 
 APP_NAME="Folio"
 BUNDLE_ID="com.sriramb.folio"
-VERSION="0.1.0"
+# scripts/release.sh passes the version being released; it then asserts the
+# built Info.plist matches, so this default only applies to local builds.
+VERSION="${MARKETING_VERSION:-0.1.0}"
 CONFIG="${1:-release}"
 
 if [[ ! -f Package.swift ]]; then
@@ -45,8 +47,27 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-# Ad-hoc sign so Gatekeeper lets it run locally.
-codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || \
+# Sign. A Developer ID signature is what lets someone who *downloads* the app
+# open it without Gatekeeper stopping them, so prefer it and fall back to ad-hoc
+# (fine locally, not for a release — scripts/release.sh warns when it happens).
+if [[ -z "${CODE_SIGN_IDENTITY:-}" ]]; then
+    for KIND in "Developer ID Application" "Apple Development"; do
+        LINE="$(security find-identity -v -p codesigning 2>/dev/null | grep "\"$KIND" | head -1 || true)"
+        if [[ -n "$LINE" ]]; then
+            CODE_SIGN_IDENTITY="$(echo "$LINE" | awk '{print $2}')"
+            echo "› signing with $KIND ($CODE_SIGN_IDENTITY)"
+            break
+        fi
+    done
+fi
+CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:--}"
+[[ "$CODE_SIGN_IDENTITY" == "-" ]] && echo "› no signing identity found; signing ad-hoc"
+
+# --options runtime (hardened runtime) is required for notarization; harmless
+# when signing ad-hoc locally.
+codesign --force --deep --options runtime --timestamp \
+    --sign "$CODE_SIGN_IDENTITY" "$APP" >/dev/null 2>&1 || \
+    codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || \
     echo "  (codesign skipped — app will still run locally)"
 
-echo "✓ Built $APP"
+echo "✓ Built $APP ($VERSION)"

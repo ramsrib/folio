@@ -16,3 +16,9 @@ build-ios/
 
 # macOS
 .DS_Store
+
+# Release credentials — never commit
+.env
+
+# Release artifacts
+dist/
