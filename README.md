@@ -10,16 +10,18 @@ efficiently. Writing is supported — but reading is the default, the most polis
 every interaction is optimized around.
 
 > **Status: early.** macOS is the built target and is genuinely usable day to day. iOS exists but is
-> a partial reader. There is **no test suite**, no release build, and no vault-wide search yet. See
+> a partial reader. There is **no test suite** and no release build. See
 > [Limitations](#limitations) before you point it at anything you can't afford to lose.
 
 ## Built for read-heavy use
 
 - **Reading is the default.** Opening a note, following a link, or switching tabs always lands you in
-  the fully-rendered Reading view. Writing is one keystroke away (⌘E / double-click) but opt-in.
-- **Optimized for scanning many docs.** Tabs with session restore, file search, a `#tags` browser,
-  backlinks, and a hover outline — built to move through a whole project's notes quickly, not to sit
-  in one document.
+  the fully-rendered Reading view. Writing is opt-in — the Read | Write switch in the title bar or
+  ⌘E — and Esc always returns you to reading. There is deliberately no double-click-to-edit, so
+  selecting text can never flip the mode.
+- **Optimized for scanning many docs.** A fuzzy quick switcher, vault-wide content search,
+  back/forward history, tabs with session restore, a `#tags` browser, backlinks, and a hover
+  outline — built to move through a whole project's notes quickly, not to sit in one document.
 - **Calm, low-chrome rendering.** Centered reading column, frontmatter as a typed Properties panel,
   thin auto-hiding scrollbars, no syntax symbols — so the docs, not the editor, are what you look at.
 
@@ -35,10 +37,19 @@ Everything in this list is implemented. Anything not in it, assume it isn't.
 - YAML frontmatter renders as a **read-only** Properties card, with per-key icons, formatted dates,
   and tag chips.
 - Vim-style scrolling: `j`/`k`/`h`/`l`, `d`/`u`, `gg`/`G`, space / ⇧space.
+- Text selection flows across consecutive paragraphs (not across headings, lists, or code blocks —
+  see Limitations).
 
-**Navigating**
-- **⌘K** — file search. Matches **file names and paths by substring** (not fuzzy, not full-text).
-- **⌘P** — command palette (a small fixed set of commands, not every action).
+**Navigating & search**
+- **⌘O / ⌘K** — quick switcher. **Fuzzy** name/path matching with highlighted hits, spaces as word
+  separators, recency-weighted ranking, recently-opened notes on an empty query, **⇧↵** to create a
+  note from the query, **⌘↵** to open in a new tab, and a `#` prefix to jump to a heading in the
+  current note.
+- **⇧⌘F** — **vault-wide content search.** Case-insensitive literal matching (no regex, no
+  operators), live results grouped per file with snippets; ↵ opens the note with the find bar on
+  that occurrence.
+- **⌘[ / ⌘]** (or ⌘⌥←/→) — **back/forward history** through visited notes, with title-bar chevrons.
+- **⌘P** — command palette: every app action, fuzzy-matched, including Switch Vault and Set Theme.
 - **⇧⌘Y** — tag browser: all inline `#tags` and frontmatter `tags:` with counts; click through to notes.
 - **⌘F** — find in page, in *both* reading and writing modes, with case toggle and ⌘G / ⇧⌘G.
 - Hover-reveal **outline** at the right edge; click a heading to scroll to it.
@@ -49,7 +60,9 @@ Everything in this list is implemented. Anything not in it, assume it isn't.
 - **⇧⌘O** opens any folder of Markdown as a vault (an Obsidian vault works). Recent vaults in the
   File menu; **⇧⌘R** reloads.
 - Collapsible folder tree in a resizable sidebar (**⌃⌘S** to toggle). Skips hidden dirs and
-  `node_modules`, `build`, `dist`, `target`, etc.
+  `node_modules`, `build`, `dist`, `target`, etc. The tree **reveals** the current note (expands and
+  scrolls to it), remembers folder expansion per vault, and has a **filter field** — every
+  space-separated word must appear in the file name.
 - Live external-change watching via FSEvents — edits from git, Obsidian, or an agent show up without
   a manual reload, and the open note reloads in place (as long as you have no unsaved local edit
   pending).
@@ -63,8 +76,11 @@ Everything in this list is implemented. Anything not in it, assume it isn't.
 - Hovering a wikilink in the editor previews the target note.
 
 **Tabs**
+- Navigation **reuses the current tab** (Obsidian-style); **⌘-click** a note or wikilink — or **⌘↵**
+  in a palette — to open a new tab. Creating a note always gets its own tab.
 - Open/close (**⌘W**), drag to reorder, reopen closed (**⇧⌘T**), cycle (**⌃⇥** / **⌃⇧⇥**),
-  close-others/close-all. Open tabs and the active note are **restored per vault** on relaunch.
+  **⌘1–⌘8** to jump to a tab and **⌘9** to the last, close-others/close-all. Open tabs and the
+  active note are **restored per vault** on relaunch.
 
 **Writing**
 - A Live Preview editor (TextKit `NSTextView`) that styles the literal Markdown buffer in place, so
@@ -129,8 +145,14 @@ device means setting your own team and identity first.
 
 Stated plainly, because the alternative is you finding out later:
 
-- **No vault-wide / full-text search.** ⌘K searches *file names*, not contents. This is the biggest
-  gap.
+- **Search is literal.** ⇧⌘F matches exact (case-insensitive) text — no regex, no operators
+  (`tag:`, `path:`), no boolean queries. In Reading mode, jumping to a hit can land on a
+  *neighboring* occurrence in notes with heavy frontmatter/tables before the match (exact in
+  writing mode).
+- **Text selection in Reading mode stops at rich blocks.** Selection flows across paragraphs, but
+  cannot cross a heading, list, code block, table, or callout — each is a separate SwiftUI view,
+  and macOS can't extend a selection across them. A TextKit-backed reading view is the eventual
+  fix.
 - **No test suite.** Nothing is committed — no unit tests, no parser tests, no test target. File
   writes are lightly exercised by hand only. **Keep backups.**
 - **No Source mode**, and Live Preview *dims* Markdown syntax rather than hiding it.

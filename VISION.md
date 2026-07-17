@@ -4,8 +4,8 @@
 >
 > **Nothing in this document should be read as a description of what Folio currently does.**
 > It describes the app Folio is being *built toward* — the intended end state, most of which is
-> **not implemented**. Whole sections here (graph view, vault-wide search, transclusion, daily notes,
-> templates, bookmarks, split panes, math, plugins) have **no code behind them at all**.
+> **not implemented**. Whole sections here (graph view, transclusion, daily notes, templates,
+> bookmarks, split panes, math, plugins) have **no code behind them at all**.
 >
 > For an accurate, verified account of what actually works today — and what doesn't — see the
 > [README](README.md). Where the README and this document disagree, **the README is right** and this
@@ -92,9 +92,10 @@ behavior.
 - Optional: show non-Markdown files; show/hide file extensions; show/hide hidden files.
 
 > **Today:** collapsible folder tree, name sort (folders first), new note, rename (updates wikilinks),
-> Move to Trash, and Reveal in Finder. **Not built:** folder create/rename/delete, drag-and-drop move,
-> copy path/link, delete confirmation, explorer filtering, sort options, and hidden/non-Markdown
-> display toggles. Folder expansion is not persisted across vault switches.
+> Move to Trash, Reveal in Finder, Copy Path (via ⌘P), a **filter field** (word-wise name match),
+> auto-reveal of the current note, and folder expansion **persisted per vault**. **Not built:**
+> folder create/rename/delete, drag-and-drop move, copy link, delete confirmation, sort options,
+> and hidden/non-Markdown display toggles.
 
 ## 4. The editor — modes
 
@@ -277,9 +278,9 @@ The connective tissue — must feel effortless and stay correct.
 > next/previous. In Reading mode it searches headings, paragraphs, lists, tasks, quotes, and code —
 > it does **not** search callouts, tables, properties, or image alt text.
 >
-> **There is no vault-wide / full-text search at all.** ⌘K searches *file names only*. No operators,
-> no regex, no snippets, no saved searches. This is the single largest gap between this document and
-> the app.
+> **Vault-wide content search exists (⇧⌘F):** live, case-insensitive **literal** search across every
+> note, results grouped per file with snippets, and ↵ jumps to the occurrence. **Not built:**
+> operators (`path:`, `tag:`, …), boolean queries, regex, and saved searches.
 
 ## 14. Navigation
 
@@ -291,11 +292,12 @@ The connective tissue — must feel effortless and stay correct.
 - **Go to heading/block** within a note; **scroll to top/bottom**.
 - **"Open random note"** and **"open today's daily note"** quick actions.
 
-> **Today:** ⌘K opens a file-name switcher (**substring** match, not fuzzy, no recent-weighting, no
-> create-on-miss); ⌘P opens a command palette with a **small hardcoded list** of commands, not every
-> action; a hover-reveal outline of the current note's headings scrolls on click; and Reading mode has
-> vim-style scrolling (j/k/h/l, d/u, gg/G, space). **Not built:** back/forward history, breadcrumbs,
-> go-to-heading/block, random note, daily note.
+> **Today:** the quick switcher (⌘O/⌘K) is **fuzzy** with recency weighting, create-on-miss (⇧↵),
+> and a `#` prefix that jumps to a heading in the current note; **back/forward history** works
+> (⌘[ / ⌘], ⌘⌥←→, title-bar chevrons); ⌘P runs a fuzzy command palette over the app's actions; a
+> hover-reveal outline of the current note's headings scrolls on click; and Reading mode has
+> vim-style scrolling (j/k/h/l, d/u, gg/G, space). **Not built:** breadcrumbs, block-level go-to,
+> random note, daily note.
 
 ## 15. Bookmarks — *not implemented*
 
@@ -317,10 +319,11 @@ The connective tissue — must feel effortless and stay correct.
 - **Pop-out windows:** tear a note/pane into its own window (macOS).
 - **Workspace memory:** layout persists across launches; optional named/saved layouts.
 
-> **Today:** tabs work — open, close (⌘W), drag-reorder, close-others/all, reopen closed (⇧⌘T),
-> cycle (⌃⇥ / ⌃⇧⇥) — and are restored per vault on relaunch. There is one resizable, collapsible
-> sidebar (⌃⌘S). **Not built:** pinned tabs, split panes, linked panes, stacked tabs, rearrangeable
-> panels, pop-out windows, saved workspaces, scroll/cursor restoration.
+> **Today:** tabs work — navigation reuses the current tab (⌘-click / ⌘↵ for a new one), open,
+> close (⌘W), drag-reorder, close-others/all, reopen closed (⇧⌘T), cycle (⌃⇥ / ⌃⇧⇥), ⌘1–9 direct
+> access — and are restored per vault on relaunch. There is one resizable, collapsible sidebar
+> (⌃⌘S). **Not built:** pinned tabs, split panes, linked panes, stacked tabs, rearrangeable panels,
+> pop-out windows, saved workspaces, scroll/cursor restoration.
 
 ## 17. Reading & preview behaviors
 
@@ -376,8 +379,9 @@ The connective tissue — must feel effortless and stay correct.
 - **Native menu bar** (macOS) mirrors key commands; standard system shortcuts behave as expected.
 - Common defaults align with platform conventions and, where sensible, with Obsidian's muscle memory.
 
-> **Today:** a native menu bar, a ⌘/ shortcut cheat sheet, and a command palette carrying a handful of
-> commands. **Not built:** every action registered as a command, and customizable/rebindable hotkeys.
+> **Today:** a native menu bar, a ⌘/ shortcut cheat sheet, and a fuzzy command palette covering the
+> app's actions (vault switching, themes, tabs, navigation, search). **Not built:**
+> customizable/rebindable hotkeys.
 
 ## 22. Settings / preferences
 
