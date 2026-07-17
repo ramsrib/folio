@@ -14,8 +14,15 @@ struct ReadingView: View {
     @EnvironmentObject private var ui: UIState
     @EnvironmentObject private var settings: AppSettings
 
-    // Parsed once per content change (not on every redraw/scroll).
-    @State private var blocks: [Block] = []
+    // Parsed once per content change (not on every redraw/scroll). Two variants:
+    // `parsed` keeps every paragraph as its own block (find-in-page needs that
+    // granularity to scroll to a match); `mergedBlocks` collapses runs of
+    // consecutive paragraphs into one block so text selection — which macOS can't
+    // extend across separate Text views — flows over whole stretches of prose.
+    // Reading uses the merged variant except while the find bar is active.
+    @State private var parsed: [Block] = []
+    @State private var mergedBlocks: [Block] = []
+    private var blocks: [Block] { find.active ? parsed : mergedBlocks }
     private var body0: CGFloat { settings.bodyFontSize }
     private var design: Font.Design { settings.readingFont.design }
 
@@ -49,7 +56,11 @@ struct ReadingView: View {
                 .background(KeyboardScroller())
                 #endif
             }
-            .task(id: vault.content) { blocks = MarkdownParser.parse(vault.content); recomputeMatches(); scrollToCurrent() }
+            .task(id: vault.content) {
+                parsed = MarkdownParser.parse(vault.content)
+                mergedBlocks = Self.mergeParagraphRuns(parsed)
+                recomputeMatches(); scrollToCurrent()
+            }
             .onChange(of: vault.scrollRequest) {
                 if let req = vault.scrollRequest {
                     withAnimation(.smooth) { proxy.scrollTo(req, anchor: .top) }
@@ -90,6 +101,44 @@ struct ReadingView: View {
         return -block.id.hashValue
     }
 
+    /// Collapse runs of consecutive paragraphs into single blocks (joined with
+    /// "\n\n" — a parsed paragraph can never contain a newline, soft-wrapped
+    /// lines are joined with spaces). One block = one Text = one selectable flow.
+    private static func mergeParagraphRuns(_ blocks: [Block]) -> [Block] {
+        var out: [Block] = []
+        var run: [String] = []
+        func flush() {
+            guard !run.isEmpty else { return }
+            out.append(Block(kind: .paragraph(text: run.joined(separator: "\n\n"))))
+            run = []
+        }
+        for b in blocks {
+            if case let .paragraph(t) = b.kind { run.append(t) } else { flush(); out.append(b) }
+        }
+        flush()
+        return out
+    }
+
+    /// Render a (possibly merged) paragraph block. The blank separator line gets
+    /// a much smaller font so the visual gap inside a merged run stays close to
+    /// the 16pt block spacing — otherwise merging would widen the paragraph
+    /// rhythm. Must be used by *both* the view and `searchAttr` so find-match
+    /// ranges line up with what's displayed.
+    private func renderParagraph(_ text: String) -> AttributedString {
+        let parts = text.components(separatedBy: "\n\n")
+        guard parts.count > 1 else { return InlineMarkdown.render(text) }
+        var out = AttributedString()
+        for (i, part) in parts.enumerated() {
+            if i > 0 {
+                var sep = AttributedString("\n\n")
+                sep.font = .system(size: body0 * 0.3, design: design)
+                out += sep
+            }
+            out += InlineMarkdown.render(part)
+        }
+        return out
+    }
+
     // MARK: - Find in page
 
     /// The rendered text a block contributes to search — nil for blocks we don't
@@ -97,7 +146,7 @@ struct ReadingView: View {
     private func searchAttr(_ block: Block) -> AttributedString? {
         switch block.kind {
         case let .heading(_, t, _):     return InlineMarkdown.render(t)
-        case let .paragraph(t):         return InlineMarkdown.render(t)
+        case let .paragraph(t):         return renderParagraph(t)
         case let .listItem(_, _, _, t): return InlineMarkdown.render(t)
         case let .task(_, _, t, _):     return InlineMarkdown.render(t)
         case let .quote(t):             return InlineMarkdown.render(t)
@@ -167,7 +216,7 @@ struct ReadingView: View {
                 .padding(.top, level <= 2 ? 18 : 8)
 
         case let .paragraph(text):
-            Text(applyFindHighlight(InlineMarkdown.render(text), blockIndex: index))
+            Text(applyFindHighlight(renderParagraph(text), blockIndex: index))
                 .font(.system(size: body0, design: design)).lineSpacing(body0 * 0.42)
 
         case let .listItem(ordered, number, indent, text):
