@@ -14,6 +14,10 @@ struct SidebarRow: View {
     let item: SidebarItem
     @Binding var expanded: Set<URL>
     let selected: Bool
+    /// While the filter is active every shown folder reads as open (its matching
+    /// descendants are already visible), so force the chevron open regardless of
+    /// the persisted expansion state.
+    var forceExpanded: Bool = false
     let onSelect: () -> Void
     let onToggle: () -> Void
     let startRename: (URL) -> Void
@@ -22,7 +26,7 @@ struct SidebarRow: View {
     @State private var hover = false
 
     private var node: VaultNode { item.node }
-    private var isOpen: Bool { expanded.contains(node.id) }
+    private var isOpen: Bool { forceExpanded || expanded.contains(node.id) }
 
     var body: some View {
         HStack(spacing: 5) {

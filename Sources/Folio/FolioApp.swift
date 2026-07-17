@@ -52,8 +52,19 @@ struct FolioApp: App {
                 Button("Reload Vault") { vault.refresh() }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
                 Divider()
+                // Navigation history (Obsidian muscle memory). ⌘⌥← / ⌘⌥→ are bound
+                // as hidden shortcuts in ContentView so both key combos reach it.
+                Button("Back") { vault.goBack() }
+                    .keyboardShortcut("[", modifiers: .command)
+                    .disabled(!vault.canGoBack)
+                Button("Forward") { vault.goForward() }
+                    .keyboardShortcut("]", modifiers: .command)
+                    .disabled(!vault.canGoForward)
+                Divider()
                 Button("Search Files…") { ui.showQuickSwitcher = true }
                     .keyboardShortcut("k", modifiers: .command)
+                Button("Search in Vault…") { ui.showSearch = true }
+                    .keyboardShortcut("f", modifiers: [.command, .shift])
                 Button("Command Palette…") { ui.showCommandPalette = true }
                     .keyboardShortcut("p", modifiers: .command)
                 Button("Browse Tags…") { ui.showTags = true }

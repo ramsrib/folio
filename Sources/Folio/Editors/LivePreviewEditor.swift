@@ -12,6 +12,7 @@ struct LivePreviewEditor: NSViewRepresentable {
     var noteNames: () -> [String]
     var onOpenLink: (URL) -> Bool
     var previewForLink: (URL) -> String? = { _ in nil }
+    var onEscape: () -> Void = {}
     var background: NSColor = .textBackgroundColor
     var readableWidth: CGFloat = 720
     @ObservedObject var find: FindModel
@@ -48,6 +49,7 @@ struct LivePreviewEditor: NSViewRepresentable {
         tv.onClickLink = onOpenLink
         tv.previewProvider = previewForLink
         tv.onFind = { [find] in find.open() }
+        tv.onEscape = onEscape
         tv.string = text
 
         scroll.documentView = tv
@@ -83,6 +85,7 @@ struct LivePreviewEditor: NSViewRepresentable {
         }
 
         tv.onFind = { [find] in find.open() }
+        tv.onEscape = onEscape
         context.coordinator.applyFind(find, to: tv)
     }
 

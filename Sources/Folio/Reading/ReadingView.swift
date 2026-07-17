@@ -40,8 +40,10 @@ struct ReadingView: View {
                 .contentShape(Rectangle())
                 .padding(.horizontal, 32)
                 .padding(.vertical, 28)
-                // Double-click the page to start writing (like Notion).
-                .onTapGesture(count: 2) { withAnimation(.smooth(duration: 0.2)) { ui.mode = .edit } }
+                // No double-click-to-edit: double-clicks happen constantly while
+                // reading (word selection), and silently flipping into writing mode
+                // reads as random. Mode changes are explicit only — the toolbar
+                // pencil or ⌘E.
                 // Vim-style j/k/h/l scrolling (macOS only — AppKit-backed).
                 #if os(macOS)
                 .background(KeyboardScroller())
@@ -54,7 +56,10 @@ struct ReadingView: View {
                     vault.scrollRequest = nil
                 }
             }
-            .onChange(of: find.query) { find.current = 0; recomputeMatches(); scrollToCurrent() }
+            // `current` is already zeroed by FindModel.query.didSet; don't re-zero
+            // it here, so a search jump can set `current` right after `query` and
+            // have it survive the recompute (see EditorPane.consumePendingFind).
+            .onChange(of: find.query) { recomputeMatches(); scrollToCurrent() }
             .onChange(of: find.caseSensitive) { recomputeMatches(); scrollToCurrent() }
             .onChange(of: find.active) { recomputeMatches(); scrollToCurrent() }
             .onChange(of: find.current) { scrollToCurrent() }
@@ -68,7 +73,12 @@ struct ReadingView: View {
             if url.scheme == "folio", url.host == "wikilink" {
                 let target = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                     .queryItems?.first(where: { $0.name == "target" })?.value ?? ""
-                vault.openWikilink(target); return .handled
+                #if os(macOS)
+                let newTab = NSApp.currentEvent?.modifierFlags.contains(.command) ?? false
+                #else
+                let newTab = false
+                #endif
+                vault.openWikilink(target, inNewTab: newTab); return .handled
             }
             return .systemAction
         })

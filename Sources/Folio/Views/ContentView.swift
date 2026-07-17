@@ -11,6 +11,11 @@ struct ContentView: View {
     @State private var showSidebar = true
     @State private var sidebarWidth: CGFloat = 280
     @State private var dragStartWidth: CGFloat?
+    @State private var filter = ""
+    @FocusState private var filterFocused: Bool
+
+    private let expandedKey = "folio.expandedByVault"   // [vaultPath: [dirPath]]
+    private var filterActive: Bool { !filter.trimmingCharacters(in: .whitespaces).isEmpty }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -31,6 +36,15 @@ struct ContentView: View {
         .ignoresSafeArea(.container, edges: .top)   // let the title-bar row reach the traffic-light line
         .background(WindowConfigurator(background: settings.nsWindowBackground,
                                        translucent: settings.windowIsTranslucent))
+        .background { navigationShortcuts }
+        .onChange(of: ui.toggleSidebar) { withAnimation(.smooth(duration: 0.2)) { showSidebar.toggle() } }
+        // Handled at the root (not inside the sidebar subtree): when the sidebar is
+        // hidden its views aren't mounted, so a handler there would never fire —
+        // reveal the sidebar first, then focus the field once it exists.
+        .onChange(of: ui.sidebarFilterFocus) {
+            if !showSidebar { withAnimation(.smooth(duration: 0.2)) { showSidebar = true } }
+            DispatchQueue.main.async { filterFocused = true }
+        }
         .overlay { paletteOverlay }
         .animation(.easeOut(duration: 0.14), value: paletteShown)
         .onChange(of: vault.selection) {
@@ -53,7 +67,7 @@ struct ContentView: View {
     // palette's own onExitCommand.
 
     private var paletteShown: Bool {
-        ui.showCommandPalette || ui.showQuickSwitcher || ui.showTags || ui.showShortcuts
+        ui.showCommandPalette || ui.showQuickSwitcher || ui.showTags || ui.showShortcuts || ui.showSearch
     }
 
     @ViewBuilder
@@ -67,6 +81,7 @@ struct ContentView: View {
                 Group {
                     if ui.showCommandPalette { CommandPaletteView() }
                     else if ui.showQuickSwitcher { QuickSwitcherView() }
+                    else if ui.showSearch { SearchPaletteView() }
                     else if ui.showTags { TagsView() }
                     else if ui.showShortcuts { ShortcutsView() }
                 }
@@ -80,6 +95,26 @@ struct ContentView: View {
         ui.showQuickSwitcher = false
         ui.showTags = false
         ui.showShortcuts = false
+        ui.showSearch = false
+    }
+
+    /// Invisible buttons carrying the keyboard shortcuts that have no discoverable
+    /// menu item of their own: ⌘O (quick switcher, alongside ⌘K), the ⌘⌥←/→ history
+    /// combos (Back/Forward also live in the menu as ⌘[ / ⌘]), and ⌘1…⌘8 / ⌘9 tab
+    /// access. Kept out of the menus so the menus stay tidy; documented in
+    /// ShortcutsView instead. Mirrors EditorPane.findShortcuts.
+    private var navigationShortcuts: some View {
+        ZStack {
+            Button("") { ui.showQuickSwitcher = true }.keyboardShortcut("o", modifiers: .command)
+            Button("") { vault.goBack() }.keyboardShortcut(.leftArrow, modifiers: [.command, .option])
+            Button("") { vault.goForward() }.keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+            ForEach(1...8, id: \.self) { n in
+                Button("") { vault.activateTab(n - 1) }
+                    .keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: .command)
+            }
+            Button("") { vault.activateLastTab() }.keyboardShortcut("9", modifiers: .command)
+        }
+        .opacity(0).allowsHitTesting(false).accessibilityHidden(true)
     }
 
     // MARK: Title bar — split into a sidebar title area + a content title area
@@ -126,11 +161,24 @@ struct ContentView: View {
     private var contentTitleArea: some View {
         HStack(spacing: 8) {
             if !showSidebar { toggleButton }   // toggle relocates here when the sidebar is hidden
+            historyChevrons
             TabBarView().frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)   // tabs + trailing "+"
             actionButtons
         }
         .padding(.leading, showSidebar ? 12 : 78)   // clear traffic lights only when sidebar is off
         .padding(.trailing, 12)
+    }
+
+    /// ‹ › back/forward buttons next to the tabs; disabled when their stack is empty.
+    private var historyChevrons: some View {
+        HStack(spacing: 2) {
+            Button { vault.goBack() } label: { Image(systemName: "chevron.left") }
+                .help("Back (⌘[)").accessibilityLabel("Back").disabled(!vault.canGoBack)
+            Button { vault.goForward() } label: { Image(systemName: "chevron.right") }
+                .help("Forward (⌘])").accessibilityLabel("Forward").disabled(!vault.canGoForward)
+        }
+        .buttonStyle(.borderless)
+        .font(.system(size: 13, weight: .semibold))
     }
 
     /// Sidebar/backdrop fill: native vibrancy in the Frosted theme, otherwise the
@@ -153,18 +201,46 @@ struct ContentView: View {
     }
 
     private var actionButtons: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             Button { ui.showTags = true } label: { Image(systemName: "number") }
+                .buttonStyle(.borderless).imageScale(.large)
                 .help("Browse Tags").accessibilityLabel("Browse tags").disabled(vault.vaultURL == nil)
-            Button {
-                withAnimation(.smooth(duration: 0.2)) { ui.mode = ui.mode == .read ? .edit : .read }
-            } label: { Image(systemName: ui.mode == .read ? "pencil.line" : "book") }
-                .help(ui.mode == .read ? "Writing Mode (⌘E)" : "Reading Mode (⌘E)")
-                .accessibilityLabel(ui.mode == .read ? "Switch to writing" : "Switch to reading")
-                .disabled(vault.selection == nil)
+            modeSwitch
         }
-        .buttonStyle(.borderless)
-        .imageScale(.large)
+    }
+
+    /// Read | Write mode switch as two fixed segments, never a morphing toggle
+    /// icon: the highlighted segment *is* the current mode, the other one is the
+    /// available action. (A single swapping icon always shows the mode you're not
+    /// in, which half of users read as the current state — the ambiguity this
+    /// replaced.)
+    private var modeSwitch: some View {
+        HStack(spacing: 2) {
+            modeSegment("book", mode: .read, help: "Reading mode (⌘E toggles, Esc returns)")
+            modeSegment("pencil.line", mode: .edit, help: "Writing mode (⌘E toggles)")
+        }
+        .padding(2)
+        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .disabled(vault.selection == nil)
+        .opacity(vault.selection == nil ? 0.4 : 1)
+    }
+
+    private func modeSegment(_ icon: String, mode: EditorMode, help: String) -> some View {
+        Button {
+            withAnimation(.smooth(duration: 0.2)) { ui.mode = mode }
+        } label: {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .medium))
+                .frame(width: 28, height: 20)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(ui.mode == mode ? settings.selectionFill : .clear,
+                    in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+        .foregroundStyle(ui.mode == mode ? settings.selectionTint : Color.secondary)
+        .help(help)
+        .accessibilityLabel(mode == .read ? "Reading mode" : "Writing mode")
+        .accessibilityAddTraits(ui.mode == mode ? [.isSelected] : [])
     }
 
     private var resizeDivider: some View {
@@ -198,51 +274,188 @@ struct ContentView: View {
                     .buttonStyle(.borderedProminent)
             }
         } else {
-            // A plain ScrollView + LazyVStack (not List): SwiftUI's List draws an
-            // uncustomizable blue context-menu highlight ring around the right-clicked
-            // row. We already provide our own selection/hover backgrounds and row
-            // chrome, so nothing is lost by dropping List.
+            VStack(spacing: 0) {
+                filterField
+                fileTree
+            }
+            .background(sidebarBackdrop)
+            .onAppear { restoreExpansion() }        // initial launch (onChange won't fire)
+            .onChange(of: vault.vaultURL) { filter = ""; restoreExpansion() }
+        }
+    }
+
+    /// Slim, calm filter field pinned above the tree. Substring-matches file names.
+    private var filterField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(.secondary)
+            TextField("Filter", text: $filter)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12))
+                .focused($filterFocused)
+                .autocorrectionDisabled(true)
+                .onExitCommand { clearFilter() }
+            if !filter.isEmpty {
+                Button { clearFilter() } label: {
+                    Image(systemName: "xmark.circle.fill").font(.system(size: 11))
+                }
+                .buttonStyle(.plain).foregroundStyle(.secondary).accessibilityLabel("Clear filter")
+            }
+        }
+        .padding(.horizontal, 8).padding(.vertical, 5)
+        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .padding(.horizontal, 10).padding(.top, 8).padding(.bottom, 4)
+    }
+
+    // A plain ScrollView + LazyVStack (not List): SwiftUI's List draws an
+    // uncustomizable blue context-menu highlight ring around the right-clicked row.
+    // We already provide our own selection/hover backgrounds and row chrome, so
+    // nothing is lost by dropping List.
+    private var fileTree: some View {
+        ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 1) {
                     ForEach(visibleItems) { item in
                         SidebarRow(item: item, expanded: $expandedDirs,
                                    selected: vault.selection == item.node.id,
-                                   onSelect: { vault.select(item.node.id) },
+                                   forceExpanded: filterActive && item.node.isDirectory,
+                                   // ⌘-click opens in a new tab (Obsidian/browser convention).
+                                   onSelect: { vault.select(item.node.id, inNewTab: cmdHeld) },
                                    onToggle: { toggleDir(item.node.id) },
                                    startRename: startRename)
+                            .id(item.node.id)          // reveal target for scroll-to
                             .padding(.horizontal, 6)
                     }
                 }
                 .padding(.vertical, 6)
             }
-            .background(sidebarBackdrop)
             .background(ThinScrollers())   // thin, auto-hiding overlay scroller
-            .onChange(of: vault.vaultURL) { expandedDirs.removeAll() }
+            .onChange(of: vault.selection) { revealSelection(proxy) }
             .overlay {
                 if vault.tree.isEmpty {
                     ContentUnavailableView("No notes", systemImage: "doc.text",
                         description: Text("No Markdown files found in this folder."))
+                } else if filterActive && visibleItems.isEmpty {
+                    ContentUnavailableView("No matches", systemImage: "line.3.horizontal.decrease.circle",
+                        description: Text("No file names match “\(filter)”."))
                 }
             }
         }
     }
 
+    private func clearFilter() { filter = ""; filterFocused = false }
+
     // MARK: Tree flattening (respecting expansion)
 
     private var visibleItems: [SidebarItem] {
+        // The filter matches word-wise: every whitespace-separated word must appear
+        // somewhere in the file name (any order), so "migration strategy" finds
+        // "migration-strategy.md". Kept substring-per-word (not fuzzy) on purpose —
+        // a tree filter should narrow decisively, not keep loose subsequence hits.
+        let words = filter.lowercased().split(whereSeparator: \.isWhitespace).map(String.init)
         var rows: [SidebarItem] = []
-        func walk(_ nodes: [VaultNode], _ depth: Int) {
-            for n in nodes {
-                rows.append(SidebarItem(node: n, depth: depth))
-                if n.isDirectory, expandedDirs.contains(n.id), let c = n.children { walk(c, depth + 1) }
+        if words.isEmpty {
+            func walk(_ nodes: [VaultNode], _ depth: Int) {
+                for n in nodes {
+                    rows.append(SidebarItem(node: n, depth: depth))
+                    if n.isDirectory, expandedDirs.contains(n.id), let c = n.children { walk(c, depth + 1) }
+                }
+            }
+            walk(vault.tree, 0)
+        } else {
+            appendFiltered(vault.tree, depth: 0, words: words, into: &rows)
+        }
+        return rows
+    }
+
+    /// Filtered flattening: keep files whose name contains every filter word, plus
+    /// every ancestor folder on the path to them (shown regardless of expansion).
+    @discardableResult
+    private func appendFiltered(_ nodes: [VaultNode], depth: Int, words: [String],
+                                into rows: inout [SidebarItem]) -> Bool {
+        var any = false
+        for n in nodes {
+            if n.isDirectory, let c = n.children {
+                var childRows: [SidebarItem] = []
+                if appendFiltered(c, depth: depth + 1, words: words, into: &childRows) {
+                    rows.append(SidebarItem(node: n, depth: depth))
+                    rows.append(contentsOf: childRows)
+                    any = true
+                }
+            } else if !n.isDirectory {
+                let name = n.name.lowercased()
+                if words.allSatisfy({ name.contains($0) }) {
+                    rows.append(SidebarItem(node: n, depth: depth))
+                    any = true
+                }
             }
         }
-        walk(vault.tree, 0)
-        return rows
+        return any
     }
 
     private func toggleDir(_ id: URL) {
         if expandedDirs.contains(id) { expandedDirs.remove(id) } else { expandedDirs.insert(id) }
+        persistExpansion()
+    }
+
+    /// Whether ⌘ is down during the current event (used to route clicks to a new tab).
+    private var cmdHeld: Bool { NSApp.currentEvent?.modifierFlags.contains(.command) ?? false }
+
+    // MARK: Reveal + persist expansion
+
+    /// Expand every ancestor folder of the current selection and scroll to its row.
+    /// Ancestors are expanded even while a filter is active — otherwise clearing
+    /// the filter would leave the just-selected note hidden in a collapsed folder;
+    /// only the scroll is skipped (the filtered list is already flat).
+    private func revealSelection(_ proxy: ScrollViewProxy) {
+        guard let sel = vault.selection else { return }
+        for dir in ancestors(of: sel) { expandedDirs.insert(dir) }
+        persistExpansion()
+        guard !filterActive else { return }
+        // Scroll after the newly-expanded rows exist in the lazy stack.
+        DispatchQueue.main.async {
+            withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(sel, anchor: .center) }
+        }
+    }
+
+    /// Directory node IDs on the path from a tree root down to `target` — taken from
+    /// the actual tree nodes so they match the URLs `expandedDirs` is tested against.
+    private func ancestors(of target: URL) -> [URL] {
+        var result: [URL] = []
+        func walk(_ nodes: [VaultNode]) {
+            for n in nodes where n.isDirectory {
+                if target.path.hasPrefix(n.id.path + "/") {
+                    result.append(n.id)
+                    if let c = n.children { walk(c) }
+                    return
+                }
+            }
+        }
+        walk(vault.tree)
+        return result
+    }
+
+    private func allDirNodeIDs(_ nodes: [VaultNode]) -> [URL] {
+        var out: [URL] = []
+        for n in nodes where n.isDirectory {
+            out.append(n.id)
+            if let c = n.children { out.append(contentsOf: allDirNodeIDs(c)) }
+        }
+        return out
+    }
+
+    private func restoreExpansion() {
+        guard let root = vault.vaultURL else { expandedDirs = []; return }
+        let saved = Set((UserDefaults.standard.dictionary(forKey: expandedKey) as? [String: [String]])?[root.path] ?? [])
+        // Match saved paths back to actual tree-node URLs so Set membership (which
+        // the flattener tests with node.id) lines up exactly.
+        expandedDirs = Set(allDirNodeIDs(vault.tree).filter { saved.contains($0.path) })
+    }
+
+    private func persistExpansion() {
+        guard let root = vault.vaultURL else { return }
+        var all = UserDefaults.standard.dictionary(forKey: expandedKey) as? [String: [String]] ?? [:]
+        all[root.path] = expandedDirs.map(\.path)
+        UserDefaults.standard.set(all, forKey: expandedKey)
     }
 
     // MARK: Rename

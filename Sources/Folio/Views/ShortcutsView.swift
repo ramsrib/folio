@@ -23,15 +23,29 @@ struct ShortcutsView: View {
             Item(keys: "⌘W", label: "Close tab"),
             Item(keys: "⇧⌘T", label: "Reopen closed tab"),
         ]),
-        Group(title: "Navigation", items: [
-            Item(keys: "⌘K", label: "Search files"),
+        Group(title: "Search & Navigation", items: [
+            Item(keys: "⌘O / ⌘K", label: "Quick switcher (open note)"),
+            Item(keys: "⇧⌘F", label: "Search in vault (content)"),
             Item(keys: "⌘P", label: "Command palette"),
             Item(keys: "⇧⌘Y", label: "Browse tags"),
+            Item(keys: "⌘[ / ⌘⌥←", label: "Back"),
+            Item(keys: "⌘] / ⌘⌥→", label: "Forward"),
+        ]),
+        Group(title: "Tabs", items: [
             Item(keys: "⌃⇥", label: "Next tab"),
             Item(keys: "⌃⇧⇥", label: "Previous tab"),
+            Item(keys: "⌘1…⌘8", label: "Go to tab N"),
+            Item(keys: "⌘9", label: "Go to last tab"),
+        ]),
+        Group(title: "Quick Switcher", items: [
+            Item(keys: "↩", label: "Open selection"),
+            Item(keys: "⌘↩", label: "Open in new tab"),
+            Item(keys: "⇧↩", label: "Create note from query"),
+            Item(keys: "#", label: "Jump to heading in note"),
         ]),
         Group(title: "View", items: [
             Item(keys: "⌘E", label: "Toggle reading / writing mode"),
+            Item(keys: "esc", label: "Writing → reading (closes find bar first)"),
             Item(keys: "⌃⌘S", label: "Toggle sidebar"),
         ]),
         Group(title: "Reading Mode (Vim)", items: [

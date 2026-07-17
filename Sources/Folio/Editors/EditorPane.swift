@@ -19,8 +19,26 @@ struct EditorPane: View {
                 .overlay(alignment: .bottom) {
                     BacklinksBar().frame(maxWidth: .infinity)
                 }
+                // Ambient write-mode signal: a hairline accent rule pinned to the
+                // pane's top edge, present only while editing — the mode stays
+                // glanceable peripherally without a banner. (Reading needs no
+                // signal; it's the default state.)
+                .overlay(alignment: .top) {
+                    ZStack {
+                        if ui.mode == .edit {
+                            Rectangle().fill(settings.selectionTint.opacity(0.5))
+                                .frame(height: 2)
+                                .transition(.opacity)
+                        }
+                    }
+                    .animation(.smooth(duration: 0.2), value: ui.mode)
+                    .allowsHitTesting(false)
+                }
                 .background(settings.paneBackground ?? Color(nsColor: .textBackgroundColor))
                 .background { findShortcuts }
+                // A global-search hit hands us a query + occurrence to focus.
+                .onChange(of: ui.pendingFind) { consumePendingFind() }
+                .onAppear { consumePendingFind() }
         } else {
             ContentUnavailableView("Select a note", systemImage: "doc.text",
                 description: Text("Pick a note from the sidebar to start writing."))
@@ -55,6 +73,12 @@ struct EditorPane: View {
                     noteNames: { vault.allNoteNames },
                     onOpenLink: openLink,
                     previewForLink: previewForLink,
+                    // Esc is the exit ramp: close the find bar if it's open,
+                    // otherwise return home to reading.
+                    onEscape: {
+                        if find.active { find.close() }
+                        else { withAnimation(.smooth(duration: 0.2)) { ui.mode = .read } }
+                    },
                     background: settings.nsPaneBackground,
                     readableWidth: settings.readableWidth,
                     find: find
@@ -62,6 +86,21 @@ struct EditorPane: View {
             }
         }
         .animation(.smooth(duration: 0.18), value: find.active)
+    }
+
+    /// Apply a jump requested by global search: open the find bar on the query and
+    /// focus the requested occurrence. `FindModel.query`'s didSet already zeroes
+    /// `current`, and ReadingView no longer re-zeroes it on the query change, so
+    /// setting `current` right after `query` survives into the recompute. If the
+    /// occurrence is out of range (e.g. reading-mode block parsing counts matches
+    /// slightly differently), the mode's recompute clamps it to the nearest match.
+    private func consumePendingFind() {
+        guard let pending = ui.pendingFind else { return }
+        ui.pendingFind = nil
+        find.query = pending.query
+        find.active = true
+        find.current = pending.occurrence
+        find.focusRequest &+= 1
     }
 
     /// Invisible buttons carrying the find keyboard shortcuts, present in both modes.
@@ -80,7 +119,9 @@ struct EditorPane: View {
         if url.scheme == "folio", url.host == "wikilink" {
             let target = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                 .queryItems?.first(where: { $0.name == "target" })?.value ?? ""
-            vault.openWikilink(target)
+            // ⌘-click a wikilink → open in a new tab.
+            let newTab = NSApp.currentEvent?.modifierFlags.contains(.command) ?? false
+            vault.openWikilink(target, inNewTab: newTab)
             return true
         }
         if url.scheme == "http" || url.scheme == "https" {

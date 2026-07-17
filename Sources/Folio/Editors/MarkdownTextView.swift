@@ -38,6 +38,14 @@ final class MarkdownTextView: NSTextView {
     /// want one consistent finder across both modes rather than the native one).
     var onFind: () -> Void = {}
 
+    /// Invoked on Esc. NSTextView's default Esc binding pops the completions list;
+    /// Folio repurposes Esc as the exit ramp out of writing mode. An active `[[`
+    /// completion session intercepts Esc before this is reached, so it still
+    /// dismisses the completion popup as expected.
+    var onEscape: () -> Void = {}
+
+    override func cancelOperation(_ sender: Any?) { onEscape() }
+
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
            event.charactersIgnoringModifiers == "f" {

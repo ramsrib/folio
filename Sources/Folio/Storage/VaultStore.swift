@@ -20,6 +20,16 @@ final class VaultStore: ObservableObject {
     @Published var scrollRequest: Int?   // character offset for the editor to scroll to
     @Published private(set) var openTabs: [URL] = []   // open notes, in tab order
     @Published private(set) var recentVaults: [URL] = []
+    /// Most-recently-opened notes for this vault, most-recent-first, deduped. Feeds
+    /// the quick switcher's recency ranking + empty-state list.
+    @Published private(set) var recentFiles: [URL] = []
+    /// Back/forward navigation availability (drives the toolbar chevrons + menu).
+    @Published private(set) var canGoBack = false
+    @Published private(set) var canGoForward = false
+    /// Bumped on every `refresh()` (external change, rename, create, delete) so
+    /// views that show derived-from-disk data (e.g. the open search palette) know
+    /// to recompute even when the file *count* didn't change.
+    @Published private(set) var revision = 0
     /// Set by create actions so the next selection opens in edit mode (navigation
     /// otherwise opens in reading mode). Consumed by the view on selection change.
     var openInEditMode = false
@@ -31,6 +41,7 @@ final class VaultStore: ObservableObject {
     private let tabsKey = "folio.tabsByVault"      // [vaultPath: [filePath]]
     private let activeKey = "folio.activeByVault"  // [vaultPath: filePath]
     private let recentKey = "folio.recentVaults"   // [vaultPath]
+    private let recentFilesKey = "folio.recentsByVault"  // [vaultPath: [filePath]]
     private let mdExtensions: Set<String> = ["md", "markdown", "mdown", "mkd"]
     /// Dependency/build directories never worth scanning (so pointing a vault at a
     /// code project doesn't crawl node_modules and index package READMEs). Hidden
@@ -44,6 +55,15 @@ final class VaultStore: ObservableObject {
     private var saveTask: Task<Void, Never>?
     private var watcher: VaultWatcher?
     private var recentlyClosed: [URL] = []   // stack for "reopen closed tab"
+
+    // Back/forward history. A single global stack (not per-tab) for v1 — simple and
+    // predictable: it mirrors the order you visited notes in, regardless of which
+    // tab they landed in. `isNavigatingHistory` suppresses the push while replaying
+    // so goBack/goForward don't record themselves.
+    private var backStack: [URL] = []
+    private var forwardStack: [URL] = []
+    private var isNavigatingHistory = false
+    private let historyCap = 100
 
     // Link index
     private var noteByName: [String: [URL]] = [:]     // lowercased basename -> urls
@@ -104,6 +124,8 @@ final class VaultStore: ObservableObject {
         addRecent(url)
         selection = nil; content = ""; loadedURL = nil
         outline = []; backlinks = []; openTabs = []
+        recentFiles = []
+        backStack = []; forwardStack = []; updateHistoryFlags()
         refresh()
         startWatching()
         restoreSession()
@@ -153,6 +175,10 @@ final class VaultStore: ObservableObject {
         let byPath = Dictionary(files.map { ($0.id.path, $0.id) }, uniquingKeysWith: { a, _ in a })
         let savedTabs = (UserDefaults.standard.dictionary(forKey: tabsKey) as? [String: [String]])?[root.path] ?? []
         openTabs = savedTabs.compactMap { byPath[$0] }
+        // Restore recency (drop entries whose file no longer exists) so the quick
+        // switcher's empty-state list survives relaunches.
+        let savedRecents = (UserDefaults.standard.dictionary(forKey: recentFilesKey) as? [String: [String]])?[root.path] ?? []
+        recentFiles = savedRecents.compactMap { byPath[$0] }
         let activePath = (UserDefaults.standard.dictionary(forKey: activeKey) as? [String: String])?[root.path]
         if let activePath, let active = byPath[activePath] {
             select(active)
@@ -169,6 +195,13 @@ final class VaultStore: ObservableObject {
         var active = UserDefaults.standard.dictionary(forKey: activeKey) as? [String: String] ?? [:]
         active[root.path] = selection?.path
         UserDefaults.standard.set(active, forKey: activeKey)
+    }
+
+    private func persistRecents() {
+        guard let root = vaultURL else { return }
+        var all = UserDefaults.standard.dictionary(forKey: recentFilesKey) as? [String: [String]] ?? [:]
+        all[root.path] = recentFiles.map(\.path)
+        UserDefaults.standard.set(all, forKey: recentFilesKey)
     }
 
     /// Close a tab; if it was active, activate a neighbor (or clear if last).
@@ -215,7 +248,7 @@ final class VaultStore: ObservableObject {
     /// Re-open the most recently closed tab whose file still exists (⌘⇧T).
     func reopenClosedTab() {
         while let url = recentlyClosed.popLast() {
-            if files.contains(where: { $0.id == url }) { select(url); return }
+            if files.contains(where: { $0.id == url }) { select(url, inNewTab: true); return }
         }
     }
 
@@ -223,6 +256,17 @@ final class VaultStore: ObservableObject {
     func cycleTab(_ delta: Int) {
         guard let sel = selection, let idx = openTabs.firstIndex(of: sel), !openTabs.isEmpty else { return }
         select(openTabs[(idx + delta + openTabs.count) % openTabs.count])
+    }
+
+    /// Activate the Nth tab (0-based) — for ⌘1…⌘8. No-op if out of range.
+    func activateTab(_ index: Int) {
+        guard openTabs.indices.contains(index) else { return }
+        select(openTabs[index])
+    }
+
+    /// Activate the last tab — ⌘9, the browser convention (jump to end, not #9).
+    func activateLastTab() {
+        if let last = openTabs.last { select(last) }
     }
 
     private func trimClosed() { if recentlyClosed.count > 20 { recentlyClosed.removeFirst(recentlyClosed.count - 20) } }
@@ -245,6 +289,7 @@ final class VaultStore: ObservableObject {
         rebuildLinkIndex()
         updateBacklinks()
         maybeReloadOpenNote()
+        revision &+= 1
     }
 
     /// If the open note changed on disk (cloud sync / another app / the iOS app)
@@ -388,25 +433,103 @@ final class VaultStore: ObservableObject {
 
     // MARK: - Open / edit / save
 
-    func select(_ id: MarkdownFile.ID?) {
+    /// Open a note. Tab behavior (the Obsidian model):
+    ///  - already open in a tab → just activate that tab (never a duplicate);
+    ///  - `inNewTab` set, or nothing open yet → append a new tab;
+    ///  - otherwise → replace the *active* tab's URL in place, so a stream of opens
+    ///    leaves one tab trail instead of one tab per file.
+    func select(_ id: MarkdownFile.ID?, inNewTab: Bool = false) {
         // Ignore nil/folder/duplicate selections so a folder click never blanks
         // the open note (folders toggle expansion in the explorer instead).
         guard let id, files.contains(where: { $0.id == id }), id != selection else { return }
         flushSave()
+
+        // History: record where we're leaving from (unless this *is* a replay), and
+        // clear the forward stack — a fresh navigation forks the timeline.
+        if !isNavigatingHistory, let prev = selection {
+            backStack.append(prev)
+            if backStack.count > historyCap { backStack.removeFirst(backStack.count - historyCap) }
+            forwardStack.removeAll()
+        }
+
+        // Tab placement.
+        if openTabs.firstIndex(of: id) == nil {
+            if inNewTab || openTabs.isEmpty {
+                openTabs.append(id)
+            } else if let active = selection, let idx = openTabs.firstIndex(of: active) {
+                openTabs[idx] = id                          // replace active tab in place
+            } else {
+                openTabs.append(id)                         // no active tab → append
+            }
+        }
+
         selection = id
-        if !openTabs.contains(id) { openTabs.append(id) }   // open file → ensure a tab
         content = (try? String(contentsOf: id, encoding: .utf8)) ?? ""
         diskContent = content
         loadedURL = id
         savedAt = nil
+        noteOpened(id)
         updateOutline()
         updateBacklinks()
+        updateHistoryFlags()
         persistSession()
     }
 
+    /// Record a note as most-recently-opened (deduped, capped, persisted per vault).
+    private func noteOpened(_ url: URL) {
+        recentFiles.removeAll { $0 == url }
+        recentFiles.insert(url, at: 0)
+        if recentFiles.count > 50 { recentFiles.removeLast(recentFiles.count - 50) }
+        persistRecents()
+    }
+
+    private func updateHistoryFlags() {
+        if canGoBack != !backStack.isEmpty { canGoBack = !backStack.isEmpty }
+        if canGoForward != !forwardStack.isEmpty { canGoForward = !forwardStack.isEmpty }
+    }
+
+    /// Go back to the previous note, pushing the current one onto forward. Skips
+    /// entries whose file has since been deleted; navigates in the current tab.
+    func goBack() {
+        guard let target = popExistingURL(&backStack) else { updateHistoryFlags(); return }
+        if let cur = selection {
+            forwardStack.append(cur)
+            if forwardStack.count > historyCap { forwardStack.removeFirst(forwardStack.count - historyCap) }
+        }
+        navigateHistory(to: target)
+    }
+
+    /// Replay a forward step (undo a goBack), pushing the current note onto back.
+    func goForward() {
+        guard let target = popExistingURL(&forwardStack) else { updateHistoryFlags(); return }
+        if let cur = selection {
+            backStack.append(cur)
+            if backStack.count > historyCap { backStack.removeFirst(backStack.count - historyCap) }
+        }
+        navigateHistory(to: target)
+    }
+
+    /// Pop the most recent entry that still points at an existing note (and isn't
+    /// the current selection), discarding stale ones along the way.
+    private func popExistingURL(_ stack: inout [URL]) -> URL? {
+        while let url = stack.popLast() {
+            if url != selection, files.contains(where: { $0.id == url }),
+               FileManager.default.fileExists(atPath: url.path) { return url }
+        }
+        return nil
+    }
+
+    private func navigateHistory(to url: URL) {
+        isNavigatingHistory = true
+        select(url)                 // won't touch the stacks while the flag is set
+        isNavigatingHistory = false
+        updateHistoryFlags()
+    }
+
     /// Open a wikilink target — navigate if it resolves, else create the note.
-    func openWikilink(_ target: String) {
-        if let dest = resolve(target) { select(dest); return }
+    /// `inNewTab` carries a ⌘-click through from the click site.
+    func openWikilink(_ target: String, inNewTab: Bool = false) {
+        if let dest = resolve(target) { select(dest, inNewTab: inNewTab); return }
         guard let root = vaultURL else { return }
         let base = normalizeTarget(target)
         guard !base.isEmpty else { return }
@@ -418,7 +541,7 @@ final class VaultStore: ObservableObject {
         }
         refresh()
         openInEditMode = true        // followed an unresolved link → new note to write
-        select(url)
+        select(url, inNewTab: true)  // creation is explicit → don't evict the current read
     }
 
     /// Called by the editor on every edit.
@@ -481,24 +604,68 @@ final class VaultStore: ObservableObject {
     // MARK: - CRUD
 
     func newNote() {
-        guard let root = vaultURL else { return }
-        let dir = selection?.deletingLastPathComponent() ?? root
+        guard let dir = newNoteDirectory() else { return }
         let fm = FileManager.default
         var name = "Untitled.md"
         var n = 1
         while fm.fileExists(atPath: dir.appendingPathComponent(name).path) {
             n += 1; name = "Untitled \(n).md"
         }
-        let url = dir.appendingPathComponent(name)
-        try? "".write(to: url, atomically: true, encoding: .utf8)
+        createAndOpen(at: dir.appendingPathComponent(name))
+    }
+
+    /// Create `<title>.md` (deduping the name if it exists) in the standard
+    /// new-note folder and open it for writing. Used by the quick switcher's
+    /// create-on-miss so the placement rule stays identical to `newNote()`.
+    /// Returns the created (or opened, if it already existed) note's URL.
+    @discardableResult
+    func createNote(named title: String) -> URL? {
+        guard let dir = newNoteDirectory() else { return nil }
+        let stripped = title.hasSuffix(".md") ? String(title.dropLast(3)) : title
+        // A switcher query is a note *name*, never a path: keep only the last path
+        // component so "../escape" or "sub/dir" can't write outside the vault or
+        // into a folder that doesn't exist.
+        let base = (stripped as NSString).lastPathComponent
+            .trimmingCharacters(in: .whitespaces)
+        guard !base.isEmpty, base != ".", base != ".." else { return nil }
+        let fm = FileManager.default
+        var fileName = base + ".md"
+        var candidate = dir.appendingPathComponent(fileName)
+        var n = 1
+        while fm.fileExists(atPath: candidate.path) {
+            n += 1; fileName = "\(base) \(n).md"
+            candidate = dir.appendingPathComponent(fileName)
+        }
+        return createAndOpen(at: candidate) ? candidate : nil
+    }
+
+    /// New notes land in the current note's folder, else the vault root — the one
+    /// placement rule shared by every create path.
+    private func newNoteDirectory() -> URL? {
+        guard let root = vaultURL else { return nil }
+        return selection?.deletingLastPathComponent() ?? root
+    }
+
+    @discardableResult
+    private func createAndOpen(at url: URL) -> Bool {
+        do { try "".write(to: url, atomically: true, encoding: .utf8) } catch {
+            #if os(macOS)
+            NSSound.beep()               // e.g. read-only folder — don't pretend it worked
+            #endif
+            return false
+        }
         refresh()
         openInEditMode = true        // new note → start writing
-        select(url)
+        select(url, inNewTab: true)  // creation is explicit → don't evict the current read
+        return true
     }
 
     func rename(_ id: URL, to newName: String) {
-        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        // Rename takes a file *name*, not a path — a "/" would silently move the
+        // note (or escape the vault); keep only the last component.
+        let trimmed = ((newName.trimmingCharacters(in: .whitespacesAndNewlines))
+            as NSString).lastPathComponent
+        guard !trimmed.isEmpty, trimmed != ".", trimmed != ".." else { return }
         var fileName = trimmed
         if !mdExtensions.contains((fileName as NSString).pathExtension.lowercased()) { fileName += ".md" }
         let dest = id.deletingLastPathComponent().appendingPathComponent(fileName)
@@ -510,6 +677,7 @@ final class VaultStore: ObservableObject {
             let changed = updateLinks(oldBase: oldBase, newBase: newBase)
             if selection == id { selection = dest; loadedURL = dest }
             if let i = openTabs.firstIndex(of: id) { openTabs[i] = dest }   // keep tab on rename
+            remapNavigationState(from: id, to: dest)
             if let open = loadedURL, changed.contains(open) {
                 content = (try? String(contentsOf: open, encoding: .utf8)) ?? content
             }
@@ -521,6 +689,17 @@ final class VaultStore: ObservableObject {
             NSSound.beep()
             #endif
         }
+    }
+
+    /// A rename moves the note's URL out from under every URL-keyed navigation
+    /// structure; rewrite them all so recency ranking, Back/Forward, and Reopen
+    /// Closed Tab keep working across the rename instead of silently skipping it.
+    private func remapNavigationState(from old: URL, to new: URL) {
+        recentFiles = recentFiles.map { $0 == old ? new : $0 }
+        backStack = backStack.map { $0 == old ? new : $0 }
+        forwardStack = forwardStack.map { $0 == old ? new : $0 }
+        recentlyClosed = recentlyClosed.map { $0 == old ? new : $0 }
+        persistRecents()
     }
 
     /// Rewrite `[[oldBase]]`, `[[oldBase|…]]`, `[[oldBase#…]]` to use `newBase`
