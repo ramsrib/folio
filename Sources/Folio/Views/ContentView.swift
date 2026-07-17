@@ -247,16 +247,15 @@ struct ContentView: View {
         Divider()
             .background(Color(nsColor: .windowBackgroundColor))   // opaque: the Frosted window is see-through
             .overlay(
-                Color.clear.frame(width: 8).contentShape(Rectangle())
-                    .onHover { inside in
-                        if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
-                    }
-                    .gesture(DragGesture()
-                        .onChanged { v in
-                            if dragStartWidth == nil { dragStartWidth = sidebarWidth }
-                            sidebarWidth = min(max((dragStartWidth ?? sidebarWidth) + v.translation.width, 200), 480)
-                        }
-                        .onEnded { _ in dragStartWidth = nil })
+                // AppKit-backed: a SwiftUI DragGesture here loses to the
+                // movable-by-background window and drags the whole window.
+                SidebarResizeHandle(
+                    onDrag: { delta in
+                        if dragStartWidth == nil { dragStartWidth = sidebarWidth }
+                        sidebarWidth = min(max((dragStartWidth ?? sidebarWidth) + delta, 200), 480)
+                    },
+                    onEnd: { dragStartWidth = nil })
+                    .frame(width: 8)
             )
     }
 
