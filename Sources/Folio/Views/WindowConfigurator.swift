@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 /// Reaches the hosting `NSWindow` to make the title bar transparent, hide the
-/// title, allow background dragging, and tint the window to the theme color.
+/// title, and tint the window to the theme color.
 struct WindowConfigurator: NSViewRepresentable {
     var background: NSColor?
     /// When true, the window is see-through so a vibrancy sidebar can blur the
@@ -26,7 +26,11 @@ struct WindowConfigurator: NSViewRepresentable {
         window.styleMask.insert(.fullSizeContentView)
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
-        window.isMovableByWindowBackground = true
+        // Native document-app behavior: the window moves only by its title-bar
+        // strip (a WindowDragGesture in ContentView.titleBar). Background
+        // dragging is for utility panels — in a reader you click/select/drag
+        // everywhere, and it caused constant accidental window moves.
+        window.isMovableByWindowBackground = false
         if translucent {
             window.isOpaque = false
             window.backgroundColor = .clear

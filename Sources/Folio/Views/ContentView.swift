@@ -134,6 +134,10 @@ struct ContentView: View {
                 .background(settings.topBarBackground)
         }
         .frame(height: 42)
+        // The custom title-bar strip is the window's (only) drag handle, like a
+        // native toolbar. Buttons and the tab strip's own onDrag still win —
+        // child interactions take precedence over this parent gesture.
+        .gesture(WindowDragGesture())
     }
 
     private var sidebarTitleArea: some View {
