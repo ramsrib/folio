@@ -81,7 +81,7 @@ Everything in this list is implemented. Anything not in it, assume it isn't.
 - Navigation **reuses the current tab** (Obsidian-style); **⌘-click** a note or wikilink — or **⌘↵**
   in a palette — to open a new tab. Creating a note always gets its own tab.
 - Open/close (**⌘W**), drag to reorder, reopen closed (**⇧⌘T**), cycle (**⌃⇥** / **⌃⇧⇥**),
-  **⌘1–⌘8** to jump to a tab and **⌘9** to the last, close-others/close-all. Open tabs and the
+  **⌘1–⌘8** to jump to a tab and **⌘9** to the last, close-others / close-tabs-to-the-right / close-all, and a right-click menu with the same copy actions (relative/absolute path, wikilink) as the explorer. Open tabs and the
   active note are **restored per vault** on relaunch.
 
 **Writing**

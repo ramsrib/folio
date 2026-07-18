@@ -231,6 +231,23 @@ final class VaultStore: ObservableObject {
         persistSession()
     }
 
+    /// Vault-relative path for any file/folder in the vault (what Obsidian's
+    /// "copy path" gives you); falls back to the absolute path outside the vault.
+    func relativePath(for url: URL) -> String {
+        guard let root = vaultURL?.path, url.path.hasPrefix(root + "/") else { return url.path }
+        return String(url.path.dropFirst(root.count + 1))
+    }
+
+    /// Close every tab after `url` (browser convention), keeping `url` active if
+    /// the previously active tab was among the closed.
+    func closeTabsToTheRight(of url: URL) {
+        guard let idx = openTabs.firstIndex(of: url), idx + 1 < openTabs.count else { return }
+        recentlyClosed.append(contentsOf: openTabs[(idx + 1)...]); trimClosed()
+        let closedActive = selection.map { openTabs[(idx + 1)...].contains($0) } ?? false
+        openTabs.removeSubrange((idx + 1)...)
+        if closedActive { select(url) } else { persistSession() }
+    }
+
     func closeOtherTabs(keeping url: URL) {
         recentlyClosed.append(contentsOf: openTabs.filter { $0 != url }); trimClosed()
         openTabs = openTabs.contains(url) ? [url] : []

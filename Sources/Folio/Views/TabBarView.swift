@@ -110,10 +110,22 @@ private struct TabChip: View {
         .contextMenu {
             Button("Close") { vault.closeTab(url) }
             Button("Close Others") { vault.closeOtherTabs(keeping: url) }
+            Button("Close Tabs to the Right") { vault.closeTabsToTheRight(of: url) }
             Button("Close All") { vault.closeAllTabs() }
+            Button("Reopen Closed Tab") { vault.reopenClosedTab() }
+            Divider()
+            // Same copy trio as the explorer's context menu — keep them in sync.
+            Button("Copy Relative Path") { copyToPasteboard(vault.relativePath(for: url)) }
+            Button("Copy Absolute Path") { copyToPasteboard(url.path) }
+            Button("Copy Wikilink") { copyToPasteboard("[[\(name)]]") }
             Divider()
             Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
         }
+    }
+
+    private func copyToPasteboard(_ s: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(s, forType: .string)
     }
 }
 

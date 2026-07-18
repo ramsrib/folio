@@ -86,14 +86,8 @@ struct SidebarRow: View {
     /// Relative is vault-relative (what Obsidian copies, what you'd paste into a
     /// Markdown link); absolute is the full filesystem path for tools/terminals.
     @ViewBuilder private var copyItems: some View {
-        Button("Copy Relative Path") { copyToPasteboard(relativePath) }
+        Button("Copy Relative Path") { copyToPasteboard(vault.relativePath(for: node.id)) }
         Button("Copy Absolute Path") { copyToPasteboard(node.id.path) }
-    }
-
-    private var relativePath: String {
-        guard let root = vault.vaultURL?.path else { return node.id.path }
-        let full = node.id.path
-        return full.hasPrefix(root + "/") ? String(full.dropFirst(root.count + 1)) : full
     }
 
     private func copyToPasteboard(_ s: String) {
