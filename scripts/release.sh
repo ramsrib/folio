@@ -90,7 +90,11 @@ echo "    version: $BUILT_VERSION"
 
 # A Developer ID signature is what lets a downloader open the app without
 # right-click → Open. Warn loudly if we only managed ad-hoc.
-if codesign -dvv "$APP" 2>&1 | grep -q 'Authority=Developer ID Application'; then
+# Capture first, then match: under `set -o pipefail`, grep -q exits at the first
+# match and SIGPIPEs codesign, so the pipeline reports 141 and a correctly signed
+# app looks unsigned.
+SIG_INFO="$(codesign -dvv "$APP" 2>&1 || true)"
+if grep -q 'Authority=Developer ID Application' <<<"$SIG_INFO"; then
   echo "    signed:  Developer ID"
 else
   echo "    WARNING: not Developer ID–signed — downloaders will hit Gatekeeper" >&2
