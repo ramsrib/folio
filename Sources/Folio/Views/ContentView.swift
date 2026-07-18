@@ -134,10 +134,25 @@ struct ContentView: View {
                 .background(settings.topBarBackground)
         }
         .frame(height: 42)
+        // Native title-bar double-click (zoom/minimize per System Settings).
+        // Our custom strip hides the real title bar, so AppKit's built-in
+        // handling never sees the click — restore it ourselves.
+        .onTapGesture(count: 2) { titleBarDoubleClicked() }
         // The custom title-bar strip is the window's (only) drag handle, like a
         // native toolbar. Buttons and the tab strip's own onDrag still win —
         // child interactions take precedence over this parent gesture.
         .gesture(WindowDragGesture())
+    }
+
+    /// Perform the system-configured title-bar double-click action ("Double-click
+    /// a window's title bar to…" in System Settings ▸ Desktop & Dock).
+    private func titleBarDoubleClicked() {
+        guard let window = NSApp.keyWindow else { return }
+        switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") {
+        case "Minimize": window.performMiniaturize(nil)
+        case "None":     break
+        default:         window.performZoom(nil)   // "Fill"/"Zoom" — the default
+        }
     }
 
     private var sidebarTitleArea: some View {

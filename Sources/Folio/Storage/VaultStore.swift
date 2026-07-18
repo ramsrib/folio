@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import os
 #if os(macOS)
 import AppKit
 #endif
@@ -291,22 +292,54 @@ final class VaultStore: ObservableObject {
     private func startWatching() {
         watcher = nil
         guard let root = vaultURL else { return }
-        watcher = VaultWatcher(path: root.path) { [weak self] in self?.refresh() }
+        watcher = VaultWatcher(path: root.path) { [weak self] in self?.scheduleRefresh() }
+    }
+
+    /// Watcher events arrive in bursts (git pull, an agent writing a batch of
+    /// files). Each refresh walks the tree and re-stats every note on the main
+    /// thread — doing that per event is where the CPU spikes came from. Coalesce:
+    /// rescan once per lull instead of once per event. User-initiated actions
+    /// still call `refresh()` directly, so their result is never delayed.
+    private var refreshDebounce: Task<Void, Never>?
+    private func scheduleRefresh() {
+        refreshDebounce?.cancel()
+        refreshDebounce = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(400))
+            if Task.isCancelled { return }
+            self?.refresh()
+        }
     }
 
     // MARK: - File listing (tree + flat) + link index
 
+    /// Perf log for the scan/index path. Follow live with:
+    ///   log stream --level debug --predicate 'subsystem == "com.sriramb.folio"'
+    private static let perfLog = Logger(subsystem: "com.sriramb.folio", category: "perf")
+
     func refresh() {
         guard let root = vaultURL else { tree = []; files = []; return }
+        let t0 = ContinuousClock.now
         var flat: [MarkdownFile] = []
         tree = buildTree(root, root: root, flat: &flat)
         files = flat.sorted {
             $0.relativePath.localizedStandardCompare($1.relativePath) == .orderedAscending
         }
+        let tTree = ContinuousClock.now
         rebuildLinkIndex()
+        let tIndex = ContinuousClock.now
         updateBacklinks()
         maybeReloadOpenNote()
         revision &+= 1
+
+        let treeMs = (tTree - t0).ms, indexMs = (tIndex - tTree).ms
+        let totalMs = (ContinuousClock.now - t0).ms
+        // Always visible at debug level; escalates when a refresh is slow enough
+        // to matter (this all runs on the main thread today).
+        if totalMs > 100 {
+            Self.perfLog.notice("slow refresh: \(totalMs)ms (tree \(treeMs)ms, index \(indexMs)ms, \(self.files.count) files)")
+        } else {
+            Self.perfLog.debug("refresh: \(totalMs)ms (tree \(treeMs)ms, index \(indexMs)ms, \(self.files.count) files)")
+        }
     }
 
     /// If the open note changed on disk (cloud sync / another app / the iOS app)
@@ -760,4 +793,9 @@ final class VaultStore: ObservableObject {
         }
         persistSession()
     }
+}
+
+private extension Duration {
+    /// Whole milliseconds, for perf log lines.
+    var ms: Int { Int(components.seconds * 1000) + Int(components.attoseconds / 1_000_000_000_000_000) }
 }

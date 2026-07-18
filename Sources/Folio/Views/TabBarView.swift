@@ -102,6 +102,9 @@ private struct TabChip: View {
             }
         }
         .contentShape(Rectangle())
+        // Double-tap declared first so a rapid double-click on a tab reads as
+        // "select" here and doesn't bubble up to the title bar's zoom handler.
+        .onTapGesture(count: 2) { vault.select(url) }
         .onTapGesture { vault.select(url) }
         .onHover { hover = $0 }
         .help(url.lastPathComponent)
