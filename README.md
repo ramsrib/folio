@@ -66,7 +66,9 @@ Everything in this list is implemented. Anything not in it, assume it isn't.
 - Live external-change watching via FSEvents — edits from git, Obsidian, or an agent show up without
   a manual reload, and the open note reloads in place (as long as you have no unsaved local edit
   pending).
-- New note (**⌘N**), rename, Move to Trash, Reveal in Finder.
+- New note (**⌘N**), rename, Move to Trash, Reveal in Finder. Right-click a file for Open in New
+  Tab, **Copy Relative / Absolute Path**, and **Copy Wikilink**; right-click a folder for New Note
+  in Folder and the path copies.
 
 **Links**
 - `[[wikilinks]]` resolve by basename or path, render resolved vs unresolved, click to open, and

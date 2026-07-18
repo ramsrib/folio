@@ -58,15 +58,47 @@ struct SidebarRow: View {
         .contextMenu {
             if node.isDirectory {
                 Button(isOpen ? "Collapse" : "Expand") { onToggle() }
+                Button("New Note in Folder") { vault.newNote(in: node.id) }
+                Divider()
+                copyItems
+                Divider()
                 Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([node.id]) }
             } else {
+                Button("Open in New Tab") { vault.select(node.id, inNewTab: true) }
                 Button("Rename…") { startRename(node.id) }
+                Divider()
+                copyItems
+                // A wikilink is how notes refer to each other — copy it ready to
+                // paste into another note (Obsidian's "copy link").
+                Button("Copy Wikilink") {
+                    copyToPasteboard("[[\((node.name as NSString).deletingPathExtension)]]")
+                }
+                Divider()
                 Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([node.id]) }
                 Divider()
                 Button("Move to Trash", role: .destructive) { vault.delete(node.id) }
             }
         }
         .focusEffectDisabled()   // suppress the blue focus ring on right-click / focus
+    }
+
+    /// Copy Relative Path / Copy Absolute Path — shared by files and folders.
+    /// Relative is vault-relative (what Obsidian copies, what you'd paste into a
+    /// Markdown link); absolute is the full filesystem path for tools/terminals.
+    @ViewBuilder private var copyItems: some View {
+        Button("Copy Relative Path") { copyToPasteboard(relativePath) }
+        Button("Copy Absolute Path") { copyToPasteboard(node.id.path) }
+    }
+
+    private var relativePath: String {
+        guard let root = vault.vaultURL?.path else { return node.id.path }
+        let full = node.id.path
+        return full.hasPrefix(root + "/") ? String(full.dropFirst(root.count + 1)) : full
+    }
+
+    private func copyToPasteboard(_ s: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(s, forType: .string)
     }
 
     private var rowBackground: Color {

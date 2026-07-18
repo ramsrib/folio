@@ -603,8 +603,10 @@ final class VaultStore: ObservableObject {
 
     // MARK: - CRUD
 
-    func newNote() {
-        guard let dir = newNoteDirectory() else { return }
+    /// Create an untitled note — in `dir` when given (the explorer's "New Note in
+    /// Folder"), else in the standard new-note folder.
+    func newNote(in dir: URL? = nil) {
+        guard let dir = dir ?? newNoteDirectory() else { return }
         let fm = FileManager.default
         var name = "Untitled.md"
         var n = 1

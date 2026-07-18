@@ -54,9 +54,17 @@ struct CommandPaletteView: View {
         if let sel = vault.selection {
             c.append(AppCommand(title: "Reveal in Finder", subtitle: nil) {
                 NSWorkspace.shared.activateFileViewerSelecting([sel]) })
-            c.append(AppCommand(title: "Copy Path", subtitle: nil) {
+            c.append(AppCommand(title: "Copy Relative Path", subtitle: nil) {
+                let root = vault.vaultURL?.path
+                let rel = root.flatMap { sel.path.hasPrefix($0 + "/") ? String(sel.path.dropFirst($0.count + 1)) : nil }
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(rel ?? sel.path, forType: .string) })
+            c.append(AppCommand(title: "Copy Absolute Path", subtitle: nil) {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(sel.path, forType: .string) })
+            c.append(AppCommand(title: "Copy Wikilink", subtitle: nil) {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString("[[\((sel.lastPathComponent as NSString).deletingPathExtension)]]", forType: .string) })
             c.append(AppCommand(title: "Move Note to Trash", subtitle: nil) { vault.delete(sel) })
         }
         c.append(AppCommand(title: "Keyboard Shortcuts", subtitle: "⌘/") { ui.showShortcuts = true })

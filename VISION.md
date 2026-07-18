@@ -92,10 +92,11 @@ behavior.
 - Optional: show non-Markdown files; show/hide file extensions; show/hide hidden files.
 
 > **Today:** collapsible folder tree, name sort (folders first), new note, rename (updates wikilinks),
-> Move to Trash, Reveal in Finder, Copy Path (via ⌘P), a **filter field** (word-wise name match),
-> auto-reveal of the current note, and folder expansion **persisted per vault**. **Not built:**
-> folder create/rename/delete, drag-and-drop move, copy link, delete confirmation, sort options,
-> and hidden/non-Markdown display toggles.
+> Move to Trash, Reveal in Finder, a context menu (Open in New Tab, Copy Relative / Absolute Path,
+> Copy Wikilink, New Note in Folder), a **filter field** (word-wise name match), auto-reveal of the
+> current note, and folder expansion **persisted per vault**. **Not built:** folder
+> create/rename/delete, drag-and-drop move, delete confirmation, sort options, and
+> hidden/non-Markdown display toggles.
 
 ## 4. The editor — modes
 
