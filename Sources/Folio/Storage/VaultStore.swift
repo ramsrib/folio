@@ -292,22 +292,112 @@ final class VaultStore: ObservableObject {
     private func startWatching() {
         watcher = nil
         guard let root = vaultURL else { return }
-        watcher = VaultWatcher(path: root.path) { [weak self] in self?.scheduleRefresh() }
+        watcher = VaultWatcher(path: root.path) { [weak self] in self?.enqueueWatcherEvents($0) }
     }
 
     /// Watcher events arrive in bursts (git pull, an agent writing a batch of
-    /// files). Each refresh walks the tree and re-stats every note on the main
-    /// thread — doing that per event is where the CPU spikes came from. Coalesce:
-    /// rescan once per lull instead of once per event. User-initiated actions
-    /// still call `refresh()` directly, so their result is never delayed.
+    /// files). Accumulate them and process once per lull — and then, like
+    /// Obsidian, patch the index *per changed file* instead of rescanning the
+    /// vault, falling back to a full rescan only for structural changes.
+    /// User-initiated actions still call `refresh()` directly.
     private var refreshDebounce: Task<Void, Never>?
-    private func scheduleRefresh() {
+    private var pendingEvents: [VaultEvent] = []
+
+    private func enqueueWatcherEvents(_ events: [VaultEvent]) {
+        pendingEvents.append(contentsOf: events)
         refreshDebounce?.cancel()
         refreshDebounce = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(400))
             if Task.isCancelled { return }
-            self?.refresh()
+            self?.drainWatcherEvents()
         }
+    }
+
+    private func drainWatcherEvents() {
+        let events = pendingEvents
+        pendingEvents = []
+        guard !events.isEmpty else { return }
+
+        switch classify(events) {
+        case .nothing:
+            break   // e.g. only attachment/tmp-file churn — the index doesn't care
+        case .fullRescan(let reason):
+            Self.perfLog.debug("watcher: \(events.count) events → full rescan (\(reason))")
+            refresh()
+        case .reindex(let urls):
+            let t0 = ContinuousClock.now
+            for url in urls { reindexNote(url) }
+            updateBacklinks()
+            revision &+= 1
+            Self.perfLog.debug("watcher: reindexed \(urls.count) note(s) in \((ContinuousClock.now - t0).ms)ms")
+        }
+    }
+
+    private enum WatcherAction {
+        case nothing
+        case reindex(Set<URL>)
+        case fullRescan(String)
+    }
+
+    /// Decide whether a burst of events can be handled by patching individual
+    /// notes. Conservative: anything that might change the *set* of notes —
+    /// directory events, coalescing overflow, a note appearing or disappearing
+    /// (creates, deletes, and the rename half we can't pair) — falls back to a
+    /// full rescan. Content-only changes to known notes are patched in place.
+    private func classify(_ events: [VaultEvent]) -> WatcherAction {
+        var changed: Set<URL> = []
+        let known = Set(files.map(\.id.path))
+        for e in events {
+            if e.isStructural { return .fullRescan("structural change") }
+            guard e.isFile else { return .fullRescan("non-file event") }
+            let url = URL(fileURLWithPath: e.path)
+            // Non-note files (attachments, .tmp) don't participate in the tree
+            // or the index — ignore them entirely.
+            guard mdExtensions.contains(url.pathExtension.lowercased()) else { continue }
+            let exists = FileManager.default.fileExists(atPath: e.path)
+            if !known.contains(url.path) { return .fullRescan(exists ? "new note" : "unknown note event") }
+            if !exists { return .fullRescan("note removed or renamed away") }
+            changed.insert(url)
+        }
+        // Above ~16 notes a rescan is cheaper than 16 backlink-map splices.
+        if changed.count > 16 { return .fullRescan("large batch (\(changed.count) notes)") }
+        return changed.isEmpty ? .nothing : .reindex(changed)
+    }
+
+    /// Re-index a single changed note in place — the targeted alternative to a
+    /// full rescan. Refreshes its cached wikilink refs + tags, splices its old
+    /// contributions out of the backlink/tag maps, and adds the new ones. The
+    /// note's *name* can't have changed (renames classify as structural), so
+    /// `noteByName` and the tree are untouched.
+    private func reindexNote(_ url: URL) {
+        let mtime = (try? url.resourceValues(forKeys: [.contentModificationDateKey])
+            .contentModificationDate) ?? .distantPast
+        if let cached = linkCache[url], cached.mtime == mtime {
+            if url == loadedURL { maybeReloadOpenNote() }
+            return   // duplicate/echoed event — content already indexed
+        }
+        let info = extractInfo(url)
+        linkCache[url] = (mtime, info.refs, info.tags)
+
+        let name = (url.lastPathComponent as NSString).deletingPathExtension
+        for (target, links) in backlinkMap {
+            let kept = links.filter { $0.source != url }
+            if kept.count != links.count { backlinkMap[target] = kept }
+        }
+        for ref in info.refs where resolve(ref.inner) != nil {
+            backlinkMap[resolve(ref.inner)!, default: []].append(
+                Backlink(source: url, sourceName: name, context: ref.context))
+        }
+
+        var tags = tagsIndex
+        for (tag, urls) in tags {
+            let kept = urls.filter { $0 != url }
+            if kept.count != urls.count { tags[tag] = kept.isEmpty ? nil : kept }
+        }
+        for tag in info.tags { tags[tag, default: []].append(url) }
+        tagsIndex = tags
+
+        if url == loadedURL { maybeReloadOpenNote() }
     }
 
     // MARK: - File listing (tree + flat) + link index
