@@ -126,8 +126,10 @@ make clean
 Then **⇧⌘O** to open a folder of `.md` files.
 
 Note that `make install` **force-quits any running Folio** and replaces `/Applications/Folio.app`.
-The packaged app is **ad-hoc signed only** — not Developer ID signed, not notarized. There are no
-downloadable releases.
+A locally packaged app falls back to **ad-hoc signing** when no Developer ID certificate is in the
+keychain. Proper releases (signed, notarized, published to GitHub Releases and the
+[Homebrew tap](https://github.com/ramsrib/homebrew-tap)) are cut with `make release` — see
+[`RELEASE.md`](RELEASE.md).
 
 ### iOS
 
