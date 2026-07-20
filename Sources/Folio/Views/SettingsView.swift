@@ -38,6 +38,13 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460, height: 340)
+        .frame(width: 460, height: 380)
+        // The Settings window is its own scene, so the theme applied to the main
+        // window doesn't reach it — mirror the color scheme and the theme's pane
+        // tint here (a Paper-warm app with a stark system-gray Settings reads as
+        // someone else's window).
+        .scrollContentBackground(.hidden)
+        .background(settings.paneBackground ?? Color(nsColor: .windowBackgroundColor))
+        .preferredColorScheme(settings.colorScheme)
     }
 }

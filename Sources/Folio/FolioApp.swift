@@ -87,6 +87,8 @@ struct FolioApp: App {
                     .keyboardShortcut("k", modifiers: .command)
                 Button("Search in Vault…") { ui.showSearch = true }
                     .keyboardShortcut("f", modifiers: [.command, .shift])
+                Button("Filter Files") { ui.sidebarFilterFocus &+= 1 }
+                    .keyboardShortcut("k", modifiers: [.command, .shift])
                 Button("Command Palette…") { ui.showCommandPalette = true }
                     .keyboardShortcut("p", modifiers: .command)
                 Button("Browse Tags…") { ui.showTags = true }

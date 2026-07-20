@@ -12,6 +12,10 @@ struct ContentView: View {
     @State private var sidebarWidth: CGFloat = 280
     @State private var dragStartWidth: CGFloat?
     @State private var filter = ""
+    /// The filter field is collapsed by default — a permanently mounted TextField
+    /// grabs first-responder at launch and competes with the palettes for focus.
+    /// Revealed by the sidebar's magnifier icon, ⇧⌘K, or the command palette.
+    @State private var showFilter = false
     @FocusState private var filterFocused: Bool
 
     private let expandedKey = "folio.expandedByVault"   // [vaultPath: [dirPath]]
@@ -41,9 +45,13 @@ struct ContentView: View {
         .onChange(of: ui.toggleSidebar) { withAnimation(.smooth(duration: 0.2)) { showSidebar.toggle() } }
         // Handled at the root (not inside the sidebar subtree): when the sidebar is
         // hidden its views aren't mounted, so a handler there would never fire —
-        // reveal the sidebar first, then focus the field once it exists.
+        // reveal the sidebar and the collapsed field first, then focus it once it
+        // exists in the hierarchy.
         .onChange(of: ui.sidebarFilterFocus) {
-            if !showSidebar { withAnimation(.smooth(duration: 0.2)) { showSidebar = true } }
+            withAnimation(.smooth(duration: 0.2)) {
+                if !showSidebar { showSidebar = true }
+                showFilter = true
+            }
             DispatchQueue.main.async { filterFocused = true }
         }
         .overlay { paletteOverlay }
@@ -169,10 +177,19 @@ struct ContentView: View {
 
             HStack(spacing: 6) {
                 Spacer(minLength: 0)
+                // Filter lives behind an icon (Finder-style), not a always-visible
+                // field: a mounted TextField steals first-responder at launch and
+                // fights the palettes for focus.
+                Button {
+                    if showFilter { clearFilter() } else { ui.sidebarFilterFocus &+= 1 }
+                } label: { Image(systemName: "magnifyingglass") }
+                    .buttonStyle(.borderless).help("Filter Files (⇧⌘K)").accessibilityLabel("Filter files")
+                    .foregroundStyle(showFilter ? settings.selectionTint : Color.secondary)
+                    .disabled(vault.vaultURL == nil)
                 Button { vault.refresh() } label: { Image(systemName: "arrow.clockwise") }
                     .buttonStyle(.borderless).help("Reload Vault (⇧⌘R)").accessibilityLabel("Reload vault")
                     .disabled(vault.vaultURL == nil)
-                toggleButton            // reload + toggle pinned to the trailing edge
+                toggleButton            // filter + reload + toggle pinned to the trailing edge
             }
             .padding(.trailing, 10)
         }
@@ -294,12 +311,15 @@ struct ContentView: View {
             }
         } else {
             VStack(spacing: 0) {
-                filterField
+                if showFilter {
+                    filterField
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
                 fileTree
             }
             .background(sidebarBackdrop)
             .onAppear { restoreExpansion() }        // initial launch (onChange won't fire)
-            .onChange(of: vault.vaultURL) { filter = ""; restoreExpansion() }
+            .onChange(of: vault.vaultURL) { clearFilter(); restoreExpansion() }
         }
     }
 
@@ -362,7 +382,14 @@ struct ContentView: View {
         }
     }
 
-    private func clearFilter() { filter = ""; filterFocused = false }
+    /// Clear and fully collapse the filter (Esc, the ⨯ button, or the magnifier
+    /// toggling off) — dismissing it always returns the field to hidden, so the
+    /// sidebar never keeps an idle first-responder around.
+    private func clearFilter() {
+        filter = ""
+        filterFocused = false
+        withAnimation(.smooth(duration: 0.2)) { showFilter = false }
+    }
 
     // MARK: Tree flattening (respecting expansion)
 

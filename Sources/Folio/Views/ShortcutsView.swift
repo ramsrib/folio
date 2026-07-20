@@ -26,6 +26,7 @@ struct ShortcutsView: View {
         Group(title: "Search & Navigation", items: [
             Item(keys: "⌘O / ⌘K", label: "Quick switcher (open note)"),
             Item(keys: "⇧⌘F", label: "Search in vault (content)"),
+            Item(keys: "⇧⌘K", label: "Filter files in sidebar"),
             Item(keys: "⌘P", label: "Command palette"),
             Item(keys: "⇧⌘Y", label: "Browse tags"),
             Item(keys: "⌘[ / ⌘⌥←", label: "Back"),

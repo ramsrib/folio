@@ -72,7 +72,14 @@ struct SearchPaletteView: View {
         }
         .frame(width: 700, height: 540)
         .paletteSurface()
-        .onAppear { focused = true; tamePaletteFieldEditor() }
+        .onAppear {
+            focused = true
+            tamePaletteFieldEditor()
+            // Re-assert focus a runloop later: if something else held first
+            // responder when the palette appeared (the editor, a filter field),
+            // the immediate request can lose the race and leave the field dead.
+            DispatchQueue.main.async { focused = true }
+        }
         .onDisappear { model.cancel() }
         // Keep results live if the vault changes while the palette is open — the
         // revision counter bumps on every refresh (rename, external edit, create,

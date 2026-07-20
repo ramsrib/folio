@@ -137,7 +137,14 @@ struct QuickSwitcherView: View {
         }
         .frame(width: 620, height: 460)
         .paletteSurface()
-        .onAppear { focused = true; tamePaletteFieldEditor() }
+        .onAppear {
+            focused = true
+            tamePaletteFieldEditor()
+            // Re-assert focus a runloop later: if something else held first
+            // responder when the palette appeared (the editor, a filter field),
+            // the immediate request can lose the race and leave the field dead.
+            DispatchQueue.main.async { focused = true }
+        }
         .onKeyPress(.downArrow) { move(1); return .handled }
         .onKeyPress(.upArrow) { move(-1); return .handled }
         .onKeyPress(.return, phases: .down) { handleReturn($0.modifiers) }

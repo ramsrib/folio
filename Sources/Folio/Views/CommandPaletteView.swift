@@ -47,7 +47,7 @@ struct CommandPaletteView: View {
         c.append(AppCommand(title: "Search Files…", subtitle: "⌘K") { ui.showQuickSwitcher = true })
         c.append(AppCommand(title: "Search in Vault…", subtitle: "⇧⌘F") { ui.showSearch = true })
         c.append(AppCommand(title: "Browse Tags", subtitle: "⇧⌘Y") { ui.showTags = true })
-        c.append(AppCommand(title: "Filter Files", subtitle: nil) { ui.sidebarFilterFocus &+= 1 })
+        c.append(AppCommand(title: "Filter Files", subtitle: "⇧⌘K") { ui.sidebarFilterFocus &+= 1 })
         for theme in AppTheme.allCases {
             c.append(AppCommand(title: "Set Theme: \(theme.label)", subtitle: nil) { settings.theme = theme })
         }
@@ -133,7 +133,14 @@ struct CommandPaletteView: View {
         }
         .frame(width: 560, height: 420)
         .paletteSurface()
-        .onAppear { focused = true; tamePaletteFieldEditor() }
+        .onAppear {
+            focused = true
+            tamePaletteFieldEditor()
+            // Re-assert focus a runloop later: if something else held first
+            // responder when the palette appeared (the editor, a filter field),
+            // the immediate request can lose the race and leave the field dead.
+            DispatchQueue.main.async { focused = true }
+        }
         .onKeyPress(.downArrow) { move(1); return .handled }
         .onKeyPress(.upArrow) { move(-1); return .handled }
         .onKeyPress(.return) { runSelected(); return .handled }
