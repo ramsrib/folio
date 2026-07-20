@@ -69,7 +69,9 @@ behavior.
   (git pull, Obsidian, Finder, another device's sync), the vault reflects it without a manual reload.
 
 > **Today:** open a folder, recent-vaults menu, and live external-change detection (FSEvents)
-> all work on macOS. **Not built:** independent multi-vault windows, and restoration of pane layout
+> all work on macOS. You can also open a `.md` from Finder / `open -a Folio` (it finds or opens a
+> vault around the file), follow `folio://open?vault=…&file=…` deep links, and pick recent notes or
+> vaults from the Dock menu. **Not built:** independent multi-vault windows, and restoration of pane layout
 > or scroll/cursor position (only open tabs and the active note are restored). Non-Markdown files
 > are not surfaced. On iOS there is no watcher — pull to refresh.
 
@@ -295,7 +297,8 @@ The connective tissue — must feel effortless and stay correct.
 
 > **Today:** the quick switcher (⌘O/⌘K) is **fuzzy** with recency weighting, create-on-miss (⇧↵),
 > and a `#` prefix that jumps to a heading in the current note; **back/forward history** works
-> (⌘[ / ⌘], ⌘⌥←→, title-bar chevrons); ⌘P runs a fuzzy command palette over the app's actions; a
+> (⌘[ / ⌘], ⌘⌥←→, a two-finger trackpad swipe, title-bar chevrons); ⌘P runs a fuzzy command
+> palette over the app's actions; a
 > hover-reveal outline of the current note's headings scrolls on click; and Reading mode has
 > vim-style scrolling (j/k/h/l, d/u, gg/G, space). **Not built:** breadcrumbs, block-level go-to,
 > random note, daily note.

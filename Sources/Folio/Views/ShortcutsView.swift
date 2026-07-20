@@ -59,6 +59,10 @@ struct ShortcutsView: View {
             Item(keys: "gg", label: "Jump to top"),
             Item(keys: "G", label: "Jump to bottom"),
         ]),
+        Group(title: "Trackpad", items: [
+            Item(keys: "swipe ←→", label: "Back / forward (two fingers)"),
+            Item(keys: "pinch", label: "Bigger / smaller text"),
+        ]),
         Group(title: "Find in Page", items: [
             Item(keys: "⌘F", label: "Find in page (reading & writing)"),
             Item(keys: "↩ / ⌘G", label: "Next match"),

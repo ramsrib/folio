@@ -16,14 +16,30 @@ struct FolioApp: App {
     }
 
     var body: some Scene {
-        WindowGroup {
+        // A single `Window` scene, deliberately: the vault/tab state is one shared
+        // @StateObject, so a WindowGroup's extra windows were *mirrors* of the same
+        // store (navigate in one, every window follows) — worse than no second
+        // window. True multi-window needs per-window stores + focused-scene menu
+        // plumbing; until that lands, one honest window.
+        Window("Folio", id: "main") {
             ContentView()
                 .environmentObject(vault)
                 .environmentObject(ui)
                 .environmentObject(settings)
                 .frame(minWidth: 900, minHeight: 600)
                 .preferredColorScheme(settings.colorScheme)
+                // The delegate has no reference to this @StateObject and may have
+                // buffered file/URL opens that arrived before SwiftUI existed; hand
+                // it the store here and flush whatever queued up.
+                .onAppear {
+                    appDelegate.store = vault
+                    appDelegate.urlHandler = { [weak vault] in vault?.handleExternal(urls: $0) }
+                }
         }
+        // First-launch size: a comfortable reading layout (sidebar + ~70-char
+        // column) rather than the 900×600 minimum a bare window fell back to.
+        // Resized windows are restored by the system, so this only shapes launch #1.
+        .defaultSize(width: 1360, height: 900)
         .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(after: .newItem) {
@@ -94,12 +110,101 @@ struct FolioApp: App {
 
 /// Behave as a regular foreground app even when launched unbundled via `swift run`.
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// Set from the WindowGroup's `.onAppear` once the store exists. Weak because
+    /// the store is owned by the SwiftUI scene, not the delegate.
+    weak var store: VaultStore?
+    /// Route for external file/URL opens. nil until SwiftUI is up; opens that
+    /// arrive before then are buffered and flushed the moment it's assigned.
+    var urlHandler: (([URL]) -> Void)? {
+        didSet {
+            guard let urlHandler, !bufferedURLs.isEmpty else { return }
+            let pending = bufferedURLs; bufferedURLs = []
+            urlHandler(pending)
+        }
+    }
+    private var bufferedURLs: [URL] = []
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         configureAppIcon()
         NSApp.activate(ignoringOtherApps: true)
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    // MARK: - Dock menu (recent notes + vaults)
+
+    /// Right-click / long-press the Dock icon. Built fresh each time so it always
+    /// reflects the current recents. Sections that would be empty are omitted, and
+    /// a wholly empty menu returns nil (no reference to the store yet, or a fresh
+    /// launch with no history).
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        guard let store else { return nil }
+        let menu = NSMenu()
+
+        // Recents can go stale (file trashed, vault folder moved since) — a Dock
+        // click on a ghost would beep or open nothing, so filter here at build time
+        // (the handlers re-check on click as the last line of defense).
+        let notes = Array(store.recentFiles
+            .filter { FileManager.default.fileExists(atPath: $0.path) }.prefix(5))
+        if !notes.isEmpty {
+            menu.addItem(header("Recent Notes"))
+            for url in notes {
+                menu.addItem(dockItem(title: (url.lastPathComponent as NSString).deletingPathExtension,
+                                      url: url, action: #selector(openRecentNote(_:))))
+            }
+        }
+
+        // Skip the vault already open — switching to it would be a no-op.
+        let vaults = store.recentVaults
+            .filter { $0.standardizedFileURL.path != store.vaultURL?.standardizedFileURL.path }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+            .prefix(5)
+        if !vaults.isEmpty {
+            if !notes.isEmpty { menu.addItem(.separator()) }
+            menu.addItem(header("Recent Vaults"))
+            for url in vaults {
+                menu.addItem(dockItem(title: url.lastPathComponent,
+                                      url: url, action: #selector(openRecentVault(_:))))
+            }
+        }
+        return menu.items.isEmpty ? nil : menu
+    }
+
+    /// A disabled, dimmed label acting as a section heading in the Dock menu.
+    private func header(_ title: String) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        item.isEnabled = false
+        return item
+    }
+
+    private func dockItem(title: String, url: URL, action: Selector) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        item.target = self
+        item.representedObject = url
+        return item
+    }
+
+    // Dock menu actions fire on the main thread, so touching the MainActor store
+    // directly is safe. Recent notes are per-vault, so the note is in the open
+    // vault and `select` resolves it.
+    @MainActor @objc private func openRecentNote(_ sender: NSMenuItem) {
+        guard let url = sender.representedObject as? URL,
+              FileManager.default.fileExists(atPath: url.path) else { NSSound.beep(); return }
+        store?.select(url)
+    }
+
+    @MainActor @objc private func openRecentVault(_ sender: NSMenuItem) {
+        guard let url = sender.representedObject as? URL,
+              FileManager.default.fileExists(atPath: url.path) else { NSSound.beep(); return }
+        store?.setVault(url)
+    }
+
+    /// The single AppKit entry point for both Finder double-clicks / `open -a Folio`
+    /// (file URLs) and `folio://` deep links. URLs can arrive before the window
+    /// exists (open-at-launch), so buffer until `urlHandler` is wired.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        if let urlHandler { urlHandler(urls) } else { bufferedURLs.append(contentsOf: urls) }
+    }
 
     private func configureAppIcon() {
         let bundledIcon = Bundle.main.url(forResource: "Folio", withExtension: "icns")

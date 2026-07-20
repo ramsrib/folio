@@ -73,6 +73,9 @@ struct SidebarRow: View {
                 Button("Copy Wikilink") {
                     copyToPasteboard("[[\((node.name as NSString).deletingPathExtension)]]")
                 }
+                // A folio:// deep link straight to this note — for pasting into
+                // another app or handing an agent (Copy Wikilink's cross-app peer).
+                Button("Copy Folio Link") { copyToPasteboard(vault.folioLink(for: node.id)) }
                 Divider()
                 Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([node.id]) }
                 Divider()

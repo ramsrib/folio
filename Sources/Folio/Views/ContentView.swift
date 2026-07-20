@@ -37,6 +37,7 @@ struct ContentView: View {
         .background(WindowConfigurator(background: settings.nsWindowBackground,
                                        translucent: settings.windowIsTranslucent))
         .background { navigationShortcuts }
+        .background { GestureMonitor(vault: vault, settings: settings, ui: ui) }   // trackpad swipe/pinch
         .onChange(of: ui.toggleSidebar) { withAnimation(.smooth(duration: 0.2)) { showSidebar.toggle() } }
         // Handled at the root (not inside the sidebar subtree): when the sidebar is
         // hidden its views aren't mounted, so a handler there would never fire —

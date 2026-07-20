@@ -43,6 +43,56 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>NSPrincipalClass</key><string>NSApplication</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
+    <!-- Files Folio can open (Finder "Open With", \`open -a Folio x.md\`). Markdown
+         is rank Alternate too: it makes Folio *an* option for .md without seizing
+         the user's existing default editor. Plain-text is Alternate so Folio never
+         hijacks .txt. -->
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key><string>Markdown Document</string>
+            <key>CFBundleTypeRole</key><string>Editor</string>
+            <key>LSHandlerRank</key><string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>net.daringfireball.markdown</string>
+            </array>
+        </dict>
+        <!-- Markdown only — no public.plain-text entry: the open handler rejects
+             non-.md files, so advertising ourselves in every .txt "Open With" menu
+             would just be a beep factory. -->
+    </array>
+    <!-- \`folio://open?vault=…&file=…\` deep links (Copy Folio Link). -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key><string>${BUNDLE_ID}</string>
+            <key>CFBundleTypeRole</key><string>Editor</string>
+            <key>CFBundleURLSchemes</key>
+            <array><string>folio</string></array>
+        </dict>
+    </array>
+    <!-- Declare the Markdown UTI ourselves in case Launch Services doesn't already
+         know net.daringfireball.markdown (it's imported, not owned by us). -->
+    <key>UTImportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key><string>net.daringfireball.markdown</string>
+            <key>UTTypeDescription</key><string>Markdown Document</string>
+            <key>UTTypeConformsTo</key>
+            <array><string>public.plain-text</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>md</string>
+                    <string>markdown</string>
+                    <string>mdown</string>
+                    <string>mkd</string>
+                </array>
+            </dict>
+        </dict>
+    </array>
 </dict>
 </plist>
 PLIST

@@ -684,6 +684,134 @@ final class VaultStore: ObservableObject {
         select(url, inNewTab: true)  // creation is explicit → don't evict the current read
     }
 
+    // MARK: - External open (Finder / CLI / folio:// deep links)
+
+    /// Parsed `folio://open?vault=…&file=…` link. Pure value (no filesystem
+    /// access) so the parse step is trivially testable in isolation; the caller
+    /// resolves the paths against the running vault.
+    struct FolioLink: Equatable {
+        var vault: String?   // absolute directory path, percent-decoded
+        var file: String?    // vault-relative when `vault` is set, else absolute
+    }
+
+    /// Parse a `folio://open?…` URL. Returns nil for anything else. `URLComponents`
+    /// percent-decodes the query values for us, so a link built by `folioLink(for:)`
+    /// round-trips (spaces, "#", "&" in note names survive).
+    static func parseFolioLink(_ url: URL) -> FolioLink? {
+        // Scheme and host compare case-insensitively (RFC 3986 — "FOLIO://OPEN"
+        // is the same link).
+        guard url.scheme?.lowercased() == "folio",
+              let comps = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              comps.host?.lowercased() == "open" else { return nil }
+        let items = comps.queryItems ?? []
+        func value(_ name: String) -> String? {
+            let v = items.first { $0.name == name }?.value
+            return (v?.isEmpty ?? true) ? nil : v
+        }
+        return FolioLink(vault: value("vault"), file: value("file"))
+    }
+
+    /// Single funnel for URLs arriving from outside the app (the delegate's
+    /// `application(_:open:)`): file URLs from Finder / `open -a Folio x.md`, and
+    /// `folio://` deep links. Paths are standardized before any vault-prefix check
+    /// so a crafted link with `..` can't masquerade as living inside a vault.
+    func handleExternal(urls: [URL]) {
+        for url in urls {
+            if url.isFileURL { openExternalFile(url) }
+            else if url.scheme?.lowercased() == "folio" { openFolioLink(url) }
+            else { beep() }
+        }
+    }
+
+    private func openFolioLink(_ url: URL) {
+        guard let link = Self.parseFolioLink(url) else { beep(); return }
+        // A vault-qualified link fully specifies where the note lives: switch to
+        // that vault first (only if it still exists), then select the file — the
+        // link *is* the navigation, so it lands in the current tab, not a new one.
+        if let vaultPath = link.vault {
+            let target = URL(fileURLWithPath: vaultPath).standardizedFileURL
+            var isDir: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: target.path, isDirectory: &isDir),
+                  isDir.boolValue else { beep(); return }
+            if target.path != vaultURL?.standardizedFileURL.path { setVault(target) }
+            if let file = link.file {   // vault-only links (no file) just open the vault
+                let fileURL = target.appendingPathComponent(file).standardizedFileURL
+                if files.contains(where: { $0.id == fileURL }) { select(fileURL) } else { beep() }
+            }
+            return
+        }
+        // No vault → `file` is expected to be an absolute path (same as a file URL).
+        if let file = link.file { openExternalFile(URL(fileURLWithPath: file)) } else { beep() }
+    }
+
+    /// Open a Markdown file identified by an absolute URL, finding it a vault to
+    /// live in. Folio can't render a rootless note, so the tiers below reuse an
+    /// open/known vault when the file sits inside one, and otherwise fall back to
+    /// treating the file's *parent directory* as a throwaway vault — which is what
+    /// makes "open any project doc in Folio" just work.
+    private func openExternalFile(_ url: URL) {
+        let url = url.standardizedFileURL
+        guard mdExtensions.contains(url.pathExtension.lowercased()),
+              FileManager.default.fileExists(atPath: url.path) else { beep(); return }
+        // Compare through resolved symlinks: a vault opened via a symlinked path
+        // (e.g. ~/Projects/vapi/dev → vapi-ops) must still claim a file addressed
+        // by its real path, and vice versa — otherwise we'd fall through to tier 3
+        // and open a duplicate vault for the same folder.
+        let resolved = url.resolvingSymlinksInPath().path
+
+        // 1. Already inside the current vault → just select it.
+        if let root = vaultURL,
+           resolved.hasPrefix(root.standardizedFileURL.resolvingSymlinksInPath().path + "/") {
+            if !selectResolved(url) { beep() }
+            return
+        }
+        // 2. Inside a recent vault (deepest matching prefix wins, so a nested vault
+        //    beats its parent) → switch to that vault, then select.
+        if let host = recentVaults
+            .filter({ resolved.hasPrefix($0.standardizedFileURL.resolvingSymlinksInPath().path + "/") })
+            .max(by: { $0.standardizedFileURL.path.count < $1.standardizedFileURL.path.count }) {
+            setVault(host)
+            if !selectResolved(url) { beep() }
+            return
+        }
+        // 3. No known vault contains it → open its parent directory as the vault.
+        setVault(url.deletingLastPathComponent())
+        if !selectResolved(url) { beep() }
+    }
+
+    /// Select a note that may be addressed by a different alias of its path than
+    /// the vault index uses (symlinked vault vs. real path). Exact match first,
+    /// then a resolved-path match against the indexed files.
+    @discardableResult
+    private func selectResolved(_ url: URL) -> Bool {
+        if files.contains(where: { $0.id == url }) { select(url); return true }
+        let resolved = url.resolvingSymlinksInPath().path
+        if let match = files.first(where: { $0.id.resolvingSymlinksInPath().path == resolved }) {
+            select(match.id); return true
+        }
+        return false
+    }
+
+    /// Build a `folio://open?vault=…&file=…` deep link for a note — the string an
+    /// agent or another app pastes to jump straight here. Values are percent-encoded
+    /// by `URLComponents` and round-trip through `parseFolioLink`.
+    func folioLink(for url: URL) -> String {
+        var comps = URLComponents()
+        comps.scheme = "folio"
+        comps.host = "open"
+        var items: [URLQueryItem] = []
+        if let root = vaultURL { items.append(URLQueryItem(name: "vault", value: root.path)) }
+        items.append(URLQueryItem(name: "file", value: relativePath(for: url)))
+        comps.queryItems = items
+        return comps.string ?? ""
+    }
+
+    private func beep() {
+        #if os(macOS)
+        NSSound.beep()
+        #endif
+    }
+
     /// Called by the editor on every edit.
     func contentEdited() {
         updateOutline()

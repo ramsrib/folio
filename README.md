@@ -49,7 +49,8 @@ Everything in this list is implemented. Anything not in it, assume it isn't.
 - **⇧⌘F** — **vault-wide content search.** Case-insensitive literal matching (no regex, no
   operators), live results grouped per file with snippets; ↵ opens the note with the find bar on
   that occurrence.
-- **⌘[ / ⌘]** (or ⌘⌥←/→) — **back/forward history** through visited notes, with title-bar chevrons.
+- **⌘[ / ⌘]** (or ⌘⌥←/→, or a **two-finger swipe** left/right) — **back/forward history** through
+  visited notes, with title-bar chevrons.
 - **⌘P** — command palette: every app action, fuzzy-matched, including Switch Vault and Set Theme.
 - **⇧⌘Y** — tag browser: all inline `#tags` and frontmatter `tags:` with counts; click through to notes.
 - **⌘F** — find in page, in *both* reading and writing modes, with case toggle and ⌘G / ⇧⌘G.
@@ -68,8 +69,13 @@ Everything in this list is implemented. Anything not in it, assume it isn't.
   a manual reload, and the open note reloads in place (as long as you have no unsaved local edit
   pending).
 - New note (**⌘N**), rename, Move to Trash, Reveal in Finder. Right-click a file for Open in New
-  Tab, **Copy Relative / Absolute Path**, and **Copy Wikilink**; right-click a folder for New Note
-  in Folder and the path copies.
+  Tab, **Copy Relative / Absolute Path**, **Copy Wikilink**, and **Copy Folio Link**; right-click a
+  folder for New Note in Folder and the path copies.
+- Open a `.md` from **Finder** ("Open With → Folio") or the terminal (`open -a Folio note.md`): if
+  the file is inside the current vault or a recent one Folio switches to it, otherwise it opens the
+  file's parent folder as a vault. **`folio://open?vault=…&file=…`** deep links (what **Copy Folio
+  Link** puts on the clipboard) jump straight to a note from another app or an agent.
+- Right-click the **Dock icon** for recent notes and recent vaults.
 
 **Links**
 - `[[wikilinks]]` resolve by basename or path, render resolved vs unresolved, click to open, and
@@ -95,7 +101,8 @@ Everything in this list is implemented. Anything not in it, assume it isn't.
 
 **Appearance (⌘,)**
 - Themes: System, Light, Dark, Paper (warm), Frosted (glass).
-- Reading font (System / Serif / Mono), body font size (**⌘+ / ⌘− / ⌘0** work anywhere), readable
+- Reading font (System / Serif / Mono), body font size (**⌘+ / ⌘− / ⌘0** work anywhere, or
+  **pinch** on the trackpad), readable
   line width (default ~70 chars/line), an optional **inline title**, and a **text rendering** choice
   (Crisp / Smooth / Smoother — browser-style stem darkening; applies on relaunch). All applied live
   except text rendering.

@@ -19,6 +19,12 @@ final class UIState: ObservableObject {
     /// lives in ContentView; this pulse asks it to flip).
     @Published var toggleSidebar = 0
     @Published var mode: EditorMode = .read
+
+    /// Any modal palette on screen — gates gestures and other note-level input
+    /// so a swipe/pinch can't act on the note *behind* an open palette.
+    var anyPaletteShown: Bool {
+        showQuickSwitcher || showCommandPalette || showTags || showShortcuts || showSearch
+    }
 }
 
 struct PendingFind: Equatable {

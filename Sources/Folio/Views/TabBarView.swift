@@ -121,6 +121,7 @@ private struct TabChip: View {
             Button("Copy Relative Path") { copyToPasteboard(vault.relativePath(for: url)) }
             Button("Copy Absolute Path") { copyToPasteboard(url.path) }
             Button("Copy Wikilink") { copyToPasteboard("[[\(name)]]") }
+            Button("Copy Folio Link") { copyToPasteboard(vault.folioLink(for: url)) }
             Divider()
             Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
         }

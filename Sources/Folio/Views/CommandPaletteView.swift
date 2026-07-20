@@ -66,6 +66,9 @@ struct CommandPaletteView: View {
             c.append(AppCommand(title: "Copy Wikilink", subtitle: nil) {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString("[[\((sel.lastPathComponent as NSString).deletingPathExtension)]]", forType: .string) })
+            c.append(AppCommand(title: "Copy Folio Link", subtitle: nil) { [vault] in
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(vault.folioLink(for: sel), forType: .string) })
             c.append(AppCommand(title: "Move Note to Trash", subtitle: nil) { vault.delete(sel) })
         }
         c.append(AppCommand(title: "Keyboard Shortcuts", subtitle: "⌘/") { ui.showShortcuts = true })
