@@ -43,12 +43,27 @@ struct ReadingView: View {
     /// Parsed-block memo across tab switches, keyed by content length + hash.
     @MainActor private static var parseCache: [String: ([Block], [Block])] = [:]
 
+    @ViewBuilder private var blockRows: some View {
+        ForEach(Array(blocks.enumerated()), id: \.element.id) { i, block in
+            view(for: block, index: i).id(anchorID(block))
+        }
+    }
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 16) {
-                    ForEach(Array(blocks.enumerated()), id: \.element.id) { i, block in
-                        view(for: block, index: i).id(anchorID(block))
+                // Non-lazy for normal documents: LazyVStack only *estimates* the
+                // height of unrealized rows, so restoring a remembered pixel offset
+                // (ScrollMemory) landed near-but-not-on the old spot and drifted as
+                // rows realized. A plain VStack lays out exact geometry every time —
+                // scroll restore is pinned to the pixel. Lazy only kicks in for very
+                // large documents, where full layout would cost real time and a
+                // slightly drifty restore is the better trade.
+                Group {
+                    if blocks.count > 400 {
+                        LazyVStack(alignment: .leading, spacing: 16) { blockRows }
+                    } else {
+                        VStack(alignment: .leading, spacing: 16) { blockRows }
                     }
                 }
                 .frame(maxWidth: settings.readableWidth, alignment: .leading)
