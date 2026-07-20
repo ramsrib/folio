@@ -265,9 +265,13 @@ struct ReadingView: View {
             PropertiesView(props: props, expanded: $propsExpanded)
 
         case let .heading(level, text, _):
+            // Generous air above section headings (Notion-grade rhythm): the gap
+            // above a heading should read clearly larger than the paragraph gaps
+            // inside its section, so section boundaries land while scanning. No
+            // extra padding when the heading opens the document.
             Text(applyFindHighlight(InlineMarkdown.render(text), blockIndex: index))
                 .font(.system(size: headingSize(level), weight: level <= 2 ? .bold : .semibold, design: design))
-                .padding(.top, level <= 2 ? 18 : 8)
+                .padding(.top, index == 0 ? 0 : (level <= 2 ? 26 : 12))
 
         case let .paragraph(text):
             Text(applyFindHighlight(renderParagraph(text), blockIndex: index))

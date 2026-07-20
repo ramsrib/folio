@@ -71,6 +71,18 @@ struct CommandPaletteView: View {
                 NSPasteboard.general.setString(vault.folioLink(for: sel), forType: .string) })
             c.append(AppCommand(title: "Move Note to Trash", subtitle: nil) { vault.delete(sel) })
         }
+        if vault.selection != nil {
+            // Info-as-command (Obsidian keeps this in a status bar; Folio has no
+            // status bar by design). Searchable as "word"/"count"; ↵ copies it.
+            let words = vault.content.split(omittingEmptySubsequences: true,
+                                            whereSeparator: { $0.isWhitespace || $0.isNewline }).count
+            let mins = max(1, Int((Double(words) / 220).rounded()))
+            let summary = "\(words) words · \(vault.content.count) characters · ~\(mins) min read"
+            c.append(AppCommand(title: "Word Count: \(summary)", subtitle: nil) {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(summary, forType: .string)
+            })
+        }
         c.append(AppCommand(title: "Settings…", subtitle: "⌘,") { ui.showSettings = true })
         c.append(AppCommand(title: "Keyboard Shortcuts", subtitle: "⌘/") { ui.showShortcuts = true })
         return c
