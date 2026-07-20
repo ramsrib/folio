@@ -605,6 +605,7 @@ final class VaultStore: ObservableObject {
             }
         }
 
+        let t0 = ContinuousClock.now
         selection = id
         content = (try? String(contentsOf: id, encoding: .utf8)) ?? ""
         diskContent = content
@@ -615,6 +616,7 @@ final class VaultStore: ObservableObject {
         updateBacklinks()
         updateHistoryFlags()
         persistSession()
+        Self.perfLog.debug("select: \((ContinuousClock.now - t0).ms)ms (\(self.content.count) chars)")
     }
 
     /// The most recent in-place tab replacement (single-click navigation evicting

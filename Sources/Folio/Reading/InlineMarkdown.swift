@@ -9,7 +9,22 @@ enum InlineMarkdown {
     private static let wiki = try! NSRegularExpression(pattern: "\\[\\[([^\\]\\n]+)\\]\\]")
     private static let highlight = try! NSRegularExpression(pattern: "==([^=\\n]+)==")
 
-    static func render(_ raw: String) -> AttributedString {
+    /// Rendered-line memo. `render` runs a full Foundation Markdown parse per
+    /// call and is invoked for every visible block on every tab switch — without
+    /// this, flipping back to a tab re-parses text that hasn't changed (the
+    /// reported switch lag). Keyed by the raw source line; crude wholesale reset
+    /// when it grows past a bound (cheap to refill, and re-tuning beats an LRU).
+    @MainActor private static var cache: [String: AttributedString] = [:]
+
+    @MainActor static func render(_ raw: String) -> AttributedString {
+        if let hit = cache[raw] { return hit }
+        let rendered = renderUncached(raw)
+        if cache.count > 4096 { cache.removeAll(keepingCapacity: true) }
+        cache[raw] = rendered
+        return rendered
+    }
+
+    private static func renderUncached(_ raw: String) -> AttributedString {
         let transformed = transform(raw)
         let opts = AttributedString.MarkdownParsingOptions(
             allowsExtendedAttributes: true,

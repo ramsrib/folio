@@ -1,4 +1,5 @@
 import SwiftUI
+import os
 #if canImport(UIKit)
 import UIKit
 #elseif canImport(AppKit)
@@ -39,6 +40,9 @@ struct ReadingView: View {
 
     private struct FindLoc: Equatable { let block: Int; let occ: Int }
 
+    /// Parsed-block memo across tab switches, keyed by content length + hash.
+    @MainActor private static var parseCache: [String: ([Block], [Block])] = [:]
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -62,9 +66,25 @@ struct ReadingView: View {
                 #endif
             }
             .task(id: vault.content) {
-                parsed = MarkdownParser.parse(vault.content)
-                mergedBlocks = Self.mergeParagraphRuns(parsed)
+                let t0 = ContinuousClock.now
+                // Per-document parse memo: tab switches re-run this task with
+                // content that was parsed moments ago (twice, in fact — the view
+                // updates once with the old content before the new one lands).
+                // Reusing cached blocks also keeps their identities stable, which
+                // lets SwiftUI diff the list instead of rebuilding every row.
+                let key = "\(vault.content.count)|\(vault.content.hashValue)"
+                if let hit = Self.parseCache[key] {
+                    (parsed, mergedBlocks) = hit
+                } else {
+                    parsed = MarkdownParser.parse(vault.content)
+                    mergedBlocks = Self.mergeParagraphRuns(parsed)
+                    if Self.parseCache.count > 24 { Self.parseCache.removeAll(keepingCapacity: true) }
+                    Self.parseCache[key] = (parsed, mergedBlocks)
+                }
                 recomputeMatches(); scrollToCurrent()
+                let us = (ContinuousClock.now - t0).components.attoseconds / 1_000_000_000_000
+                Logger(subsystem: "com.sriramb.folio", category: "perf")
+                    .debug("reading parse: \(us)µs (\(parsed.count) blocks)")
             }
             .onChange(of: vault.scrollRequest) {
                 if let req = vault.scrollRequest {
@@ -349,6 +369,10 @@ struct ReadingView: View {
         return body0 * scale[min(max(level - 1, 0), 5)]
     }
 
+    /// Decoded-image memo (mtime-keyed): this runs in the row's *body*, so an
+    /// uncached decode would hit the disk on every render of every image row.
+    @MainActor private static var imageCache: [String: (mtime: Date, image: PlatformImage)] = [:]
+
     private func localImage(_ source: String) -> PlatformImage? {
         guard let note = vault.selection else { return nil }
         let candidates = [
@@ -357,7 +381,14 @@ struct ReadingView: View {
             URL(fileURLWithPath: source)
         ].compactMap { $0 }
         for url in candidates where FileManager.default.fileExists(atPath: url.path) {
-            if let img = PlatformImage.load(contentsOf: url) { return img }
+            let mtime = (try? url.resourceValues(forKeys: [.contentModificationDateKey])
+                .contentModificationDate) ?? .distantPast
+            if let hit = Self.imageCache[url.path], hit.mtime == mtime { return hit.image }
+            if let img = PlatformImage.load(contentsOf: url) {
+                if Self.imageCache.count > 64 { Self.imageCache.removeAll(keepingCapacity: true) }
+                Self.imageCache[url.path] = (mtime, img)
+                return img
+            }
         }
         return nil
     }

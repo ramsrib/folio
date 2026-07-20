@@ -33,7 +33,20 @@ enum CodeHighlighter {
     private static let string = rx("\"[^\"\\n]*\"|'[^'\\n]*'|`[^`]*`")
     private static let comment = rx("//[^\\n]*|#[^\\n]*|/\\*.*?\\*/|--[^\\n]*", [.dotMatchesLineSeparators])
 
-    static func highlight(_ code: String, language: String) -> AttributedString {
+    /// Highlighted-block memo — same rationale as `InlineMarkdown`'s cache: the
+    /// regex passes re-ran for every visible code block on every tab switch.
+    @MainActor private static var cache: [String: AttributedString] = [:]
+
+    @MainActor static func highlight(_ code: String, language: String) -> AttributedString {
+        let key = language + "\u{0}" + code
+        if let hit = cache[key] { return hit }
+        let rendered = highlightUncached(code, language: language)
+        if cache.count > 512 { cache.removeAll(keepingCapacity: true) }
+        cache[key] = rendered
+        return rendered
+    }
+
+    private static func highlightUncached(_ code: String, language: String) -> AttributedString {
         let storage = NSMutableAttributedString(
             string: code, attributes: [.font: mono, .foregroundColor: PlatformColor.pLabel])
         let full = NSRange(location: 0, length: (code as NSString).length)
