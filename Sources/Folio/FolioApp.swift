@@ -48,6 +48,12 @@ struct FolioApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .commands {
+            // Settings is an in-window overlay, not a Settings scene — replace the
+            // system item so ⌘, opens ours (see SettingsView for the rationale).
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings…") { ui.showSettings = true }
+                    .keyboardShortcut(",", modifiers: .command)
+            }
             CommandGroup(after: .newItem) {
                 Button("New Note") { vault.newNote() }
                     .keyboardShortcut("n", modifiers: .command)
@@ -109,10 +115,8 @@ struct FolioApp: App {
                     .keyboardShortcut("/", modifiers: .command)
             }
         }
-
-        Settings {
-            SettingsView().environmentObject(settings)
-        }
+        // No Settings scene: SettingsView presents as an in-window overlay
+        // (ContentView.paletteOverlay) via the ⌘, command above.
     }
 }
 

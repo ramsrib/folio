@@ -71,6 +71,7 @@ struct CommandPaletteView: View {
                 NSPasteboard.general.setString(vault.folioLink(for: sel), forType: .string) })
             c.append(AppCommand(title: "Move Note to Trash", subtitle: nil) { vault.delete(sel) })
         }
+        c.append(AppCommand(title: "Settings…", subtitle: "⌘,") { ui.showSettings = true })
         c.append(AppCommand(title: "Keyboard Shortcuts", subtitle: "⌘/") { ui.showShortcuts = true })
         return c
     }

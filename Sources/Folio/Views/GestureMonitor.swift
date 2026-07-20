@@ -37,6 +37,7 @@ struct GestureMonitor: NSViewRepresentable {
         weak var view: NSView?
         private var swipeMonitor: Any?
         private var magnifyMonitor: Any?
+        private var keyMonitor: Any?
 
         // Pinch accumulator. `event.magnification` arrives as many small deltas over
         // a gesture; we step the font each time the running total crosses ±0.12 and
@@ -63,6 +64,28 @@ struct GestureMonitor: NSViewRepresentable {
                     self?.handleMagnify(event) ?? event
                 }
             }
+            if keyMonitor == nil {
+                keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                    self?.handleKey(event) ?? event
+                }
+            }
+        }
+
+        /// Global Esc: dismiss whichever palette/overlay is open. Each palette has
+        /// its own `onExitCommand`, but that only fires when the palette actually
+        /// holds focus — opened from the command palette (or with focus elsewhere),
+        /// Esc used to fall through to nothing. This monitor is the reliable path;
+        /// when no palette is open the event passes through untouched (find bar,
+        /// editor's Esc-to-reading, `[[` completion all keep their behavior).
+        private func handleKey(_ event: NSEvent) -> NSEvent? {
+            guard event.keyCode == 53,                      // Esc
+                  let win = view?.window, event.window === win else { return event }
+            let handled = MainActor.assumeIsolated { () -> Bool in
+                guard ui.anyPaletteShown else { return false }
+                ui.dismissPalettes()
+                return true
+            }
+            return handled ? nil : event
         }
 
         /// Map a horizontal swipe to Back/Forward. Direction per the NSEvent.h header:
@@ -122,6 +145,7 @@ struct GestureMonitor: NSViewRepresentable {
         func removeMonitors() {
             if let swipeMonitor { NSEvent.removeMonitor(swipeMonitor); self.swipeMonitor = nil }
             if let magnifyMonitor { NSEvent.removeMonitor(magnifyMonitor); self.magnifyMonitor = nil }
+            if let keyMonitor { NSEvent.removeMonitor(keyMonitor); self.keyMonitor = nil }
         }
 
         deinit { removeMonitors() }

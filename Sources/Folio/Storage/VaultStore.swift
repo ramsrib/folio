@@ -809,17 +809,52 @@ final class VaultStore: ObservableObject {
     /// the vault index uses (symlinked vault vs. real path). Exact match first,
     /// then a resolved-path match against the indexed files.
     ///
-    /// Always opens in a **new tab**: an external open (Finder, CLI, deep link) is
-    /// an additive act — it must never evict the note the user is reading. If the
-    /// note is already open somewhere, its tab is activated instead (no duplicate).
+    /// Defaults to a **new tab**: an external open (Finder, CLI, deep link) is an
+    /// additive act — it must never evict the note the user is reading. In-document
+    /// links pass `inNewTab: false` (following a link *is* the navigation, same as
+    /// wikilinks). Already-open notes activate their tab either way (no duplicate).
     @discardableResult
-    private func selectResolved(_ url: URL) -> Bool {
-        if files.contains(where: { $0.id == url }) { select(url, inNewTab: true); return true }
+    private func selectResolved(_ url: URL, inNewTab: Bool = true) -> Bool {
+        if files.contains(where: { $0.id == url }) { select(url, inNewTab: inNewTab); return true }
         let resolved = url.resolvingSymlinksInPath().path
         if let match = files.first(where: { $0.id.resolvingSymlinksInPath().path == resolved }) {
-            select(match.id, inNewTab: true); return true
+            select(match.id, inNewTab: inNewTab); return true
         }
         return false
+    }
+
+    /// Open a *relative* Markdown link destination (`[text](docs/plan.md)`) — the
+    /// non-wikilink link form agents and exporters write. The system can't open a
+    /// schemeless URL (Finder's "-50" error); resolve it ourselves: against the
+    /// current note's folder, then the vault root. Markdown notes navigate in the
+    /// current tab like wikilinks; anything else that exists (image, PDF, folder)
+    /// opens in its default app; misses beep.
+    func openLocalLink(_ raw: String) {
+        let decoded = raw.removingPercentEncoding ?? raw
+        guard !decoded.isEmpty else { beep(); return }
+        var candidates: [URL] = []
+        if decoded.hasPrefix("/") {
+            candidates.append(URL(fileURLWithPath: decoded))
+        } else {
+            if let noteDir = selection?.deletingLastPathComponent() {
+                candidates.append(noteDir.appendingPathComponent(decoded))
+            }
+            if let root = vaultURL { candidates.append(root.appendingPathComponent(decoded)) }
+        }
+        for candidate in candidates.map(\.standardizedFileURL)
+        where FileManager.default.fileExists(atPath: candidate.path) {
+            if mdExtensions.contains(candidate.pathExtension.lowercased()) {
+                // Inside the vault → in-place navigation; outside → the external
+                // path (new tab, possibly a vault switch) so it's still reachable.
+                if selectResolved(candidate, inNewTab: false) { return }
+                openExternalFile(candidate); return
+            }
+            #if os(macOS)
+            NSWorkspace.shared.open(candidate)   // non-note file/folder → default app
+            #endif
+            return
+        }
+        beep()
     }
 
     /// Build a `folio://open?vault=…&file=…` deep link for a note — the string an

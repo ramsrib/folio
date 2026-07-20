@@ -97,7 +97,14 @@ struct ReadingView: View {
                 #endif
                 vault.openWikilink(target, inNewTab: newTab); return .handled
             }
-            return .systemAction
+            // Relative `[text](docs/plan.md)` links have no scheme (file: links are
+            // the absolute cousins) — the system can't open those (Finder's "-50");
+            // resolve them against the note/vault ourselves.
+            if url.scheme == nil || url.isFileURL {
+                vault.openLocalLink(url.isFileURL ? url.path : url.absoluteString)
+                return .handled
+            }
+            return .systemAction   // http(s), mailto, … → the system
         })
         .textSelection(.enabled)
     }

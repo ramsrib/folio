@@ -130,6 +130,11 @@ struct EditorPane: View {
             NSWorkspace.shared.open(url)
             return true
         }
+        // Relative/file links — resolve against the note/vault (see openLocalLink).
+        if url.scheme == nil || url.isFileURL {
+            vault.openLocalLink(url.isFileURL ? url.path : url.absoluteString)
+            return true
+        }
         return false
     }
 

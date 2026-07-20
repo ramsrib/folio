@@ -76,6 +76,8 @@ struct ShortcutsView: View {
         ]),
         Group(title: "Help", items: [
             Item(keys: "⌘/", label: "Keyboard shortcuts"),
+            Item(keys: "⌘,", label: "Settings"),
+            Item(keys: "esc", label: "Close any palette / overlay"),
         ]),
     ]
 

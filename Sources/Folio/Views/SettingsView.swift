@@ -1,10 +1,34 @@
 import SwiftUI
 
-/// Preferences window (⌘,). Appearance settings applied live across the app.
+/// ⌘, — Settings as an in-window overlay in the palette chrome (not a separate
+/// Settings window): it inherits the theme for free, the global Esc dismisses
+/// it, and ⌘W can never close a tab hiding *behind* it. All changes apply live.
 struct SettingsView: View {
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var ui: UIState
 
     var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "gearshape").foregroundStyle(.secondary)
+                Text("Settings").font(.title3.weight(.semibold))
+                Spacer()
+                Button { ui.showSettings = false } label: {
+                    Image(systemName: "xmark.circle.fill").font(.title3)
+                }
+                .buttonStyle(.plain).foregroundStyle(.secondary)
+                .accessibilityLabel("Close")
+            }
+            .padding(16)
+            Divider()
+            form
+        }
+        .frame(width: 500, height: 500)
+        .paletteSurface()
+        .onExitCommand { ui.showSettings = false }
+    }
+
+    private var form: some View {
         Form {
             Section("Appearance") {
                 Picker("Theme", selection: $settings.theme) {
@@ -38,13 +62,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460, height: 380)
-        // The Settings window is its own scene, so the theme applied to the main
-        // window doesn't reach it — mirror the color scheme and the theme's pane
-        // tint here (a Paper-warm app with a stark system-gray Settings reads as
-        // someone else's window).
-        .scrollContentBackground(.hidden)
-        .background(settings.paneBackground ?? Color(nsColor: .windowBackgroundColor))
-        .preferredColorScheme(settings.colorScheme)
+        .scrollContentBackground(.hidden)   // let the palette surface show through
     }
 }

@@ -20,10 +20,26 @@ final class UIState: ObservableObject {
     @Published var toggleSidebar = 0
     @Published var mode: EditorMode = .read
 
+    /// Settings as an in-window overlay (not a separate Settings window): it
+    /// follows the theme for free, Esc closes it, and ⌘W can't hit a tab behind it.
+    @Published var showSettings = false
+
     /// Any modal palette on screen — gates gestures and other note-level input
     /// so a swipe/pinch can't act on the note *behind* an open palette.
     var anyPaletteShown: Bool {
         showQuickSwitcher || showCommandPalette || showTags || showShortcuts || showSearch
+            || showSettings
+    }
+
+    /// Close every palette/overlay — the single dismiss path used by the outside
+    /// click-catcher and the global Esc handler.
+    func dismissPalettes() {
+        showQuickSwitcher = false
+        showCommandPalette = false
+        showTags = false
+        showShortcuts = false
+        showSearch = false
+        showSettings = false
     }
 }
 

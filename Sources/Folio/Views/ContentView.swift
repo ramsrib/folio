@@ -75,9 +75,7 @@ struct ContentView: View {
     // catches clicks outside the palette to dismiss it; Esc still works via each
     // palette's own onExitCommand.
 
-    private var paletteShown: Bool {
-        ui.showCommandPalette || ui.showQuickSwitcher || ui.showTags || ui.showShortcuts || ui.showSearch
-    }
+    private var paletteShown: Bool { ui.anyPaletteShown }
 
     @ViewBuilder
     private var paletteOverlay: some View {
@@ -86,25 +84,18 @@ struct ContentView: View {
                 Color.black.opacity(0.001)        // invisible click-catcher
                     .ignoresSafeArea()
                     .contentShape(Rectangle())
-                    .onTapGesture { dismissPalettes() }
+                    .onTapGesture { ui.dismissPalettes() }
                 Group {
                     if ui.showCommandPalette { CommandPaletteView() }
                     else if ui.showQuickSwitcher { QuickSwitcherView() }
                     else if ui.showSearch { SearchPaletteView() }
                     else if ui.showTags { TagsView() }
                     else if ui.showShortcuts { ShortcutsView() }
+                    else if ui.showSettings { SettingsView() }
                 }
             }
             .transition(.opacity)
         }
-    }
-
-    private func dismissPalettes() {
-        ui.showCommandPalette = false
-        ui.showQuickSwitcher = false
-        ui.showTags = false
-        ui.showShortcuts = false
-        ui.showSearch = false
     }
 
     /// Invisible buttons carrying the keyboard shortcuts that have no discoverable
