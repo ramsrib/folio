@@ -27,6 +27,9 @@ struct SettingsView: View {
                         Text("\(Int(settings.readableWidth))").monospacedDigit().frame(width: 46, alignment: .trailing)
                     }
                 }
+                Toggle("Show inline title", isOn: $settings.showInlineTitle)
+                Text("The big page title above a note. The tab already shows the name; turning this off hides the title (rename via the file's context menu instead).")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

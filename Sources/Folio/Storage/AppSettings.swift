@@ -45,16 +45,22 @@ final class AppSettings: ObservableObject {
     @Published var readingFont: ReadingFont { didSet { d.set(readingFont.rawValue, forKey: kFont) } }
     @Published var bodyFontSize: Double { didSet { d.set(bodyFontSize, forKey: kSize) } }
     @Published var readableWidth: Double { didSet { d.set(readableWidth, forKey: kWidth) } }
+    /// The big Notion-style page title at the top of a note. Redundant if you're
+    /// happy reading the name in the tab — but it's also the rename-in-place
+    /// affordance, so it's a toggle (like Obsidian's "Show inline title"), not gone.
+    @Published var showInlineTitle: Bool { didSet { d.set(showInlineTitle, forKey: kInlineTitle) } }
 
     private let d = UserDefaults.standard
     private let kTheme = "folio.theme", kFont = "folio.readingFont"
     private let kSize = "folio.bodyFontSize", kWidth = "folio.readableWidth"
+    private let kInlineTitle = "folio.showInlineTitle"
 
     init() {
         theme = AppTheme(rawValue: d.string(forKey: kTheme) ?? "") ?? .system
         readingFont = ReadingFont(rawValue: d.string(forKey: kFont) ?? "") ?? .system
         bodyFontSize = d.object(forKey: kSize) as? Double ?? 17
         readableWidth = d.object(forKey: kWidth) as? Double ?? 720
+        showInlineTitle = d.object(forKey: kInlineTitle) as? Bool ?? true
     }
 
     var colorScheme: ColorScheme? {

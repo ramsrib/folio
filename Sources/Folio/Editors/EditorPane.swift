@@ -57,11 +57,13 @@ struct EditorPane: View {
                     .padding(.top, 12)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
-            NoteTitleField()
-                .frame(maxWidth: 720, alignment: .leading)
-                .frame(maxWidth: .infinity)
-                .padding(.top, find.active ? 10 : 28)
-                .padding(.bottom, 2)
+            if settings.showInlineTitle {
+                NoteTitleField()
+                    .frame(maxWidth: 720, alignment: .leading)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, find.active ? 10 : 28)
+                    .padding(.bottom, 2)
+            }
             if ui.mode == .read {
                 ReadingView(find: find)
             } else {
