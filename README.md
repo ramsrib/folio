@@ -86,7 +86,10 @@ Everything in this list is implemented. Anything not in it, assume it isn't.
 
 **Tabs**
 - Navigation **reuses the current tab** (Obsidian-style); **⌘-click** a note or wikilink — or **⌘↵**
-  in a palette — to open a new tab. Creating a note always gets its own tab.
+  in a palette — to open a new tab. **Double-click** a sidebar file to keep both: the note you were
+  reading keeps its tab and the new one opens beside it (VS Code's double-click-to-keep-open).
+  Creating a note, or opening one **from outside** (Finder, CLI, a `folio://` link), always gets its
+  own tab — an external open never evicts what you're reading.
 - Open/close (**⌘W**), drag to reorder, reopen closed (**⇧⌘T**), cycle (**⌃⇥** / **⌃⇧⇥**),
   **⌘1–⌘8** to jump to a tab and **⌘9** to the last, close-others / close-tabs-to-the-right / close-all, and a right-click menu with the same copy actions (relative/absolute path, wikilink) as the explorer. Open tabs and the
   active note are **restored per vault** on relaunch.

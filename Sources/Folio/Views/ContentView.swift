@@ -339,6 +339,7 @@ struct ContentView: View {
                                    forceExpanded: filterActive && item.node.isDirectory,
                                    // ⌘-click opens in a new tab (Obsidian/browser convention).
                                    onSelect: { vault.select(item.node.id, inNewTab: cmdHeld) },
+                                   onOpenOwnTab: { vault.openInOwnTab(item.node.id) },
                                    onToggle: { toggleDir(item.node.id) },
                                    startRename: startRename)
                             .id(item.node.id)          // reveal target for scroll-to

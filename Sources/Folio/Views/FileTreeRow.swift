@@ -19,6 +19,9 @@ struct SidebarRow: View {
     /// the persisted expansion state.
     var forceExpanded: Bool = false
     let onSelect: () -> Void
+    /// Double-click on a file: "keep both" — the note being read keeps its tab,
+    /// this one opens in its own (see `VaultStore.openInOwnTab`).
+    let onOpenOwnTab: () -> Void
     let onToggle: () -> Void
     let startRename: (URL) -> Void
     @EnvironmentObject private var vault: VaultStore
@@ -53,6 +56,10 @@ struct SidebarRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(rowBackground, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         .contentShape(Rectangle())
+        // Double-tap declared first; the single-tap of the pair still fires and
+        // navigates in place — openInOwnTab then undoes the eviction (VS Code's
+        // double-click-to-keep-open). Folders keep single-click toggle only.
+        .onTapGesture(count: 2) { if !node.isDirectory { onOpenOwnTab() } }
         .onTapGesture { if node.isDirectory { onToggle() } else { onSelect() } }
         .onHover { hover = $0 }
         .contextMenu {

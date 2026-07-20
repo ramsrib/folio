@@ -36,10 +36,16 @@ struct FolioApp: App {
                     appDelegate.urlHandler = { [weak vault] in vault?.handleExternal(urls: $0) }
                 }
         }
-        // First-launch size: a comfortable reading layout (sidebar + ~70-char
-        // column) rather than the 900×600 minimum a bare window fell back to.
-        // Resized windows are restored by the system, so this only shapes launch #1.
-        .defaultSize(width: 1360, height: 900)
+        // First-launch size: proportional to whichever display the window lands on
+        // (laptop panel vs. big monitor get sensibly different frames), capped so a
+        // 5K display doesn't produce a wall of text. Once the user resizes, the
+        // system restores their frame and this never runs again.
+        .defaultWindowPlacement { _, context in
+            let visible = context.defaultDisplay.visibleRect
+            return WindowPlacement(size: CGSize(
+                width: min(1500, visible.width * 0.80),
+                height: min(1000, visible.height * 0.88)))
+        }
         .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(after: .newItem) {

@@ -593,11 +593,13 @@ final class VaultStore: ObservableObject {
         }
 
         // Tab placement.
+        lastTabReplacement = nil
         if openTabs.firstIndex(of: id) == nil {
             if inNewTab || openTabs.isEmpty {
                 openTabs.append(id)
             } else if let active = selection, let idx = openTabs.firstIndex(of: active) {
                 openTabs[idx] = id                          // replace active tab in place
+                lastTabReplacement = (evicted: active, by: id)
             } else {
                 openTabs.append(id)                         // no active tab → append
             }
@@ -612,6 +614,30 @@ final class VaultStore: ObservableObject {
         updateOutline()
         updateBacklinks()
         updateHistoryFlags()
+        persistSession()
+    }
+
+    /// The most recent in-place tab replacement (single-click navigation evicting
+    /// the previous note from the active tab). Lets a *double*-click undo it: the
+    /// second click arrives after the first already replaced the tab, and
+    /// `openInOwnTab` uses this to give the evicted note its tab back.
+    private var lastTabReplacement: (evicted: URL, by: URL)?
+
+    /// Sidebar double-click: "keep both". The first click of the double already
+    /// navigated the current tab here (evicting what was being read); restore the
+    /// evicted note to its tab and give this note its own tab beside it — VS Code's
+    /// double-click-to-keep-open, adapted to our navigate-in-current-tab model.
+    /// If nothing was evicted (note was already in a tab), this is a no-op.
+    func openInOwnTab(_ id: URL) {
+        guard let swap = lastTabReplacement, swap.by == id,
+              selection == id,
+              let idx = openTabs.firstIndex(of: id),
+              !openTabs.contains(swap.evicted),
+              files.contains(where: { $0.id == swap.evicted })
+        else { select(id, inNewTab: true); return }   // covers "not open at all" too
+        openTabs[idx] = swap.evicted            // the note being read keeps its tab…
+        openTabs.insert(id, at: idx + 1)        // …and the new note gets its own
+        lastTabReplacement = nil
         persistSession()
     }
 
@@ -736,7 +762,7 @@ final class VaultStore: ObservableObject {
             if target.path != vaultURL?.standardizedFileURL.path { setVault(target) }
             if let file = link.file {   // vault-only links (no file) just open the vault
                 let fileURL = target.appendingPathComponent(file).standardizedFileURL
-                if files.contains(where: { $0.id == fileURL }) { select(fileURL) } else { beep() }
+                if !selectResolved(fileURL) { beep() }
             }
             return
         }
@@ -782,12 +808,16 @@ final class VaultStore: ObservableObject {
     /// Select a note that may be addressed by a different alias of its path than
     /// the vault index uses (symlinked vault vs. real path). Exact match first,
     /// then a resolved-path match against the indexed files.
+    ///
+    /// Always opens in a **new tab**: an external open (Finder, CLI, deep link) is
+    /// an additive act — it must never evict the note the user is reading. If the
+    /// note is already open somewhere, its tab is activated instead (no duplicate).
     @discardableResult
     private func selectResolved(_ url: URL) -> Bool {
-        if files.contains(where: { $0.id == url }) { select(url); return true }
+        if files.contains(where: { $0.id == url }) { select(url, inNewTab: true); return true }
         let resolved = url.resolvingSymlinksInPath().path
         if let match = files.first(where: { $0.id.resolvingSymlinksInPath().path == resolved }) {
-            select(match.id); return true
+            select(match.id, inNewTab: true); return true
         }
         return false
     }
