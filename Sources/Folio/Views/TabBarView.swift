@@ -10,6 +10,39 @@ struct TabBarView: View {
     @EnvironmentObject private var vault: VaultStore
     @State private var dragging: URL?
 
+    /// Disambiguating folder qualifiers for tabs whose note *names* collide —
+    /// agent-authored vaults are full of same-named files (a README per folder),
+    /// so a bare name row reads as "README README README". VS Code's algorithm:
+    /// start with the parent folder and add path segments only until the group is
+    /// unique, so qualifiers stay as short as the tree allows.
+    private var qualifiers: [URL: String] {
+        var out: [URL: String] = [:]
+        let byName = Dictionary(grouping: vault.openTabs) {
+            ($0.lastPathComponent as NSString).deletingPathExtension
+        }
+        for group in byName.values where group.count > 1 {
+            var depth = 1
+            while true {
+                let suffixes = Dictionary(grouping: group) { dirSuffix($0, depth) }
+                let unique = suffixes.values.allSatisfy { $0.count == 1 }
+                if unique || depth >= 4 {
+                    for url in group { out[url] = dirSuffix(url, depth) }
+                    break
+                }
+                depth += 1
+            }
+        }
+        return out
+    }
+
+    /// The last `depth` folder components of the note's vault-relative path
+    /// (empty for a vault-root note — it stays unqualified, which is already
+    /// distinct from its qualified twins).
+    private func dirSuffix(_ url: URL, _ depth: Int) -> String {
+        let dirs = vault.relativePath(for: url).split(separator: "/").dropLast()
+        return dirs.suffix(depth).joined(separator: "/")
+    }
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 0) {
@@ -22,7 +55,8 @@ struct TabBarView: View {
                             .opacity(0.5)
                             .padding(.horizontal, 1)
                     }
-                    TabChip(url: url, isActive: url == vault.selection)
+                    TabChip(url: url, isActive: url == vault.selection,
+                            qualifier: qualifiers[url].flatMap { $0.isEmpty ? nil : $0 })
                         .onDrag {
                             dragging = url
                             return NSItemProvider(object: url.path as NSString)
@@ -60,6 +94,8 @@ struct TabBarView: View {
 private struct TabChip: View {
     let url: URL
     let isActive: Bool
+    /// Folder qualifier shown when another open tab has the same note name.
+    var qualifier: String?
     @EnvironmentObject private var vault: VaultStore
     @EnvironmentObject private var settings: AppSettings
     @State private var hover = false
@@ -82,6 +118,16 @@ private struct TabChip: View {
                 .font(.system(size: 13, weight: isActive ? .semibold : .regular))
                 .foregroundStyle(isActive ? Color.primary : .secondary)
                 .lineLimit(1)
+            if let qualifier {
+                // The distinguishing part must survive truncation: among
+                // duplicates the *name* is identical, so the qualifier gets
+                // layout priority and a squeezed tab truncates the name instead.
+                Text(qualifier)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .layoutPriority(1)
+            }
             Button { vault.closeTab(url) } label: {
                 Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
             }
@@ -108,7 +154,7 @@ private struct TabChip: View {
         // this needs disambiguation — clicks select instantly.
         .onTapGesture { vault.select(url) }
         .onHover { hover = $0 }
-        .help(url.lastPathComponent)
+        .help(vault.relativePath(for: url))   // hover = full path, the last-resort disambiguator
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
         .contextMenu {
