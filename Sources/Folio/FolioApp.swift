@@ -74,6 +74,13 @@ struct FolioApp: App {
                     ui.mode = ui.mode == .read ? .edit : .read
                 }
                 .keyboardShortcut("e", modifiers: .command)
+                // ⌘= reads as ⌘+ on a US layout — the browser/reader convention.
+                Button("Bigger Text") { settings.biggerText() }
+                    .keyboardShortcut("=", modifiers: .command)
+                Button("Smaller Text") { settings.smallerText() }
+                    .keyboardShortcut("-", modifiers: .command)
+                Button("Reset Text Size") { settings.resetTextSize() }
+                    .keyboardShortcut("0", modifiers: .command)
                 Button("Keyboard Shortcuts") { ui.showShortcuts = true }
                     .keyboardShortcut("/", modifiers: .command)
             }

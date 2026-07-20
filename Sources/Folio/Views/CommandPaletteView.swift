@@ -51,6 +51,9 @@ struct CommandPaletteView: View {
         for theme in AppTheme.allCases {
             c.append(AppCommand(title: "Set Theme: \(theme.label)", subtitle: nil) { settings.theme = theme })
         }
+        c.append(AppCommand(title: "Bigger Text", subtitle: "⌘+") { settings.biggerText() })
+        c.append(AppCommand(title: "Smaller Text", subtitle: "⌘−") { settings.smallerText() })
+        c.append(AppCommand(title: "Reset Text Size", subtitle: "⌘0") { settings.resetTextSize() })
         if let sel = vault.selection {
             c.append(AppCommand(title: "Reveal in Finder", subtitle: nil) {
                 NSWorkspace.shared.activateFileViewerSelecting([sel]) })

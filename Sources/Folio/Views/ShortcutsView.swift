@@ -46,6 +46,8 @@ struct ShortcutsView: View {
         Group(title: "View", items: [
             Item(keys: "⌘E", label: "Toggle reading / writing mode"),
             Item(keys: "esc", label: "Writing → reading (closes find bar first)"),
+            Item(keys: "⌘+ / ⌘−", label: "Bigger / smaller text"),
+            Item(keys: "⌘0", label: "Reset text size"),
             Item(keys: "⌃⌘S", label: "Toggle sidebar"),
         ]),
         Group(title: "Reading Mode (Vim)", items: [

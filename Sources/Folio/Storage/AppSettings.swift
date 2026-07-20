@@ -94,10 +94,18 @@ final class AppSettings: ObservableObject {
         theme = AppTheme(rawValue: d.string(forKey: kTheme) ?? "") ?? .system
         readingFont = ReadingFont(rawValue: d.string(forKey: kFont) ?? "") ?? .system
         bodyFontSize = d.object(forKey: kSize) as? Double ?? 17
-        readableWidth = d.object(forKey: kWidth) as? Double ?? 720
+        // ~660pt at 17pt body ≈ 70–75 characters per line — the long-form
+        // sweet spot (60–75); the old 720 default ran ~85 and read wide.
+        readableWidth = d.object(forKey: kWidth) as? Double ?? 660
         showInlineTitle = d.object(forKey: kInlineTitle) as? Bool ?? true
         fontSmoothing = FontSmoothing(rawValue: d.string(forKey: kSmoothing) ?? "") ?? .system
     }
+
+    // ⌘= / ⌘- / ⌘0 (browser/reader convention), mirrored in the View menu and
+    // command palette. Bounds match the settings slider.
+    func biggerText()  { bodyFontSize = min(24, bodyFontSize + 1) }
+    func smallerText() { bodyFontSize = max(13, bodyFontSize - 1) }
+    func resetTextSize() { bodyFontSize = 17 }
 
     var colorScheme: ColorScheme? {
         switch theme {

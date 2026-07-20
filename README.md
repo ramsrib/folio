@@ -95,7 +95,10 @@ Everything in this list is implemented. Anything not in it, assume it isn't.
 
 **Appearance (⌘,)**
 - Themes: System, Light, Dark, Paper (warm), Frosted (glass).
-- Reading font (System / Serif / Mono), body font size, readable line width, an optional **inline title**, and a **text rendering** choice (Crisp / Smooth / Smoother — browser-style stem darkening; applies on relaunch). All applied live except text rendering.
+- Reading font (System / Serif / Mono), body font size (**⌘+ / ⌘− / ⌘0** work anywhere), readable
+  line width (default ~70 chars/line), an optional **inline title**, and a **text rendering** choice
+  (Crisp / Smooth / Smoother — browser-style stem darkening; applies on relaunch). All applied live
+  except text rendering.
 
 ## iOS
 
