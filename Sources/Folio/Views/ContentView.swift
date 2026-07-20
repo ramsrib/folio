@@ -57,7 +57,11 @@ struct ContentView: View {
         .overlay { paletteOverlay }
         .animation(.easeOut(duration: 0.14), value: paletteShown)
         .onChange(of: vault.selection) {
-            ui.mode = vault.openInEditMode ? .edit : .read
+            // Only assign when the mode actually changes: setting a @Published
+            // property fires objectWillChange even for same-value writes, which
+            // re-rendered the whole window a second time on every tab switch.
+            let target: EditorMode = vault.openInEditMode ? .edit : .read
+            if ui.mode != target { ui.mode = target }
             vault.openInEditMode = false
         }
         .alert("Rename Note", isPresented: renamePresented) {
@@ -449,10 +453,10 @@ struct ContentView: View {
         for dir in ancestors(of: sel) { expandedDirs.insert(dir) }
         persistExpansion()
         guard !filterActive else { return }
-        // Scroll after the newly-expanded rows exist in the lazy stack.
-        DispatchQueue.main.async {
-            withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(sel, anchor: .center) }
-        }
+        // Scroll after the newly-expanded rows exist in the lazy stack. Not
+        // animated: this fires on every tab switch, and an animated sidebar
+        // scroll compounding with the content swap read as switch lag.
+        DispatchQueue.main.async { proxy.scrollTo(sel, anchor: .center) }
     }
 
     /// Directory node IDs on the path from a tree root down to `target` — taken from

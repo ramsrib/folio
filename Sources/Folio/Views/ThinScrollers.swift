@@ -8,29 +8,42 @@ import AppKit
 ///     ring around themselves on right-click, which `.focusEffectDisabled()` can't
 ///     reach; setting `focusRingType = .none` on the table + its rows removes it.
 ///
-/// Attached once in the main window; re-runs on updates so freshly-created rows and
-/// palettes are covered too.
+/// Perf contract: `updateNSView` fires on *every* SwiftUI update (tab switch,
+/// folder toggle, keystroke), so the walk is (a) coalesced to at most one per
+/// runloop turn and (b) mutation-free when nothing needs changing — every setter
+/// is guarded, because unconditional sets invalidate AppKit layout/display and
+/// made the whole app feel laggy.
 struct ThinScrollers: NSViewRepresentable {
+    final class Coordinator { var walkScheduled = false }
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
     func makeNSView(context: Context) -> NSView {
         let v = NSView()
-        DispatchQueue.main.async { apply(from: v) }
+        scheduleWalk(from: v, context.coordinator)
         return v
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async { apply(from: nsView) }
+        scheduleWalk(from: nsView, context.coordinator)
     }
 
-    private func apply(from view: NSView) {
-        guard let content = view.window?.contentView else { return }
-        styleScrollers(in: content)
+    /// Coalesce: a single interaction can produce several SwiftUI update passes;
+    /// walk the window once at the end of the runloop turn instead of per pass.
+    private func scheduleWalk(from view: NSView, _ coordinator: Coordinator) {
+        guard !coordinator.walkScheduled else { return }
+        coordinator.walkScheduled = true
+        DispatchQueue.main.async {
+            coordinator.walkScheduled = false
+            guard let content = view.window?.contentView else { return }
+            styleScrollers(in: content)
+        }
     }
 
     private func styleScrollers(in view: NSView) {
         if let scroll = view as? NSScrollView {
-            scroll.scrollerStyle = .overlay
-            scroll.verticalScroller?.controlSize = .small
-            scroll.horizontalScroller?.controlSize = .small
+            if scroll.scrollerStyle != .overlay { scroll.scrollerStyle = .overlay }
+            if let v = scroll.verticalScroller, v.controlSize != .small { v.controlSize = .small }
+            if let h = scroll.horizontalScroller, h.controlSize != .small { h.controlSize = .small }
         }
         if let table = view as? NSTableView {
             disableFocusRing(in: table)   // kills the blue right-click ring on List rows
@@ -40,7 +53,7 @@ struct ThinScrollers: NSViewRepresentable {
 
     /// Suppress the focus ring on a table and every row/cell view inside it.
     private func disableFocusRing(in view: NSView) {
-        view.focusRingType = .none
+        if view.focusRingType != .none { view.focusRingType = .none }
         view.subviews.forEach(disableFocusRing)
     }
 }

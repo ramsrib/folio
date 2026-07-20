@@ -9,28 +9,47 @@ struct WindowConfigurator: NSViewRepresentable {
     /// desktop behind it (the Frosted theme); opaque content still hides it elsewhere.
     var translucent: Bool = false
 
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    /// Remembers what was last applied so `updateNSView` — which SwiftUI calls on
+    /// *every* content update (each tab switch, folder toggle, keystroke…) — can
+    /// skip the window mutations entirely when nothing changed. Unconditionally
+    /// re-setting styleMask/backgroundColor invalidated window-wide layout on
+    /// every interaction, which read as app-wide lag.
+    final class Coordinator {
+        var applied: (background: NSColor?, translucent: Bool)?
+        var didConfigureChrome = false
+    }
+
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
-        DispatchQueue.main.async { configure(view.window) }
+        let coordinator = context.coordinator
+        DispatchQueue.main.async { configure(view.window, coordinator) }
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async { configure(nsView.window) }
+        let coordinator = context.coordinator
+        guard coordinator.applied?.background != background
+            || coordinator.applied?.translucent != translucent
+            || coordinator.applied == nil else { return }
+        DispatchQueue.main.async { configure(nsView.window, coordinator) }
     }
 
-    private func configure(_ window: NSWindow?) {
+    private func configure(_ window: NSWindow?, _ coordinator: Coordinator) {
         guard let window else { return }
-        // Let our SwiftUI content draw all the way up into the title-bar strip
-        // (so a custom title-bar row sits under the traffic lights, not below them).
-        window.styleMask.insert(.fullSizeContentView)
-        window.titlebarAppearsTransparent = true
-        window.titleVisibility = .hidden
-        // Native document-app behavior: the window moves only by its title-bar
-        // strip (a WindowDragGesture in ContentView.titleBar). Background
-        // dragging is for utility panels — in a reader you click/select/drag
-        // everywhere, and it caused constant accidental window moves.
-        window.isMovableByWindowBackground = false
+        if !coordinator.didConfigureChrome {
+            // One-time chrome: let our SwiftUI content draw all the way up into the
+            // title-bar strip (custom title-bar row under the traffic lights), and
+            // move the window only by that strip (WindowDragGesture in ContentView)
+            // — background dragging is for utility panels, not a reader where you
+            // click/select/drag everywhere.
+            window.styleMask.insert(.fullSizeContentView)
+            window.titlebarAppearsTransparent = true
+            window.titleVisibility = .hidden
+            window.isMovableByWindowBackground = false
+            coordinator.didConfigureChrome = true
+        }
         if translucent {
             window.isOpaque = false
             window.backgroundColor = .clear
@@ -38,6 +57,7 @@ struct WindowConfigurator: NSViewRepresentable {
             window.isOpaque = true
             window.backgroundColor = background ?? .windowBackgroundColor
         }
+        coordinator.applied = (background, translucent)
         centerTrafficLights(window, barHeight: 42)
     }
 
