@@ -47,10 +47,6 @@ struct ReadingView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
-                    // Stable scroll target for "start of document" — the scroll
-                    // view is reused across notes, so without an explicit jump the
-                    // next note would inherit the previous note's scroll offset.
-                    Color.clear.frame(height: 0).id("top")
                     ForEach(Array(blocks.enumerated()), id: \.element.id) { i, block in
                         view(for: block, index: i).id(anchorID(block))
                     }
@@ -67,6 +63,12 @@ struct ReadingView: View {
                 // Vim-style j/k/h/l scrolling (macOS only — AppKit-backed).
                 #if os(macOS)
                 .background(KeyboardScroller())
+                // Per-note scroll memory: restore each note's own offset on tab
+                // switch (top for first visits). A find/search jump or heading
+                // scroll owns the position for that switch and wins.
+                .background(ScrollMemory(noteID: vault.selection, positionOwnedElsewhere: {
+                    (find.active && !find.query.isEmpty) || vault.scrollRequest != nil || ui.pendingFind != nil
+                }))
                 #endif
             }
             .task(id: vault.content) {
@@ -96,10 +98,7 @@ struct ReadingView: View {
                     vault.scrollRequest = nil
                 }
             }
-            .onChange(of: vault.selection) {
-                propsExpanded = false                     // each note opens collapsed
-                proxy.scrollTo("top", anchor: .top)       // never inherit the last note's offset
-            }
+            .onChange(of: vault.selection) { propsExpanded = false }   // each note opens collapsed
             // `current` is already zeroed by FindModel.query.didSet; don't re-zero
             // it here, so a search jump can set `current` right after `query` and
             // have it survive the recompute (see EditorPane.consumePendingFind).
