@@ -118,15 +118,18 @@ private struct TabChip: View {
                 .font(.system(size: 13, weight: isActive ? .semibold : .regular))
                 .foregroundStyle(isActive ? Color.primary : .secondary)
                 .lineLimit(1)
+                .layoutPriority(1)   // the note name must never truncate away
             if let qualifier {
-                // The distinguishing part must survive truncation: among
-                // duplicates the *name* is identical, so the qualifier gets
-                // layout priority and a squeezed tab truncates the name instead.
+                // A long folder name must not evict the filename (it did — a tab
+                // once read as just "non-call-db-aurora-migration"). The qualifier
+                // takes the leftover space and middle-truncates: sibling folders
+                // differ at their starts/ends, so "non-call…migration" still
+                // disambiguates where a tail-cut "non-call…" might not.
                 Text(qualifier)
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
-                    .layoutPriority(1)
+                    .truncationMode(.middle)
             }
             Button { vault.closeTab(url) } label: {
                 Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
@@ -137,7 +140,8 @@ private struct TabChip: View {
             .accessibilityLabel("Close \(name)")
         }
         .padding(.horizontal, 12)
-        .frame(maxWidth: 220, maxHeight: .infinity)
+        // Qualified tabs get extra room — they're carrying two labels.
+        .frame(maxWidth: qualifier == nil ? 220 : 280, maxHeight: .infinity)
         .background(chipBackground, in: TabShape(radius: 6))
         // Active tab: three-sided frame (top + sides) with softly rounded top
         // corners; the bottom is left open so it merges into the title-bar divider.
