@@ -30,6 +30,11 @@ struct SettingsView: View {
                 Toggle("Show inline title", isOn: $settings.showInlineTitle)
                 Text("The big page title above a note. The tab already shows the name; turning this off hides the title (rename via the file's context menu instead).")
                     .font(.caption).foregroundStyle(.secondary)
+                Picker("Text rendering", selection: $settings.fontSmoothing) {
+                    ForEach(FontSmoothing.allCases) { Text($0.label).tag($0) }
+                }
+                Text("Smooth/Smoother darken letter stems the way browsers do — fuller, softer text. Takes effect after relaunching Folio.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

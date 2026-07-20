@@ -38,6 +38,28 @@ enum ReadingFont: String, CaseIterable, Identifiable {
     }
 }
 
+enum FontSmoothing: String, CaseIterable, Identifiable {
+    case system, smooth, smoother
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .system:   return "Crisp (system)"
+        case .smooth:   return "Smooth"
+        case .smoother: return "Smoother"
+        }
+    }
+    /// Core Text's stem-darkening level (`AppleFontSmoothing`): nil = leave the
+    /// system default; 2/3 = medium/strong darkening — the fuller, softer look
+    /// browsers (and so Obsidian/Notion) apply to text by default.
+    var appleFontSmoothing: Int? {
+        switch self {
+        case .system: return nil
+        case .smooth: return 2
+        case .smoother: return 3
+        }
+    }
+}
+
 /// User-facing appearance settings, persisted to UserDefaults and applied live.
 @MainActor
 final class AppSettings: ObservableObject {
@@ -49,11 +71,24 @@ final class AppSettings: ObservableObject {
     /// happy reading the name in the tab — but it's also the rename-in-place
     /// affordance, so it's a toggle (like Obsidian's "Show inline title"), not gone.
     @Published var showInlineTitle: Bool { didSet { d.set(showInlineTitle, forKey: kInlineTitle) } }
+    /// Core Text reads `AppleFontSmoothing` from the app's defaults domain at
+    /// launch, so changes take effect on next launch (the settings row says so).
+    @Published var fontSmoothing: FontSmoothing {
+        didSet {
+            d.set(fontSmoothing.rawValue, forKey: kSmoothing)
+            if let level = fontSmoothing.appleFontSmoothing {
+                d.set(level, forKey: "AppleFontSmoothing")
+            } else {
+                d.removeObject(forKey: "AppleFontSmoothing")
+            }
+        }
+    }
 
     private let d = UserDefaults.standard
     private let kTheme = "folio.theme", kFont = "folio.readingFont"
     private let kSize = "folio.bodyFontSize", kWidth = "folio.readableWidth"
     private let kInlineTitle = "folio.showInlineTitle"
+    private let kSmoothing = "folio.fontSmoothing"
 
     init() {
         theme = AppTheme(rawValue: d.string(forKey: kTheme) ?? "") ?? .system
@@ -61,6 +96,7 @@ final class AppSettings: ObservableObject {
         bodyFontSize = d.object(forKey: kSize) as? Double ?? 17
         readableWidth = d.object(forKey: kWidth) as? Double ?? 720
         showInlineTitle = d.object(forKey: kInlineTitle) as? Bool ?? true
+        fontSmoothing = FontSmoothing(rawValue: d.string(forKey: kSmoothing) ?? "") ?? .system
     }
 
     var colorScheme: ColorScheme? {

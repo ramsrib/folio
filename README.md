@@ -95,7 +95,7 @@ Everything in this list is implemented. Anything not in it, assume it isn't.
 
 **Appearance (⌘,)**
 - Themes: System, Light, Dark, Paper (warm), Frosted (glass).
-- Reading font (System / Serif / Mono), body font size, readable line width, and an optional **inline title** (the big page title — off if the tab name is enough). All applied live.
+- Reading font (System / Serif / Mono), body font size, readable line width, an optional **inline title**, and a **text rendering** choice (Crisp / Smooth / Smoother — browser-style stem darkening; applies on relaunch). All applied live except text rendering.
 
 ## iOS
 
