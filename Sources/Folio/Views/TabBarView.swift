@@ -102,9 +102,10 @@ private struct TabChip: View {
             }
         }
         .contentShape(Rectangle())
-        // Double-tap declared first so a rapid double-click on a tab reads as
-        // "select" here and doesn't bubble up to the title bar's zoom handler.
-        .onTapGesture(count: 2) { vault.select(url) }
+        // No count-2 recognizer here: it made SwiftUI hold every tab click for
+        // the double-click interval (the reported ~1s switch lag). The zoom
+        // double-click lives on the sidebar title area only, so nothing above
+        // this needs disambiguation — clicks select instantly.
         .onTapGesture { vault.select(url) }
         .onHover { hover = $0 }
         .help(url.lastPathComponent)

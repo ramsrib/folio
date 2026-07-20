@@ -27,6 +27,7 @@ struct SidebarRow: View {
     @EnvironmentObject private var vault: VaultStore
     @EnvironmentObject private var settings: AppSettings
     @State private var hover = false
+    @State private var lastTap: TimeInterval = 0   // manual double-click detection
 
     private var node: VaultNode { item.node }
     private var isOpen: Bool { forceExpanded || expanded.contains(node.id) }
@@ -56,11 +57,18 @@ struct SidebarRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(rowBackground, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         .contentShape(Rectangle())
-        // Double-tap declared first; the single-tap of the pair still fires and
-        // navigates in place — openInOwnTab then undoes the eviction (VS Code's
-        // double-click-to-keep-open). Folders keep single-click toggle only.
-        .onTapGesture(count: 2) { if !node.isDirectory { onOpenOwnTab() } }
-        .onTapGesture { if node.isDirectory { onToggle() } else { onSelect() } }
+        // Manual double-click detection — NEVER `.onTapGesture(count: 2)` here: a
+        // count-2 recognizer makes SwiftUI hold every single click for the whole
+        // double-click interval to disambiguate, which felt like ~1s of lag on
+        // every row click. Instead the first click acts instantly, and a second
+        // click inside the interval *upgrades* it (openInOwnTab is built to undo
+        // the first click's in-place navigation — VS Code's keep-open semantics).
+        .onTapGesture {
+            if node.isDirectory { onToggle(); return }
+            let now = ProcessInfo.processInfo.systemUptime
+            if now - lastTap < NSEvent.doubleClickInterval { onOpenOwnTab() } else { onSelect() }
+            lastTap = now
+        }
         .onHover { hover = $0 }
         .contextMenu {
             if node.isDirectory {

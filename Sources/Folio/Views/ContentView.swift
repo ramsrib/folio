@@ -138,13 +138,12 @@ struct ContentView: View {
                 .background(settings.topBarBackground)
         }
         .frame(height: 42)
-        // Native title-bar double-click (zoom/minimize per System Settings).
-        // Our custom strip hides the real title bar, so AppKit's built-in
-        // handling never sees the click — restore it ourselves.
-        .onTapGesture(count: 2) { titleBarDoubleClicked() }
         // The custom title-bar strip is the window's (only) drag handle, like a
         // native toolbar. Buttons and the tab strip's own onDrag still win —
         // child interactions take precedence over this parent gesture.
+        // (The zoom double-click deliberately does NOT live here: a count-2
+        // recognizer over the tab strip delays every tab click by the
+        // double-click interval. It's on the sidebar title area instead.)
         .gesture(WindowDragGesture())
     }
 
@@ -188,6 +187,11 @@ struct ContentView: View {
             }
             .padding(.trailing, 10)
         }
+        // Native title-bar double-click (zoom/minimize per System Settings) —
+        // the hidden real title bar means AppKit never sees it. Safe here: this
+        // area has no single-click action to delay (the buttons are Buttons, not
+        // tap gestures, and don't wait for recognizer disambiguation).
+        .onTapGesture(count: 2) { titleBarDoubleClicked() }
     }
 
     private var contentTitleArea: some View {
