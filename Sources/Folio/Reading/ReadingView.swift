@@ -31,6 +31,11 @@ struct ReadingView: View {
     // block (for the stronger current-match tint). `findScroll` triggers the scroll.
     @State private var findMatches: [FindLoc] = []
     @State private var findScroll: Int?
+    // Properties (frontmatter) start collapsed — reading the *content* is the
+    // point of opening a note; metadata is one click away. Lives here (not in
+    // PropertiesView) so a content re-parse mid-note (e.g. toggling a checkbox)
+    // doesn't snap an expanded card shut; switching notes re-collapses below.
+    @State private var propsExpanded = false
 
     private struct FindLoc: Equatable { let block: Int; let occ: Int }
 
@@ -67,6 +72,7 @@ struct ReadingView: View {
                     vault.scrollRequest = nil
                 }
             }
+            .onChange(of: vault.selection) { propsExpanded = false }   // each note opens collapsed
             // `current` is already zeroed by FindModel.query.didSet; don't re-zero
             // it here, so a search jump can set `current` right after `query` and
             // have it survive the recompute (see EditorPane.consumePendingFind).
@@ -208,7 +214,7 @@ struct ReadingView: View {
     private func view(for block: Block, index: Int) -> some View {
         switch block.kind {
         case let .properties(props):
-            PropertiesView(props: props)
+            PropertiesView(props: props, expanded: $propsExpanded)
 
         case let .heading(level, text, _):
             Text(applyFindHighlight(InlineMarkdown.render(text), blockIndex: index))
@@ -367,10 +373,43 @@ struct ReadingView: View {
 /// Notion/Obsidian-style frontmatter card: each row gets a type icon inferred from
 /// its key/value, dates are formatted, tag-like keys render as pill chips, and URLs
 /// or `[[wikilinks]]` stay clickable. Read-only — mirrors the note's YAML.
+/// Collapsible, and collapsed by default (a one-line "Properties · N" row): the
+/// content, not the metadata, is what you opened the note to read.
 private struct PropertiesView: View {
     let props: [Prop]
+    @Binding var expanded: Bool
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            Button {
+                withAnimation(.smooth(duration: 0.22)) { expanded.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(expanded ? 90 : 0))
+                    Text("Properties")
+                        .font(.system(size: 13.5, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Text("\(props.count)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(expanded ? "Collapse properties" : "Expand properties (\(props.count))")
+
+            if expanded { rows }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, expanded ? 16 : 11)
+        .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private var rows: some View {
         VStack(alignment: .leading, spacing: 13) {
             ForEach(props) { p in
                 let kind = PropKind.infer(key: p.key, value: p.value)
@@ -391,9 +430,7 @@ private struct PropertiesView: View {
                 }
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 16)
-        .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .transition(.opacity)
     }
 
     @ViewBuilder

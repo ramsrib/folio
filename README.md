@@ -35,7 +35,8 @@ Everything in this list is implemented. Anything not in it, assume it isn't.
   (`> [!note]`, `> [!warning]`, …), fenced code with syntax highlighting, tables, dividers, and
   local + remote images.
 - YAML frontmatter renders as a **read-only** Properties card, with per-key icons, formatted dates,
-  and tag chips.
+  and tag chips — **collapsed by default** to a one-line "Properties · N" row, so opening a note
+  lands you on the content; click to expand.
 - Vim-style scrolling: `j`/`k`/`h`/`l`, `d`/`u`, `gg`/`G`, space / ⇧space.
 - Text selection flows across consecutive paragraphs (not across headings, lists, or code blocks —
   see Limitations).
