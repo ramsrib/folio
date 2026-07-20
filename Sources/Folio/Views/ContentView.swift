@@ -43,6 +43,13 @@ struct ContentView: View {
         .background { navigationShortcuts }
         .background { GestureMonitor(vault: vault, settings: settings, ui: ui) }   // trackpad swipe/pinch
         .onChange(of: ui.toggleSidebar) { withAnimation(.smooth(duration: 0.2)) { showSidebar.toggle() } }
+        // Root-level: if the sidebar is hidden its subtree (and the reveal handler
+        // in it) isn't mounted — show it first; the tree's onAppear finishes the job.
+        .onChange(of: vault.sidebarRevealRequest) {
+            if vault.sidebarRevealRequest != nil, !showSidebar {
+                withAnimation(.smooth(duration: 0.2)) { showSidebar = true }
+            }
+        }
         // Handled at the root (not inside the sidebar subtree): when the sidebar is
         // hidden its views aren't mounted, so a handler there would never fire —
         // reveal the sidebar and the collapsed field first, then focus it once it
@@ -369,6 +376,9 @@ struct ContentView: View {
             }
             .background(ThinScrollers())   // thin, auto-hiding overlay scroller
             .onChange(of: vault.selection) { revealSelection(proxy) }
+            // Folder links in a note reveal the folder here instead of Finder.
+            .onChange(of: vault.sidebarRevealRequest) { revealRequestedFolder(proxy) }
+            .onAppear { revealRequestedFolder(proxy) }   // sidebar may mount after the request
             .overlay {
                 if vault.tree.isEmpty {
                     ContentUnavailableView("No notes", systemImage: "doc.text",
@@ -461,6 +471,19 @@ struct ContentView: View {
         // animated: this fires on every tab switch, and an animated sidebar
         // scroll compounding with the content swap read as switch lag.
         DispatchQueue.main.async { proxy.scrollTo(sel, anchor: .center) }
+    }
+
+    /// Reveal a folder a Markdown link pointed at: expand its ancestors and the
+    /// folder itself, scroll its row into view, and consume the request. Split
+    /// from `revealSelection` because the target is a directory, not a note.
+    private func revealRequestedFolder(_ proxy: ScrollViewProxy) {
+        guard let target = vault.sidebarRevealRequest else { return }
+        vault.sidebarRevealRequest = nil
+        clearFilter()                                    // the filtered flat list hides folders
+        for dir in ancestors(of: target) { expandedDirs.insert(dir) }
+        expandedDirs.insert(target)                      // show its contents, not just its row
+        persistExpansion()
+        DispatchQueue.main.async { proxy.scrollTo(target, anchor: .center) }
     }
 
     /// Directory node IDs on the path from a tree root down to `target` — taken from

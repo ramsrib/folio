@@ -31,6 +31,10 @@ final class VaultStore: ObservableObject {
     /// views that show derived-from-disk data (e.g. the open search palette) know
     /// to recompute even when the file *count* didn't change.
     @Published private(set) var revision = 0
+    /// A folder the sidebar should reveal (expand + scroll to) — set when a
+    /// Markdown link points at a directory inside the vault. Consumed (nilled)
+    /// by ContentView after the reveal.
+    @Published var sidebarRevealRequest: URL?
     /// Set by create actions so the next selection opens in edit mode (navigation
     /// otherwise opens in reading mode). Consumed by the view on selection change.
     var openInEditMode = false
@@ -843,8 +847,18 @@ final class VaultStore: ObservableObject {
             }
             if let root = vaultURL { candidates.append(root.appendingPathComponent(decoded)) }
         }
-        for candidate in candidates.map(\.standardizedFileURL)
-        where FileManager.default.fileExists(atPath: candidate.path) {
+        for candidate in candidates.map(\.standardizedFileURL) {
+            var isDir: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: candidate.path, isDirectory: &isDir) else { continue }
+            if isDir.boolValue {
+                // A folder link must never bounce the reader out to Finder: inside
+                // the vault it reveals the folder in the explorer; outside (or a
+                // folder with no notes, absent from the tree) it's ignored.
+                if isInsideVault(candidate), treeContains(candidate) {
+                    sidebarRevealRequest = candidate
+                }
+                return
+            }
             if mdExtensions.contains(candidate.pathExtension.lowercased()) {
                 // Inside the vault → in-place navigation; outside → the external
                 // path (new tab, possibly a vault switch) so it's still reachable.
@@ -852,11 +866,30 @@ final class VaultStore: ObservableObject {
                 openExternalFile(candidate); return
             }
             #if os(macOS)
-            NSWorkspace.shared.open(candidate)   // non-note file/folder → default app
+            NSWorkspace.shared.open(candidate)   // non-note file (image, PDF) → default app
             #endif
             return
         }
         beep()
+    }
+
+    private func isInsideVault(_ url: URL) -> Bool {
+        guard let root = vaultURL else { return false }
+        return url.resolvingSymlinksInPath().path
+            .hasPrefix(root.standardizedFileURL.resolvingSymlinksInPath().path + "/")
+    }
+
+    /// Whether the explorer actually shows this directory (folders with no
+    /// Markdown descendants are pruned from the tree — nothing to reveal).
+    private func treeContains(_ dir: URL) -> Bool {
+        func walk(_ nodes: [VaultNode]) -> Bool {
+            for n in nodes where n.isDirectory {
+                if n.id.path == dir.path { return true }
+                if dir.path.hasPrefix(n.id.path + "/"), let c = n.children { return walk(c) }
+            }
+            return false
+        }
+        return walk(tree)
     }
 
     /// Build a `folio://open?vault=…&file=…` deep link for a note — the string an
