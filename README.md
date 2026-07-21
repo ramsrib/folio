@@ -221,6 +221,9 @@ Sources/Folio/
 iOS/         iOS-only UI (shares Models/, Storage/, Reading/)
 ```
 
+Design reasoning — how search/caching/rendering work and why, plus the SwiftUI/AppKit traps this
+codebase has already paid for — lives in [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
 Sibling projects using the same shape: [recall-cli](https://github.com/ramsrib/recall-cli),
 [recall-app](https://github.com/ramsrib/recall-app), [raven](https://github.com/ramsrib/raven).
 
