@@ -281,9 +281,10 @@ The connective tissue — must feel effortless and stay correct.
 > next/previous. In Reading mode it searches headings, paragraphs, lists, tasks, quotes, and code —
 > it does **not** search callouts, tables, properties, or image alt text.
 >
-> **Vault-wide content search exists (⇧⌘F):** live, case-insensitive **literal** search across every
-> note, results grouped per file with snippets, and ↵ jumps to the occurrence. **Not built:**
-> operators (`path:`, `tag:`, …), boolean queries, regex, and saved searches.
+> **Vault-wide content search exists (⇧⌘F):** live, case-insensitive search across every note —
+> space-separated words AND together, quotes give an exact phrase — results grouped per file with
+> snippets, and ↵ jumps to the occurrence. **Not built:** operators (`path:`, `tag:`, …), OR /
+> negation, regex, and saved searches.
 
 ## 14. Navigation
 

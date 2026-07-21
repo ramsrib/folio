@@ -112,13 +112,15 @@ struct SearchPaletteView: View {
         }
     }
 
-    /// Render the snippet line with the matched substring emphasized.
+    /// Render the snippet line with every term hit emphasized.
     private func snippetText(_ s: ContentSearchModel.Snippet) -> AttributedString {
         var attr = AttributedString(s.line)
-        if let lo = AttributedString.Index(s.range.lowerBound, within: attr),
-           let hi = AttributedString.Index(s.range.upperBound, within: attr) {
-            attr[lo..<hi].inlinePresentationIntent = .stronglyEmphasized
-            attr[lo..<hi].foregroundColor = settings.selectionTint
+        for range in s.ranges {
+            if let lo = AttributedString.Index(range.lowerBound, within: attr),
+               let hi = AttributedString.Index(range.upperBound, within: attr) {
+                attr[lo..<hi].inlinePresentationIntent = .stronglyEmphasized
+                attr[lo..<hi].foregroundColor = settings.selectionTint
+            }
         }
         return attr
     }
@@ -140,7 +142,7 @@ struct SearchPaletteView: View {
                 }
             }
             Spacer()
-            Text("↵ open · ⌘↵ new tab · esc close").font(.caption.monospaced()).foregroundStyle(.tertiary)
+            Text("words AND · \"exact phrase\" · ↵ open · ⌘↵ new tab").font(.caption.monospaced()).foregroundStyle(.tertiary)
         }
         .font(.caption).foregroundStyle(.secondary)
         .padding(.horizontal, 14).padding(.vertical, 8)
@@ -181,8 +183,9 @@ struct SearchPaletteView: View {
 
     private func open(_ file: MarkdownFile, _ snippet: ContentSearchModel.Snippet, newTab: Bool) {
         // Set the jump before selecting so EditorPane observes it in the same update
-        // and lands the find bar on this occurrence.
-        ui.pendingFind = PendingFind(query: query, occurrence: snippet.occurrence)
+        // and lands the find bar on this occurrence. Multi-term queries jump via
+        // the snippet's own term — the find bar is a literal finder.
+        ui.pendingFind = PendingFind(query: snippet.jumpTerm, occurrence: snippet.jumpOccurrence)
         vault.select(file.id, inNewTab: newTab)
         ui.showSearch = false
     }

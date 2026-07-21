@@ -1,20 +1,24 @@
 import Foundation
 
-/// Backs the ⇧⌘F vault-wide content search. Case-insensitive literal search (v1 —
-/// no regex yet). Scans every note off the main actor on a debounced query change,
+/// Backs the ⇧⌘F vault-wide content search. Case-insensitive **word-AND** search:
+/// space-separated terms must all appear in a file (anywhere — not adjacent);
+/// wrap the query in quotes for an exact phrase. No regex yet.
+/// Scans every note off the main actor on a debounced query change,
 /// caches file text keyed by modification date (only re-reading changed files, the
 /// same trick as `VaultStore.linkCache`), and applies results back on the main
 /// actor guarded by a generation counter so a slow scan can't overwrite a newer one.
 @MainActor
 final class ContentSearchModel: ObservableObject {
-    /// One matched line: the trimmed line text, the match range within it (for
-    /// bolding), and the match's 0-based occurrence index within the whole file —
-    /// which the jump-to-hit plumbing uses to land the find bar on this exact hit.
+    /// One matched line: the trimmed line text, the ranges of every term hit in
+    /// it (for bolding), plus a jump target — the first-hit term and that term's
+    /// 0-based occurrence index within the whole file, which the jump-to-hit
+    /// plumbing feeds to the find bar to land on this exact hit.
     struct Snippet: Identifiable, Sendable {
         let id = UUID()
         let line: String
-        let range: Range<String.Index>
-        let occurrence: Int
+        let ranges: [Range<String.Index>]
+        let jumpTerm: String
+        let jumpOccurrence: Int
     }
     struct FileResult: Identifiable, Sendable {
         let file: MarkdownFile
@@ -87,6 +91,20 @@ final class ContentSearchModel: ObservableObject {
         let capped: Bool
     }
 
+    /// Query → search terms. Space-separated words AND together; a query wrapped
+    /// in straight or curly quotes is one exact phrase.
+    nonisolated static func terms(from query: String) -> [String] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        let quotes = CharacterSet(charactersIn: "\"\u{201C}\u{201D}")
+        if q.count > 1,
+           let first = q.unicodeScalars.first, let last = q.unicodeScalars.last,
+           quotes.contains(first), quotes.contains(last) {
+            let phrase = String(q.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
+            return phrase.isEmpty ? [] : [phrase]
+        }
+        return q.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+    }
+
     private nonisolated static func scan(
         query: String, files: [MarkdownFile], cache: [URL: (mtime: Date, text: String)]
     ) async -> Outcome {
@@ -94,6 +112,7 @@ final class ContentSearchModel: ObservableObject {
         var matched: [FileResult] = []
         var totalMatches = 0
         var totalFiles = 0
+        let terms = terms(from: query)
 
         for f in files {
             // A newer keystroke (or palette dismiss) cancels this task; bail out
@@ -109,7 +128,7 @@ final class ContentSearchModel: ObservableObject {
                 text = (try? String(contentsOf: f.url, encoding: .utf8)) ?? ""
                 cache[f.url] = (mtime, text)
             }
-            let (count, snippets) = matches(in: text, query: query, cap: snippetCap)
+            let (count, snippets) = matches(in: text, terms: terms, cap: snippetCap)
             guard count > 0 else { continue }
             totalMatches += count
             totalFiles += 1
@@ -129,42 +148,75 @@ final class ContentSearchModel: ObservableObject {
                        totalMatches: totalMatches, totalFiles: totalFiles, capped: capped)
     }
 
-    /// All case-insensitive occurrences of `query` in `text`: total count, plus up
-    /// to `cap` snippets (the matched line trimmed, with the match's range within
-    /// that trimmed line and its occurrence index in the file).
-    private nonisolated static func matches(in text: String, query: String, cap: Int) -> (Int, [Snippet]) {
-        var count = 0
-        var snippets: [Snippet] = []
-        var from = text.startIndex
-        while let r = text.range(of: query, options: .caseInsensitive, range: from..<text.endIndex) {
-            let occurrence = count
-            count += 1
-            if snippets.count < cap, let s = snippet(for: r, in: text, occurrence: occurrence) {
-                snippets.append(s)
-            }
-            from = r.upperBound
-            if from == text.endIndex { break }
-        }
-        return (count, snippets)
-    }
+    /// AND semantics over `terms`: nil result (count 0) unless *every* term occurs
+    /// in the text. Count = total occurrences of all terms. Snippets are matching
+    /// lines, preferring lines where several distinct terms co-occur; every term
+    /// hit in a chosen line is recorded for bolding, and each snippet carries a
+    /// (term, occurrence-in-file) jump target for the find bar.
+    private nonisolated static func matches(in text: String, terms: [String], cap: Int) -> (Int, [Snippet]) {
+        guard !terms.isEmpty else { return (0, []) }
 
-    private nonisolated static func snippet(
-        for match: Range<String.Index>, in text: String, occurrence: Int
-    ) -> Snippet? {
-        let lineRange = text.lineRange(for: match)
-        let rawLine = String(text[lineRange])
-        // Offsets of the match within the raw line, then re-based onto the trimmed
-        // line (leading whitespace dropped) so the bold range still lines up.
-        let startOffset = text.distance(from: lineRange.lowerBound, to: match.lowerBound)
-        let matchLen = text.distance(from: match.lowerBound, to: match.upperBound)
-        let leading = rawLine.prefix { $0 == " " || $0 == "\t" }.count
-        let trimmed = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-        let adjusted = max(0, startOffset - leading)
-        guard let lo = trimmed.index(trimmed.startIndex, offsetBy: adjusted, limitedBy: trimmed.endIndex) else {
-            return nil
+        // Cheap AND gate + total count first — most files fail on some term and
+        // never pay the line walk below.
+        var totalCount = 0
+        for term in terms {
+            var termCount = 0
+            var from = text.startIndex
+            while let r = text.range(of: term, options: .caseInsensitive, range: from..<text.endIndex) {
+                termCount += 1
+                from = r.upperBound
+                if from == text.endIndex { break }
+            }
+            if termCount == 0 { return (0, []) }
+            totalCount += termCount
         }
-        let hi = trimmed.index(lo, offsetBy: matchLen, limitedBy: trimmed.endIndex) ?? trimmed.endIndex
-        return Snippet(line: trimmed, range: lo..<hi, occurrence: occurrence)
+
+        // Line walk: collect every line with a hit, tracking per-term running
+        // occurrence counters so each snippet knows where its first hit sits in
+        // file order (what the find-bar jump needs).
+        struct Candidate { let snippet: Snippet; let distinctTerms: Int; let order: Int }
+        var candidates: [Candidate] = []
+        var occurrenceSoFar = [String: Int]()
+        var order = 0
+        var lineStart = text.startIndex
+        while lineStart < text.endIndex {
+            let lineRange = text.lineRange(for: lineStart..<lineStart)
+            defer { lineStart = lineRange.upperBound }
+            let rawLine = String(text[lineRange])
+            let trimmed = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            var ranges: [Range<String.Index>] = []
+            var distinct = 0
+            var jump: (term: String, occ: Int)?
+            for term in terms {
+                var hits = 0
+                var from = trimmed.startIndex
+                while let r = trimmed.range(of: term, options: .caseInsensitive, range: from..<trimmed.endIndex) {
+                    ranges.append(r)
+                    if jump == nil { jump = (term, occurrenceSoFar[term, default: 0] + hits) }
+                    hits += 1
+                    from = r.upperBound
+                    if from == trimmed.endIndex { break }
+                }
+                if hits > 0 { distinct += 1 }
+                occurrenceSoFar[term, default: 0] += hits
+            }
+            guard let jump, !trimmed.isEmpty else { continue }
+            candidates.append(Candidate(
+                snippet: Snippet(line: trimmed, ranges: ranges.sorted { $0.lowerBound < $1.lowerBound },
+                                 jumpTerm: jump.term, jumpOccurrence: jump.occ),
+                distinctTerms: distinct, order: order))
+            order += 1
+        }
+
+        // Prefer lines where the terms co-occur (they're what an AND query is
+        // really asking about), then file order; cap as before.
+        let snippets = candidates
+            .sorted { $0.distinctTerms != $1.distinctTerms ? $0.distinctTerms > $1.distinctTerms
+                                                           : $0.order < $1.order }
+            .prefix(cap)
+            .sorted { $0.order < $1.order }
+            .map(\.snippet)
+        return (totalCount, snippets)
     }
 }

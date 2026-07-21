@@ -46,9 +46,11 @@ Everything in this list is implemented. Anything not in it, assume it isn't.
   separators, recency-weighted ranking, recently-opened notes on an empty query, **⇧↵** to create a
   note from the query, **⌘↵** to open in a new tab, and a `#` prefix to jump to a heading in the
   current note.
-- **⇧⌘F** — **vault-wide content search.** Case-insensitive literal matching (no regex, no
-  operators), live results grouped per file with snippets; ↵ opens the note with the find bar on
-  that occurrence.
+- **⇧⌘F** — **vault-wide content search.** Space-separated words **AND** together (all must appear
+  in a file, any position — `auth db phase` finds files containing all three); quote for an
+  **exact phrase**. Case-insensitive, no regex/operators. Live results grouped per file, snippets
+  favor lines where terms co-occur with every hit bolded; ↵ opens the note with the find bar on
+  the clicked hit.
 - **⌘[ / ⌘]** (or ⌘⌥←/→, or a **two-finger swipe** left/right) — **back/forward history** through
   visited notes, with title-bar chevrons.
 - **⌘P** — command palette: every app action, fuzzy-matched, including Switch Vault and Set Theme.
