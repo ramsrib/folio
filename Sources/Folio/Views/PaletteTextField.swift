@@ -22,6 +22,11 @@ struct PaletteTextField: NSViewRepresentable {
     /// Bump to ask the field to (re)take first responder — e.g. the find bar's
     /// focusRequest when ⌘F is pressed while the bar is already open.
     var focusToken: Int = 0
+    /// Esc handler for hosts the global palette monitor does NOT cover (the find
+    /// bar in writing mode — the monitor passes Esc through there, and without
+    /// this the field swallowed it as a no-op). Palettes leave it nil: the
+    /// monitor dismisses them before the field ever sees the key.
+    var onEscape: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -109,7 +114,8 @@ struct PaletteTextField: NSViewRepresentable {
             case #selector(NSResponder.moveUp(_:)):   parent.onMoveUp(); return true
             case #selector(NSResponder.moveDown(_:)): parent.onMoveDown(); return true
             case #selector(NSResponder.cancelOperation(_:)):
-                return true   // never the completions popup; the Esc monitor dismisses us
+                parent.onEscape?()
+                return true   // never the completions popup, regardless
             default:
                 return false
             }

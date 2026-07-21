@@ -18,7 +18,8 @@ struct FindBar: View {
             // focus on creation and re-takes it on every focusRequest bump.
             PaletteTextField(text: $find.query, placeholder: "Find in page", fontSize: 16,
                              onSubmit: { $0.contains(.shift) ? find.prev() : find.next() },
-                             focusToken: find.focusRequest)
+                             focusToken: find.focusRequest,
+                             onEscape: { find.close() })
                 .frame(height: 21)
                 .frame(maxWidth: .infinity)
 

@@ -91,6 +91,12 @@ struct LivePreviewEditor: NSViewRepresentable {
 
         tv.onFind = { [find] in find.open() }
         tv.onEscape = onEscape
+        // When the find bar closes while writing, its field was first responder —
+        // hand the keyboard back to the editor so typing resumes immediately.
+        if context.coordinator.lastFindActive, !find.active {
+            DispatchQueue.main.async { tv.window?.makeFirstResponder(tv) }
+        }
+        context.coordinator.lastFindActive = find.active
         context.coordinator.applyFind(find, to: tv)
     }
 
@@ -99,6 +105,7 @@ struct LivePreviewEditor: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: LivePreviewEditor
         weak var textView: MarkdownTextView?
+        var lastFindActive = false   // detect find-bar close → refocus the editor
         init(_ parent: LivePreviewEditor) { self.parent = parent }
 
         // MARK: Find (driven by the shared FindModel)
