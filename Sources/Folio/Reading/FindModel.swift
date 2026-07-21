@@ -4,8 +4,9 @@ import SwiftUI
 ///
 /// The bar drives `query`, `caseSensitive`, and navigation; whichever mode is on
 /// screen computes the matches, publishes `total`, and reacts to `current` (the
-/// focused match) by scrolling/selecting. Only one mode is mounted at a time, so
-/// there's never a conflict over who owns the search.
+/// focused match) by scrolling/selecting. The reading view stays *mounted* while
+/// the editor is up (perf), so ownership is by visibility, not mounting: its
+/// find handlers stand down (`guard ui.mode == .read`) whenever it's hidden.
 final class FindModel: ObservableObject {
     @Published var active = false
     @Published var query = "" { didSet { if query != oldValue { current = 0 } } }

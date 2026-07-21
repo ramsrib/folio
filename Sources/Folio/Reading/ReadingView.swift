@@ -43,6 +43,14 @@ struct ReadingView: View {
     /// Parsed-block memo across tab switches, keyed by content length + hash.
     @MainActor private static var parseCache: [String: ([Block], [Block])] = [:]
 
+    /// The parse task's identity. Constant while the view is hidden behind the
+    /// editor (so keystrokes never re-fire it); flips to the content's identity
+    /// when reading returns — re-parsing exactly once if edits happened, and not
+    /// at all if they didn't.
+    private var parseTaskID: Int {
+        ui.mode == .read ? vault.content.count &+ vault.content.hashValue &* 31 : .min
+    }
+
     @ViewBuilder private var blockRows: some View {
         ForEach(Array(blocks.enumerated()), id: \.element.id) { i, block in
             view(for: block, index: i).id(anchorID(block))
@@ -79,9 +87,11 @@ struct ReadingView: View {
                 // reading (word selection), and silently flipping into writing mode
                 // reads as random. Mode changes are explicit only — the toolbar
                 // pencil or ⌘E.
-                // Vim-style j/k/h/l scrolling (macOS only — AppKit-backed).
+                // Vim-style j/k/h/l scrolling (macOS only — AppKit-backed). Only
+                // while visible: the view stays mounted behind the editor, and a
+                // hidden scroller must not eat j/k when the editor loses focus.
                 #if os(macOS)
-                .background(KeyboardScroller())
+                .background { if ui.mode == .read { KeyboardScroller() } }
                 // Per-note scroll memory: restore each note's own offset on tab
                 // switch (top for first visits). A find/search jump or heading
                 // scroll owns the position for that switch and wins.
@@ -90,7 +100,8 @@ struct ReadingView: View {
                 }))
                 #endif
             }
-            .task(id: vault.content) {
+            .task(id: parseTaskID) {
+                guard ui.mode == .read else { return }
                 let t0 = ContinuousClock.now
                 // Per-document parse memo: tab switches re-run this task with
                 // content that was parsed moments ago (twice, in fact — the view
@@ -112,7 +123,9 @@ struct ReadingView: View {
                     .debug("reading parse: \(us)µs (\(parsed.count) blocks)")
             }
             .onChange(of: vault.scrollRequest) {
-                if let req = vault.scrollRequest {
+                // Only when visible — mounted-but-hidden must not steal the
+                // request from the editor (which consumes it via its binding).
+                if ui.mode == .read, let req = vault.scrollRequest {
                     withAnimation(.smooth) { proxy.scrollTo(req, anchor: .top) }
                     vault.scrollRequest = nil
                 }
@@ -251,6 +264,9 @@ struct ReadingView: View {
     }
 
     private func recomputeMatches() {
+        // Hidden behind the editor: the editor owns the shared FindModel's
+        // totals; a stale-block recompute here would fight it.
+        guard ui.mode == .read else { return }
         guard find.active, !find.query.isEmpty else {
             findMatches = []
             if find.total != 0 { find.total = 0 }
@@ -268,6 +284,7 @@ struct ReadingView: View {
     }
 
     private func scrollToCurrent() {
+        guard ui.mode == .read else { return }
         guard find.active, findMatches.indices.contains(find.current) else { return }
         findScroll = anchorID(blocks[findMatches[find.current].block])
     }

@@ -68,10 +68,19 @@ struct EditorPane: View {
                     .padding(.top, find.active ? 10 : 28)
                     .padding(.bottom, 2)
             }
-            if ui.mode == .read {
+            // ReadingView stays mounted (hidden) while writing: remounting it on
+            // every mode switch paid an empty frame + full parse + full document
+            // layout inside the switch animation — over a second on bigger notes.
+            // Kept alive it costs nothing per keystroke (its parse task freezes
+            // while hidden, see ReadingView.parseTaskID) and edit→read becomes an
+            // opacity flip, plus one visible re-layout only if the text changed.
+            ZStack {
                 ReadingView(find: find)
-            } else {
-                LivePreviewEditor(
+                    .opacity(ui.mode == .read ? 1 : 0)
+                    .allowsHitTesting(ui.mode == .read)
+                    .accessibilityHidden(ui.mode != .read)
+                if ui.mode == .edit {
+                    LivePreviewEditor(
                     text: $vault.content,
                     scrollTo: $vault.scrollRequest,
                     onChange: { vault.contentEdited() },
@@ -85,10 +94,11 @@ struct EditorPane: View {
                         if find.active { find.close() }
                         else { withAnimation(.smooth(duration: 0.2)) { ui.mode = .read } }
                     },
-                    background: settings.nsPaneBackground,
-                    readableWidth: settings.readableWidth,
-                    find: find
-                )
+                        background: settings.nsPaneBackground,
+                        readableWidth: settings.readableWidth,
+                        find: find
+                    )
+                }
             }
         }
         .animation(.smooth(duration: 0.18), value: find.active)
