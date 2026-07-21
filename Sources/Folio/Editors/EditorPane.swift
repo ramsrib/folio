@@ -60,6 +60,10 @@ struct EditorPane: View {
                     .padding(.horizontal, 24)
                     .padding(.top, 12)
                     .transition(.move(edge: .top).combined(with: .opacity))
+                    // Composite above the reading scroll view (a *later* sibling
+                    // paints over the bar's downward shadow otherwise — it
+                    // rendered with a hard cutoff line in reading mode).
+                    .zIndex(1)
             }
             if settings.showInlineTitle {
                 NoteTitleField()
