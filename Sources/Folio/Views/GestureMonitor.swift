@@ -81,9 +81,16 @@ struct GestureMonitor: NSViewRepresentable {
             guard event.keyCode == 53,                      // Esc
                   let win = view?.window, event.window === win else { return event }
             let handled = MainActor.assumeIsolated { () -> Bool in
-                guard ui.anyPaletteShown else { return false }
-                ui.dismissPalettes()
-                return true
+                if ui.anyPaletteShown { ui.dismissPalettes(); return true }
+                if ui.mode == .read {
+                    // Reading mode often has NO first responder, so an unclaimed
+                    // Esc reaches the window and AppKit plays the unhandled-key
+                    // funk. Esc's only job here is closing the find bar — pulse
+                    // that and always consume, so it can never thunk.
+                    ui.escapePulse &+= 1
+                    return true
+                }
+                return false   // edit mode: the text view's cancelOperation owns Esc
             }
             return handled ? nil : event
         }

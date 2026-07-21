@@ -23,6 +23,11 @@ final class UIState: ObservableObject {
     /// Settings as an in-window overlay (not a separate Settings window): it
     /// follows the theme for free, Esc closes it, and ⌘W can't hit a tab behind it.
     @Published var showSettings = false
+    /// Bumped when Esc is pressed in reading mode with no palette open — the
+    /// note pane consumes it (close the find bar if open). Swallowing the key
+    /// also silences AppKit's unhandled-key funk, which played whenever nothing
+    /// held keyboard focus.
+    @Published var escapePulse = 0
 
     /// Any modal palette on screen — gates gestures and other note-level input
     /// so a swipe/pinch can't act on the note *behind* an open palette.

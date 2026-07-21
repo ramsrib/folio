@@ -39,6 +39,10 @@ struct EditorPane: View {
                 // A global-search hit hands us a query + occurrence to focus.
                 .onChange(of: ui.pendingFind) { consumePendingFind() }
                 .onAppear { consumePendingFind() }
+                // Esc in reading mode (routed via the key monitor): close the
+                // find bar if it's open; otherwise it was consumed just to stay
+                // silent — Esc has no further meaning while reading.
+                .onChange(of: ui.escapePulse) { if find.active { find.close() } }
         } else {
             ContentUnavailableView("Select a note", systemImage: "doc.text",
                 description: Text("Pick a note from the sidebar to start writing."))
