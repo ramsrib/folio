@@ -56,14 +56,22 @@ final class MarkdownTextView: NSTextView {
               let lm = layoutManager, textContainer != nil else { return }
         let length = (string as NSString).length
         let caret = selectedRange().location
+        // NEVER force layout from inside a draw pass: querying an un-laid-out
+        // glyph's fragment rect triggers reentrant layout and AppKit abandons
+        // the pass — the editor rendered *blank* on larger documents until a
+        // click forced a redisplay. If the caret's region isn't laid out yet,
+        // skip the wash; the next natural redraw draws it.
+        let laidOut = lm.firstUnlaidCharacterIndex
         var lineRect: NSRect
         if length == 0 || caret >= length {
+            guard laidOut >= length else { return }
             lineRect = lm.extraLineFragmentRect
             if lineRect.isEmpty, length > 0 {
                 let glyph = lm.glyphIndexForCharacter(at: length - 1)
                 lineRect = lm.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
             }
         } else {
+            guard caret < laidOut else { return }
             let glyph = lm.glyphIndexForCharacter(at: caret)
             lineRect = lm.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
         }
