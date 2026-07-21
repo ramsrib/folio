@@ -44,6 +44,11 @@ struct LivePreviewEditor: NSViewRepresentable {
         tv.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         tv.textContainer?.widthTracksTextView = true
         tv.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
+        // Lay out lazily: without this, NSTextView lays out the ENTIRE document
+        // before first display — seconds of "switching to edit mode" on large
+        // notes. TextKit's own LazyVStack trade: estimated heights while
+        // scrolling far, exact everywhere you've been.
+        tv.layoutManager?.allowsNonContiguousLayout = true
 
         tv.noteNames = noteNames
         tv.onClickLink = onOpenLink
@@ -173,9 +178,19 @@ struct LivePreviewEditor: NSViewRepresentable {
             parent.onChange()
         }
 
+        /// The cursor line of the last full highlight pass. Marker reveal is the
+        /// only thing that depends on the caret, so a caret move *within* the
+        /// same line changes nothing — skip the whole-document restyle (which is
+        /// what made arrowing around large notes feel sticky).
+        private var lastCursorLine = NSRange(location: NSNotFound, length: 0)
+
         func textViewDidChangeSelection(_ notification: Notification) {
-            highlight()   // re-evaluate which markers are revealed
-            textView?.needsDisplay = true   // move the current-line wash with the caret
+            guard let tv = textView else { return }
+            let ns = tv.string as NSString
+            let loc = min(tv.selectedRange().location, ns.length)
+            let line = ns.lineRange(for: NSRange(location: loc, length: 0))
+            if line != lastCursorLine { highlight() }   // reveal moved to another line
+            tv.needsDisplay = true   // move the current-line wash with the caret
         }
 
         func highlight() {
@@ -183,6 +198,7 @@ struct LivePreviewEditor: NSViewRepresentable {
             let ns = tv.string as NSString
             let loc = min(tv.selectedRange().location, ns.length)
             let lineRange = ns.lineRange(for: NSRange(location: loc, length: 0))
+            lastCursorLine = lineRange
             MarkdownHighlighter.apply(to: storage, cursorLine: lineRange,
                                       resolveWikilink: parent.resolveWikilink)
         }
