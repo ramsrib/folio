@@ -13,6 +13,10 @@ struct FolioApp: App {
         // system "Show scroll bars" setting. The app's own defaults domain takes
         // precedence over the global one, so this also overrides "Always".
         UserDefaults.standard.set("WhenScrolling", forKey: "AppleShowScrollBars")
+        // No inline prediction UI anywhere in the app — palette/search fields are
+        // queries, not prose, and the candidate bar is the "phantom dropdown"
+        // that flashed over the first palette after launch.
+        UserDefaults.standard.set(false, forKey: "NSAutomaticInlinePredictionEnabled")
     }
 
     var body: some Scene {

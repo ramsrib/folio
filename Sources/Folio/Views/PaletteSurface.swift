@@ -9,11 +9,19 @@ import AppKit
 @MainActor func tamePaletteFieldEditor() {
     DispatchQueue.main.async {
         guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView else { return }
-        editor.drawsBackground = false
-        editor.isAutomaticTextCompletionEnabled = false
-        editor.isAutomaticDataDetectionEnabled = false
-        if #available(macOS 14.0, *) { editor.inlinePredictionType = .no }
+        tameFieldEditor(editor)
     }
+}
+
+/// Strip the shared field editor's default chrome. Also called at window setup
+/// (WindowConfigurator) to *pre-warm* the editor: macOS creates it lazily on the
+/// first text-field focus, and an untamed one gets a frame on screen first — the
+/// phantom "suggestion dropdown" flash on the first palette open after launch.
+@MainActor func tameFieldEditor(_ editor: NSTextView) {
+    editor.drawsBackground = false
+    editor.isAutomaticTextCompletionEnabled = false
+    editor.isAutomaticDataDetectionEnabled = false
+    if #available(macOS 14.0, *) { editor.inlinePredictionType = .no }
 }
 
 /// Shared chrome for the floating palettes (Quick Switcher, Command Palette,
