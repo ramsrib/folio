@@ -42,6 +42,7 @@ struct ContentView: View {
                                        translucent: settings.windowIsTranslucent))
         .background { navigationShortcuts }
         .background { GestureMonitor(vault: vault, settings: settings, ui: ui) }   // trackpad swipe/pinch
+        .task { warmUpPalettes() }   // burn the first-open field-editor flash invisibly
         .onChange(of: ui.toggleSidebar) { withAnimation(.smooth(duration: 0.2)) { showSidebar.toggle() } }
         // Root-level: if the sidebar is hidden its subtree (and the reveal handler
         // in it) isn't mounted — show it first; the tree's onAppear finishes the job.
@@ -105,7 +106,25 @@ struct ContentView: View {
                     else if ui.showSettings { SettingsView() }
                 }
             }
+            .opacity(ui.warmingUp ? 0 : 1)              // launch warm-up is invisible
+            .allowsHitTesting(!ui.warmingUp)
             .transition(.opacity)
+        }
+    }
+
+    /// The first palette presentation after launch materializes the field-editor
+    /// session live, flashing its untamed chrome for a frame (pre-configuring the
+    /// editor doesn't stick — AppKit re-applies attributes when editing begins).
+    /// The user's confirmed observation: every open after the first is clean. So
+    /// make the first open BE the second: present the quick switcher once at 0
+    /// opacity, let it focus, dismiss it.
+    private func warmUpPalettes() {
+        ui.warmingUp = true
+        ui.showQuickSwitcher = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            // Don't stomp a palette the user genuinely opened in the window.
+            if ui.warmingUp { ui.dismissPalettes() }
+            ui.warmingUp = false
         }
     }
 
