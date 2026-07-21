@@ -9,7 +9,6 @@ struct TagsView: View {
     @State private var query = ""
     @State private var selected = 0
     @State private var selectedTag: String?
-    @FocusState private var focused: Bool
 
     private var tags: [(tag: String, count: Int)] {
         let q = query.lowercased()
@@ -55,14 +54,6 @@ struct TagsView: View {
         }
         .frame(width: 560, height: 440)
         .paletteSurface()
-        .onAppear {
-            focused = true
-            tamePaletteFieldEditor()
-            // Re-assert focus a runloop later: if something else held first
-            // responder when the palette appeared (the editor, a filter field),
-            // the immediate request can lose the race and leave the field dead.
-            DispatchQueue.main.async { focused = true }
-        }
         .onKeyPress(.downArrow) { move(1); return .handled }
         .onKeyPress(.upArrow) { move(-1); return .handled }
         .onKeyPress(.return) { activate(); return .handled }
@@ -77,13 +68,12 @@ struct TagsView: View {
                     .accessibilityLabel("Back to tags")
             }
             Image(systemName: selectedTag == nil ? "number" : "tag").foregroundStyle(.secondary)
-            TextField(selectedTag == nil ? "Filter tags…" : "Filter #\(selectedTag!)…", text: $query)
-                .textFieldStyle(.plain)
-                .font(.title3)
-                .focused($focused)
-                .autocorrectionDisabled(true)
+            PaletteTextField(text: $query,
+                             placeholder: selectedTag == nil ? "Filter tags…" : "Filter #\(selectedTag!)…",
+                             onSubmit: { _ in activate() },
+                             onMoveUp: { move(-1) }, onMoveDown: { move(1) })
+                .frame(height: 22)
                 .onChange(of: query) { selected = 0 }
-                .onSubmit(activate)
         }
         .padding(16)
     }

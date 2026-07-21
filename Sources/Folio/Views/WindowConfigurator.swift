@@ -48,12 +48,6 @@ struct WindowConfigurator: NSViewRepresentable {
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
             window.isMovableByWindowBackground = false
-            // Create + tame the shared field editor now, while nothing is on
-            // screen — created lazily on first focus, it would flash its default
-            // white background/prediction candidates over the first palette.
-            if let editor = window.fieldEditor(true, for: nil) as? NSTextView {
-                tameFieldEditor(editor)
-            }
             coordinator.didConfigureChrome = true
         }
         if translucent {

@@ -28,11 +28,6 @@ final class UIState: ObservableObject {
     /// also silences AppKit's unhandled-key funk, which played whenever nothing
     /// held keyboard focus.
     @Published var escapePulse = 0
-    /// True during the invisible launch warm-up of the palette machinery (see
-    /// ContentView): the first field-editor session after launch paints its
-    /// untamed chrome for a frame, so we burn that frame at 0 opacity before
-    /// the user can open anything.
-    @Published var warmingUp = false
 
     /// Any modal palette on screen — gates gestures and other note-level input
     /// so a swipe/pinch can't act on the note *behind* an open palette.

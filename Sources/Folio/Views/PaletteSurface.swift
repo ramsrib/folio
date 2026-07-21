@@ -1,29 +1,6 @@
 import SwiftUI
 import AppKit
 
-/// When a palette's search field gains focus, macOS installs a shared *field
-/// editor* (an NSTextView) over it. That editor briefly paints an opaque (white)
-/// background and may pop completion/prediction candidates before it inherits the
-/// field's plain style — which reads as a white "dropdown" over the search field.
-/// Call this right after focusing to strip that chrome.
-@MainActor func tamePaletteFieldEditor() {
-    DispatchQueue.main.async {
-        guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView else { return }
-        tameFieldEditor(editor)
-    }
-}
-
-/// Strip the shared field editor's default chrome. Also called at window setup
-/// (WindowConfigurator) to *pre-warm* the editor: macOS creates it lazily on the
-/// first text-field focus, and an untamed one gets a frame on screen first — the
-/// phantom "suggestion dropdown" flash on the first palette open after launch.
-@MainActor func tameFieldEditor(_ editor: NSTextView) {
-    editor.drawsBackground = false
-    editor.isAutomaticTextCompletionEnabled = false
-    editor.isAutomaticDataDetectionEnabled = false
-    if #available(macOS 14.0, *) { editor.inlinePredictionType = .no }
-}
-
 /// Shared chrome for the floating palettes (Quick Switcher, Command Palette,
 /// Tags, Shortcuts): rounded surface tinted to the theme (Paper → cream, else
 /// material), hairline border, and shadow. Presented as an in-window overlay

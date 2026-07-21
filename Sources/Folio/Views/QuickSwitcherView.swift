@@ -10,7 +10,6 @@ struct QuickSwitcherView: View {
     @EnvironmentObject private var settings: AppSettings
     @State private var query = ""
     @State private var selected = 0
-    @FocusState private var focused: Bool
 
     // MARK: Row model
 
@@ -103,11 +102,11 @@ struct QuickSwitcherView: View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 Image(systemName: isHeadingMode ? "number" : "magnifyingglass").foregroundStyle(.secondary)
-                TextField(isHeadingMode ? "Jump to heading…" : "Search files by name…  (# for headings)", text: $query)
-                    .textFieldStyle(.plain)
-                    .font(.title3)
-                    .focused($focused)
-                    .autocorrectionDisabled(true)
+                PaletteTextField(text: $query,
+                                 placeholder: isHeadingMode ? "Jump to heading…" : "Search files by name…  (# for headings)",
+                                 onSubmit: { handleSubmit($0) },
+                                 onMoveUp: { move(-1) }, onMoveDown: { move(1) })
+                    .frame(height: 22)
                     .onChange(of: query) { selected = 0 }
             }
             .padding(16)
@@ -137,14 +136,6 @@ struct QuickSwitcherView: View {
         }
         .frame(width: 620, height: 460)
         .paletteSurface()
-        .onAppear {
-            focused = true
-            tamePaletteFieldEditor()
-            // Re-assert focus a runloop later: if something else held first
-            // responder when the palette appeared (the editor, a filter field),
-            // the immediate request can lose the race and leave the field dead.
-            DispatchQueue.main.async { focused = true }
-        }
         .onKeyPress(.downArrow) { move(1); return .handled }
         .onKeyPress(.upArrow) { move(-1); return .handled }
         .onKeyPress(.return, phases: .down) { handleReturn($0.modifiers) }
@@ -252,6 +243,14 @@ struct QuickSwitcherView: View {
     private func move(_ delta: Int) {
         guard !rows.isEmpty else { return }
         selected = min(max(selected + delta, 0), rows.count - 1)
+    }
+
+    /// AppKit modifier flags from PaletteTextField → the same return handling.
+    private func handleSubmit(_ flags: NSEvent.ModifierFlags) {
+        var mods: EventModifiers = []
+        if flags.contains(.shift) { mods.insert(.shift) }
+        if flags.contains(.command) { mods.insert(.command) }
+        _ = handleReturn(mods)
     }
 
     /// ↵ opens/jumps; ⌘↵ opens in a new tab; ⇧↵ creates from the query anywhere.

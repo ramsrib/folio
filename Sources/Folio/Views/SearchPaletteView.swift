@@ -11,7 +11,6 @@ struct SearchPaletteView: View {
     @StateObject private var model = ContentSearchModel()
     @State private var query = ""
     @State private var selected = 0        // flat index across all snippet rows
-    @FocusState private var focused: Bool
 
     // Flattened, renderable structure: a header per file followed by its snippet
     // rows; snippet rows carry their flat index for selection + scroll targeting.
@@ -42,11 +41,10 @@ struct SearchPaletteView: View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 Image(systemName: "text.magnifyingglass").foregroundStyle(.secondary)
-                TextField("Search in vault…", text: $query)
-                    .textFieldStyle(.plain)
-                    .font(.title3)
-                    .focused($focused)
-                    .autocorrectionDisabled(true)
+                PaletteTextField(text: $query, placeholder: "Search in vault…",
+                                 onSubmit: { handleSubmit($0) },
+                                 onMoveUp: { move(-1) }, onMoveDown: { move(1) })
+                    .frame(height: 22)
                     .onChange(of: query) { runSearch() }
                 if model.isSearching { ProgressView().controlSize(.small) }
             }
@@ -72,14 +70,6 @@ struct SearchPaletteView: View {
         }
         .frame(width: 700, height: 540)
         .paletteSurface()
-        .onAppear {
-            focused = true
-            tamePaletteFieldEditor()
-            // Re-assert focus a runloop later: if something else held first
-            // responder when the palette appeared (the editor, a filter field),
-            // the immediate request can lose the race and leave the field dead.
-            DispatchQueue.main.async { focused = true }
-        }
         .onDisappear { model.cancel() }
         // Keep results live if the vault changes while the palette is open — the
         // revision counter bumps on every refresh (rename, external edit, create,
@@ -166,6 +156,12 @@ struct SearchPaletteView: View {
     private func move(_ delta: Int) {
         guard hitCount > 0 else { return }
         selected = min(max(selected + delta, 0), hitCount - 1)
+    }
+
+    private func handleSubmit(_ flags: NSEvent.ModifierFlags) {
+        var mods: EventModifiers = []
+        if flags.contains(.command) { mods.insert(.command) }
+        _ = handleReturn(mods)
     }
 
     private func handleReturn(_ modifiers: EventModifiers) -> KeyPress.Result {

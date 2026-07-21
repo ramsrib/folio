@@ -19,7 +19,6 @@ struct CommandPaletteView: View {
     @EnvironmentObject private var settings: AppSettings
     @State private var query = ""
     @State private var selected = 0
-    @FocusState private var focused: Bool
 
     /// Every command the app exposes. Selection-dependent entries (Reveal, Copy
     /// Path, Trash, Close Tab) appear only when a note is open; recent vaults expand
@@ -105,13 +104,11 @@ struct CommandPaletteView: View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 Image(systemName: "command").foregroundStyle(.secondary)
-                TextField("Run a command…", text: $query)
-                    .textFieldStyle(.plain)
-                    .font(.title3)
-                    .focused($focused)
-                    .autocorrectionDisabled(true)
+                PaletteTextField(text: $query, placeholder: "Run a command…",
+                                 onSubmit: { _ in runSelected() },
+                                 onMoveUp: { move(-1) }, onMoveDown: { move(1) })
+                    .frame(height: 22)
                     .onChange(of: query) { selected = 0 }
-                    .onSubmit(runSelected)
             }
             .padding(16)
             Divider()
@@ -146,14 +143,6 @@ struct CommandPaletteView: View {
         }
         .frame(width: 560, height: 420)
         .paletteSurface()
-        .onAppear {
-            focused = true
-            tamePaletteFieldEditor()
-            // Re-assert focus a runloop later: if something else held first
-            // responder when the palette appeared (the editor, a filter field),
-            // the immediate request can lose the race and leave the field dead.
-            DispatchQueue.main.async { focused = true }
-        }
         .onKeyPress(.downArrow) { move(1); return .handled }
         .onKeyPress(.upArrow) { move(-1); return .handled }
         .onKeyPress(.return) { runSelected(); return .handled }
