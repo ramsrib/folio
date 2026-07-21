@@ -61,7 +61,7 @@ final class MarkdownTextView: NSTextView {
         // the pass — the editor rendered *blank* on larger documents until a
         // click forced a redisplay. If the caret's region isn't laid out yet,
         // skip the wash; the next natural redraw draws it.
-        let laidOut = lm.firstUnlaidCharacterIndex
+        let laidOut = lm.firstUnlaidCharacterIndex()
         var lineRect: NSRect
         if length == 0 || caret >= length {
             guard laidOut >= length else { return }
