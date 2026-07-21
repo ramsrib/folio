@@ -46,6 +46,36 @@ final class MarkdownTextView: NSTextView {
 
     override func cancelOperation(_ sender: Any?) { onEscape() }
 
+    /// Subtle wash on the caret's line (the one editor-ism worth borrowing —
+    /// it anchors the eye in long prose). Only with a collapsed cursor: a real
+    /// selection is its own anchor. Redraw is triggered from the selection-change
+    /// delegate in LivePreviewEditor.
+    override func drawBackground(in rect: NSRect) {
+        super.drawBackground(in: rect)
+        guard isEditable, selectedRange().length == 0,
+              let lm = layoutManager, textContainer != nil else { return }
+        let length = (string as NSString).length
+        let caret = selectedRange().location
+        var lineRect: NSRect
+        if length == 0 || caret >= length {
+            lineRect = lm.extraLineFragmentRect
+            if lineRect.isEmpty, length > 0 {
+                let glyph = lm.glyphIndexForCharacter(at: length - 1)
+                lineRect = lm.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+            }
+        } else {
+            let glyph = lm.glyphIndexForCharacter(at: caret)
+            lineRect = lm.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+        }
+        guard !lineRect.isEmpty else { return }
+        var wash = lineRect.offsetBy(dx: textContainerOrigin.x, dy: textContainerOrigin.y)
+        wash.origin.x = 0
+        wash.size.width = bounds.width
+        guard wash.intersects(rect) else { return }
+        Theme.currentLineBg.setFill()
+        wash.fill()
+    }
+
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
            event.charactersIgnoringModifiers == "f" {

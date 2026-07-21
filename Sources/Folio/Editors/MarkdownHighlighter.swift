@@ -35,10 +35,19 @@ enum MarkdownHighlighter {
 
         storage.setAttributes([.font: Theme.body, .foregroundColor: Theme.text], range: full)
 
+        // Frontmatter is YAML, not Markdown: style it as metadata (mono, dimmed,
+        // keys tinted) and — critically — exclude it from every Markdown rule
+        // below. A YAML comment (`# deploy notes`) once rendered as a giant H1.
+        let fm = frontmatterRange(ns)
+        if let fm { styleFrontmatter(storage, ns, fm, cursorLine) }
+        let content: NSRange = fm.map {
+            NSRange(location: NSMaxRange($0), length: ns.length - NSMaxRange($0))
+        } ?? full
+
         // Block elements, line by line (tracks fenced code regions).
         var fenced: [NSRange] = []
         var inFence = false
-        ns.enumerateSubstrings(in: full, options: .byLines) { sub, lineRange, _, _ in
+        ns.enumerateSubstrings(in: content, options: .byLines) { sub, lineRange, _, _ in
             let line = sub ?? ns.substring(with: lineRange)
             let lineNS = NSRange(location: 0, length: (line as NSString).length)
             let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -76,15 +85,16 @@ enum MarkdownHighlighter {
             }
         }
 
-        // Inline spans whose content is styled and delimiters dimmed.
-        inline(boldStars,  storage, text, full, cursorLine, [.font: Theme.bold])
-        inline(italicStar, storage, text, full, cursorLine, [.font: Theme.italic])
-        inline(strike,     storage, text, full, cursorLine, [.strikethroughStyle: NSUnderlineStyle.single.rawValue])
-        inline(inlineCode, storage, text, full, cursorLine, [.font: Theme.mono, .backgroundColor: Theme.codeBg])
-        inline(highlight,  storage, text, full, cursorLine, [.backgroundColor: Theme.highlightBg])
+        // Inline spans whose content is styled and delimiters dimmed. All scoped
+        // to `content` so frontmatter stays pure metadata.
+        inline(boldStars,  storage, text, content, cursorLine, [.font: Theme.bold])
+        inline(italicStar, storage, text, content, cursorLine, [.font: Theme.italic])
+        inline(strike,     storage, text, content, cursorLine, [.strikethroughStyle: NSUnderlineStyle.single.rawValue])
+        inline(inlineCode, storage, text, content, cursorLine, [.font: Theme.mono, .backgroundColor: Theme.codeBg])
+        inline(highlight,  storage, text, content, cursorLine, [.backgroundColor: Theme.highlightBg])
 
         // Wikilinks: resolved (accent) vs unresolved (red); whole span clickable.
-        wiki.enumerateMatches(in: text, range: full) { m, _, _ in
+        wiki.enumerateMatches(in: text, range: content) { m, _, _ in
             guard let m else { return }
             let whole = m.range, content = m.range(at: 1)
             let inner = ns.substring(with: content)
@@ -96,7 +106,7 @@ enum MarkdownHighlighter {
         }
 
         // Markdown links: text styled + clickable, brackets/url dimmed.
-        mdLink.enumerateMatches(in: text, range: full) { m, _, _ in
+        mdLink.enumerateMatches(in: text, range: content) { m, _, _ in
             guard let m else { return }
             let whole = m.range, label = m.range(at: 1), dest = m.range(at: 2)
             storage.addAttributes([.foregroundColor: Theme.accent,
@@ -107,12 +117,56 @@ enum MarkdownHighlighter {
             mark(storage, NSRange(location: tStart, length: NSMaxRange(whole) - tStart), cursorLine)
         }
 
-        tag.enumerateMatches(in: text, range: full) { m, _, _ in
+        tag.enumerateMatches(in: text, range: content) { m, _, _ in
             guard let m else { return }
             storage.addAttribute(.foregroundColor, value: Theme.accent, range: m.range)
         }
 
         for r in fenced { storage.addAttributes([.font: Theme.mono, .backgroundColor: Theme.codeBg], range: r) }
+    }
+
+    // MARK: Frontmatter
+
+    private static let yamlKey = rx("^\\s*(-\\s+)?[A-Za-z0-9_.-]+(?=:)")
+    private static let yamlCommentRx = rx("(^|\\s)#[^\\n]*")
+
+    /// The document's leading `--- … ---` block, including both fence lines,
+    /// or nil when the note has no (closed) frontmatter.
+    private static func frontmatterRange(_ ns: NSString) -> NSRange? {
+        guard ns.length >= 4, ns.substring(to: min(4, ns.length)).hasPrefix("---\n") else { return nil }
+        var result: NSRange?
+        var first = true
+        ns.enumerateSubstrings(in: NSRange(location: 0, length: ns.length), options: .byLines) { sub, lineRange, _, stop in
+            if first { first = false; return }   // the opening fence
+            if (sub ?? "").trimmingCharacters(in: .whitespaces) == "---" {
+                result = NSRange(location: 0, length: NSMaxRange(lineRange))
+                stop.pointee = true
+            }
+        }
+        return result
+    }
+
+    /// Metadata styling: mono + dimmed base, keys tinted, YAML comments dimmest,
+    /// and the `---` fences on the marker/reveal treatment like other syntax.
+    private static func styleFrontmatter(_ storage: NSTextStorage, _ ns: NSString,
+                                         _ fm: NSRange, _ cursorLine: NSRange) {
+        storage.addAttributes([.font: Theme.mono, .foregroundColor: Theme.quote], range: fm)
+        ns.enumerateSubstrings(in: fm, options: .byLines) { sub, lineRange, _, _ in
+            let line = sub ?? ns.substring(with: lineRange)
+            let lineNS = NSRange(location: 0, length: (line as NSString).length)
+            if line.trimmingCharacters(in: .whitespaces) == "---" {
+                mark(storage, lineRange, cursorLine)   // fences dim, reveal on cursor
+                return
+            }
+            if let m = yamlKey.firstMatch(in: line, range: lineNS) {
+                storage.addAttribute(.foregroundColor, value: Theme.accent,
+                    range: NSRange(location: lineRange.location + m.range.location, length: m.range.length))
+            }
+            if let m = yamlCommentRx.firstMatch(in: line, range: lineNS) {
+                storage.addAttribute(.foregroundColor, value: Theme.yamlComment,
+                    range: NSRange(location: lineRange.location + m.range.location, length: m.range.length))
+            }
+        }
     }
 
     private static func wikilinkURL(_ inner: String) -> URL? {

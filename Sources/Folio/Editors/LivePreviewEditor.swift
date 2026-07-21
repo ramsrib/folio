@@ -175,6 +175,7 @@ struct LivePreviewEditor: NSViewRepresentable {
 
         func textViewDidChangeSelection(_ notification: Notification) {
             highlight()   // re-evaluate which markers are revealed
+            textView?.needsDisplay = true   // move the current-line wash with the caret
         }
 
         func highlight() {
