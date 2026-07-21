@@ -73,6 +73,10 @@ final class AppSettings: ObservableObject {
     @Published var showInlineTitle: Bool { didSet { d.set(showInlineTitle, forKey: kInlineTitle) } }
     /// Core Text reads `AppleFontSmoothing` from the app's defaults domain at
     /// launch, so changes take effect on next launch (the settings row says so).
+    /// Obsidian's default: a single newline inside a paragraph renders as a line
+    /// break. Off = CommonMark soft breaks (lines join with a space) — better for
+    /// reading hard-wrapped repo docs (README at 100 columns).
+    @Published var preserveLineBreaks: Bool { didSet { d.set(preserveLineBreaks, forKey: kLineBreaks) } }
     @Published var fontSmoothing: FontSmoothing {
         didSet {
             d.set(fontSmoothing.rawValue, forKey: kSmoothing)
@@ -89,6 +93,7 @@ final class AppSettings: ObservableObject {
     private let kSize = "folio.bodyFontSize", kWidth = "folio.readableWidth"
     private let kInlineTitle = "folio.showInlineTitle"
     private let kSmoothing = "folio.fontSmoothing"
+    private let kLineBreaks = "folio.preserveLineBreaks"
 
     init() {
         theme = AppTheme(rawValue: d.string(forKey: kTheme) ?? "") ?? .system
@@ -98,6 +103,7 @@ final class AppSettings: ObservableObject {
         // sweet spot (60–75); the old 720 default ran ~85 and read wide.
         readableWidth = d.object(forKey: kWidth) as? Double ?? 660
         showInlineTitle = d.object(forKey: kInlineTitle) as? Bool ?? true
+        preserveLineBreaks = d.object(forKey: kLineBreaks) as? Bool ?? true
         fontSmoothing = FontSmoothing(rawValue: d.string(forKey: kSmoothing) ?? "") ?? .system
     }
 

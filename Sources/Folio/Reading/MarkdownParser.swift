@@ -39,7 +39,12 @@ enum MarkdownParser {
     private static let calloutRx = try! NSRegularExpression(pattern: "^\\[!([A-Za-z]+)\\]\\s*(.*)$")
     private static let hrRx      = try! NSRegularExpression(pattern: "^(-{3,}|\\*{3,}|_{3,})$")
 
-    static func parse(_ content: String) -> [Block] {
+    /// - Parameter preserveLineBreaks: Obsidian's default — a single newline
+    ///   inside a paragraph stays a line break ("Overall: 4/10 ⏎ Recording: …"
+    ///   renders as two lines). Off = CommonMark soft breaks (lines join with a
+    ///   space), which reads better for hard-wrapped repo docs (README at 100
+    ///   cols). Surfaced as a setting; the reading view passes it through.
+    static func parse(_ content: String, preserveLineBreaks: Bool = true) -> [Block] {
         let lines = content.components(separatedBy: "\n")
         var offsets: [Int] = []
         var loc = 0
@@ -49,7 +54,8 @@ enum MarkdownParser {
         var paragraph: [String] = []
         func flush() {
             if !paragraph.isEmpty {
-                blocks.append(Block(kind: .paragraph(text: paragraph.joined(separator: " "))))
+                blocks.append(Block(kind: .paragraph(
+                    text: paragraph.joined(separator: preserveLineBreaks ? "\n" : " "))))
                 paragraph = []
             }
         }

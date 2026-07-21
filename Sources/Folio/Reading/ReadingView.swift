@@ -48,7 +48,10 @@ struct ReadingView: View {
     /// when reading returns — re-parsing exactly once if edits happened, and not
     /// at all if they didn't.
     private var parseTaskID: Int {
-        ui.mode == .read ? vault.content.count &+ vault.content.hashValue &* 31 : .min
+        guard ui.mode == .read else { return .min }
+        // Include the line-break preference so toggling it re-parses live.
+        return vault.content.count &+ vault.content.hashValue &* 31
+            &+ (settings.preserveLineBreaks ? 1 : 0)
     }
 
     @ViewBuilder private var blockRows: some View {
@@ -108,11 +111,12 @@ struct ReadingView: View {
                 // updates once with the old content before the new one lands).
                 // Reusing cached blocks also keeps their identities stable, which
                 // lets SwiftUI diff the list instead of rebuilding every row.
-                let key = "\(vault.content.count)|\(vault.content.hashValue)"
+                let key = "\(vault.content.count)|\(vault.content.hashValue)|\(settings.preserveLineBreaks)"
                 if let hit = Self.parseCache[key] {
                     (parsed, mergedBlocks) = hit
                 } else {
-                    parsed = MarkdownParser.parse(vault.content)
+                    parsed = MarkdownParser.parse(vault.content,
+                                                  preserveLineBreaks: settings.preserveLineBreaks)
                     mergedBlocks = Self.mergeParagraphRuns(parsed)
                     if Self.parseCache.count > 24 { Self.parseCache.removeAll(keepingCapacity: true) }
                     Self.parseCache[key] = (parsed, mergedBlocks)
@@ -172,9 +176,10 @@ struct ReadingView: View {
         return -block.id.hashValue
     }
 
-    /// Collapse runs of consecutive paragraphs into single blocks (joined with
-    /// "\n\n" — a parsed paragraph can never contain a newline, soft-wrapped
-    /// lines are joined with spaces). One block = one Text = one selectable flow.
+    /// Collapse runs of consecutive paragraphs into single blocks, joined with
+    /// "\n\n". With line breaks preserved a paragraph can contain single "\n"s,
+    /// but never a blank line — so the double-newline separator stays
+    /// unambiguous. One block = one Text = one selectable flow.
     ///
     /// Runs are capped: an unbounded merge turned prose-heavy documents into a
     /// few enormous Texts, and Core Text laying those out on every tab switch

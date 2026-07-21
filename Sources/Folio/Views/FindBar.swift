@@ -7,17 +7,19 @@ import SwiftUI
 struct FindBar: View {
     @ObservedObject var find: FindModel
     @EnvironmentObject private var settings: AppSettings
-    @FocusState private var focused: Bool
 
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "magnifyingglass").font(.system(size: 15)).foregroundStyle(.secondary)
 
-            TextField("Find in page", text: $find.query)
-                .textFieldStyle(.plain)
-                .font(.system(size: 16))
-                .focused($focused)
-                .onSubmit { find.next() }
+            // PaletteTextField, not TextField: same first-responder reliability
+            // fix as the palettes — SwiftUI focus requests lost the race with the
+            // editor/window, leaving ⌘F with an unfocused field. This one takes
+            // focus on creation and re-takes it on every focusRequest bump.
+            PaletteTextField(text: $find.query, placeholder: "Find in page", fontSize: 16,
+                             onSubmit: { $0.contains(.shift) ? find.prev() : find.next() },
+                             focusToken: find.focusRequest)
+                .frame(height: 21)
                 .frame(maxWidth: .infinity)
 
             if !find.query.isEmpty {
@@ -49,7 +51,5 @@ struct FindBar: View {
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.separator.opacity(0.5)))
         .shadow(color: .black.opacity(0.12), radius: 10, y: 3)
         .onExitCommand { find.close() }
-        .onAppear { focused = true }
-        .onChange(of: find.focusRequest) { focused = true }
     }
 }

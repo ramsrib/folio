@@ -19,6 +19,9 @@ struct PaletteTextField: NSViewRepresentable {
     var onSubmit: (NSEvent.ModifierFlags) -> Void = { _ in }
     var onMoveUp: () -> Void = {}
     var onMoveDown: () -> Void = {}
+    /// Bump to ask the field to (re)take first responder — e.g. the find bar's
+    /// focusRequest when ⌘F is pressed while the bar is already open.
+    var focusToken: Int = 0
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -75,12 +78,17 @@ struct PaletteTextField: NSViewRepresentable {
         guard let tv = nsView.documentView as? QueryTextView else { return }
         if tv.string != text { tv.string = text }
         if tv.placeholder != placeholder { tv.placeholder = placeholder; tv.needsDisplay = true }
+        if context.coordinator.lastFocusToken != focusToken {
+            context.coordinator.lastFocusToken = focusToken
+            DispatchQueue.main.async { tv.window?.makeFirstResponder(tv) }
+        }
     }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: PaletteTextField
         weak var textView: QueryTextView?
-        init(_ parent: PaletteTextField) { self.parent = parent }
+        var lastFocusToken = 0
+        init(_ parent: PaletteTextField) { self.parent = parent; lastFocusToken = parent.focusToken }
 
         func textDidChange(_ notification: Notification) {
             guard let tv = textView else { return }

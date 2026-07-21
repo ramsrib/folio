@@ -51,6 +51,9 @@ struct SettingsView: View {
                         Text("\(Int(settings.readableWidth))").monospacedDigit().frame(width: 46, alignment: .trailing)
                     }
                 }
+                Toggle("Preserve line breaks", isOn: $settings.preserveLineBreaks)
+                Text("A single newline renders as a line break (Obsidian's behavior). Turn off for CommonMark soft breaks — better for hard-wrapped repo docs like READMEs.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Toggle("Show inline title", isOn: $settings.showInlineTitle)
                 Text("The big page title above a note. The tab already shows the name; turning this off hides the title (rename via the file's context menu instead).")
                     .font(.caption).foregroundStyle(.secondary)
