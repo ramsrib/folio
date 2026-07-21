@@ -60,7 +60,11 @@ struct ReadingView: View {
                 // large documents, where full layout would cost real time and a
                 // slightly drifty restore is the better trade.
                 Group {
-                    if blocks.count > 400 {
+                    // Gate on content size too: a 370KB doc can be only ~125
+                    // blocks, but full non-lazy Core Text layout of it per switch
+                    // is a visible stall — big documents keep the lazy layout
+                    // (slightly drifty scroll restore is the better trade there).
+                    if blocks.count > 400 || vault.content.count > 150_000 {
                         LazyVStack(alignment: .leading, spacing: 16) { blockRows }
                     } else {
                         VStack(alignment: .leading, spacing: 16) { blockRows }
@@ -158,6 +162,13 @@ struct ReadingView: View {
     /// Collapse runs of consecutive paragraphs into single blocks (joined with
     /// "\n\n" — a parsed paragraph can never contain a newline, soft-wrapped
     /// lines are joined with spaces). One block = one Text = one selectable flow.
+    ///
+    /// Runs are capped: an unbounded merge turned prose-heavy documents into a
+    /// few enormous Texts, and Core Text laying those out on every tab switch
+    /// was a visible stall. Selection still flows across a cap's worth of
+    /// paragraphs — selecting more than ~24 at once is a rare act.
+    private static let mergeRunCap = 24
+
     private static func mergeParagraphRuns(_ blocks: [Block]) -> [Block] {
         var out: [Block] = []
         var run: [String] = []
@@ -167,7 +178,10 @@ struct ReadingView: View {
             run = []
         }
         for b in blocks {
-            if case let .paragraph(t) = b.kind { run.append(t) } else { flush(); out.append(b) }
+            if case let .paragraph(t) = b.kind {
+                run.append(t)
+                if run.count >= mergeRunCap { flush() }
+            } else { flush(); out.append(b) }
         }
         flush()
         return out
