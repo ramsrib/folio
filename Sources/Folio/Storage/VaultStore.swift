@@ -410,6 +410,9 @@ final class VaultStore: ObservableObject {
     ///   log stream --level debug --predicate 'subsystem == "com.sriramb.folio"'
     private static let perfLog = Logger(subsystem: "com.sriramb.folio", category: "perf")
 
+    /// Failures the user is told about (a beep) but that also deserve a trail.
+    private static let log = Logger(subsystem: "com.sriramb.folio", category: "vault")
+
     func refresh() {
         guard let root = vaultURL else { tree = []; files = []; return }
         let t0 = ContinuousClock.now
@@ -1042,9 +1045,7 @@ final class VaultStore: ObservableObject {
         guard dest != id else { return }
         do {
             try FileManager.default.moveItem(at: id, to: dest)
-            let oldBase = (id.lastPathComponent as NSString).deletingPathExtension
-            let newBase = (dest.lastPathComponent as NSString).deletingPathExtension
-            let changed = updateLinks(oldBase: oldBase, newBase: newBase)
+            let changed = updateLinks(from: id, to: dest)
             if selection == id { selection = dest; loadedURL = dest }
             if let i = openTabs.firstIndex(of: id) { openTabs[i] = dest }   // keep tab on rename
             remapNavigationState(from: id, to: dest)
@@ -1072,26 +1073,150 @@ final class VaultStore: ObservableObject {
         persistRecents()
     }
 
-    /// Rewrite `[[oldBase]]`, `[[oldBase|…]]`, `[[oldBase#…]]` to use `newBase`
-    /// across the whole vault. Returns the set of files actually changed.
+    /// Rewrite every link that pointed at `old` so it points at `new`, across the
+    /// whole vault. Covers both link forms Folio can follow:
+    ///   - wikilinks — `[[Note]]`, `[[Note|alias]]`, `[[Note#heading]]`, and the
+    ///     path-qualified `[[folder/Note]]`, with or without an extension;
+    ///   - Markdown links — `[text](folder/Note.md)`, including `<…>`-wrapped and
+    ///     percent-encoded destinations, resolved the way `openLocalLink` does.
+    /// Returns the set of files actually changed. A write that fails beeps and is
+    /// logged rather than swallowed — a half-applied rewrite is never silent.
     @discardableResult
-    private func updateLinks(oldBase: String, newBase: String) -> Set<URL> {
+    private func updateLinks(from old: URL, to new: URL) -> Set<URL> {
+        let oldBase = (old.lastPathComponent as NSString).deletingPathExtension
+        let newBase = (new.lastPathComponent as NSString).deletingPathExtension
         guard oldBase.caseInsensitiveCompare(newBase) != .orderedSame else { return [] }
-        let pattern = "(\\[\\[)" + NSRegularExpression.escapedPattern(for: oldBase) + "(\\||#|\\]\\])"
-        guard let rx = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return [] }
-        let template = "$1" + NSRegularExpression.escapedTemplate(for: newBase) + "$2"
+
         var changed: Set<URL> = []
-        for f in files {
-            guard let text = try? String(contentsOf: f.url, encoding: .utf8) else { continue }
-            let range = NSRange(location: 0, length: (text as NSString).length)
-            guard rx.firstMatch(in: text, range: range) != nil else { continue }
-            let updated = rx.stringByReplacingMatches(in: text, range: range, withTemplate: template)
-            if updated != text {
-                try? updated.write(to: f.url, atomically: true, encoding: .utf8)
-                changed.insert(f.url)
+        var failed: [URL] = []
+        // The index still holds the pre-rename URL; read that note at its new home
+        // so a note linking to *itself* gets rewritten too.
+        for url in files.map({ $0.url == old ? new : $0.url }) {
+            guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            var updated = rewriteWikilinks(in: text, old: old, oldBase: oldBase, newBase: newBase)
+            updated = rewriteMarkdownLinks(in: updated, from: url, old: old, newBase: newBase)
+            guard updated != text else { continue }
+            do {
+                try updated.write(to: url, atomically: true, encoding: .utf8)
+                changed.insert(url)
+            } catch {
+                failed.append(url)
             }
         }
+        if !failed.isEmpty {
+            let names = failed.map(\.lastPathComponent).joined(separator: ", ")
+            Self.log.error("rename: \(failed.count, privacy: .public) note(s) kept stale links after renaming \(oldBase, privacy: .public): \(names, privacy: .public)")
+            beep()
+        }
         return changed
+    }
+
+    /// `[[` + target, stopping at the alias/heading separator or the closing `]]`.
+    private static let wikiTargetRegex = try! NSRegularExpression(
+        pattern: "\\[\\[([^\\[\\]\\n]*?)(?=[|#]|\\]\\])")
+
+    /// The destination of a Markdown link — either `<…>`-wrapped or a bare token,
+    /// which stops before any ` "title"` so titles are left untouched.
+    private static let mdDestRegex = try! NSRegularExpression(
+        pattern: "\\]\\((<[^>\\n]*>|[^()\\s\\n]*)")
+
+    /// Destinations are rewritten in place, back to front, so that the ranges taken
+    /// from the original text stay valid as the string shrinks or grows.
+    private func rewrite(_ text: String, _ rx: NSRegularExpression,
+                         _ replacement: (String) -> String?) -> String {
+        let ns = text as NSString
+        var out = text
+        for m in rx.matches(in: text, range: NSRange(location: 0, length: ns.length)).reversed() {
+            let range = m.range(at: 1)
+            guard range.location != NSNotFound,
+                  let new = replacement(ns.substring(with: range)) else { continue }
+            out = (out as NSString).replacingCharacters(in: range, with: new)
+        }
+        return out
+    }
+
+    private func rewriteWikilinks(in text: String, old: URL,
+                                  oldBase: String, newBase: String) -> String {
+        rewrite(text, Self.wikiTargetRegex) { target in
+            let trimmed = target.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else { return nil }
+            let ext = (trimmed as NSString).pathExtension
+            let hasMdExtension = mdExtensions.contains(ext.lowercased())
+            let bare = hasMdExtension ? (trimmed as NSString).deletingPathExtension : trimmed
+            guard (bare as NSString).lastPathComponent
+                .caseInsensitiveCompare(oldBase) == .orderedSame else { return nil }
+            // A path-qualified link is only ours if the path really names this note;
+            // a same-named note in another folder must be left alone.
+            if bare.contains("/"), !wikiPath(bare, names: old) { return nil }
+
+            let dir = (bare as NSString).deletingLastPathComponent
+            var rebuilt = dir.isEmpty ? newBase : (dir as NSString).appendingPathComponent(newBase)
+            if hasMdExtension { rebuilt += "." + ext }
+            // Keep whatever padding the author wrote inside the brackets.
+            let leading = target.prefix { $0 == " " || $0 == "\t" }
+            let trailing = String(target.reversed().prefix { $0 == " " || $0 == "\t" })
+            return leading + rebuilt + trailing
+        }
+    }
+
+    /// Whether a path-qualified wikilink target names `old`. Mirrors `resolve()`:
+    /// the path is vault-root-relative, extension optional.
+    private func wikiPath(_ target: String, names old: URL) -> Bool {
+        guard let root = vaultURL else { return false }
+        let rel = target.hasPrefix("/") ? String(target.dropFirst()) : target
+        let candidate = root.appendingPathComponent(rel).standardizedFileURL.path
+        let stripped = (old.standardizedFileURL.path as NSString).deletingPathExtension
+        return candidate.compare(stripped, options: .caseInsensitive) == .orderedSame
+    }
+
+    /// Characters a bare Markdown destination can carry unescaped. `(`/`)` would
+    /// close the link early, so they come out of the URL-path set.
+    private static let mdDestAllowed = CharacterSet.urlPathAllowed
+        .subtracting(CharacterSet(charactersIn: "()"))
+
+    private func rewriteMarkdownLinks(in text: String, from file: URL,
+                                      old: URL, newBase: String) -> String {
+        rewrite(text, Self.mdDestRegex) { raw in
+            let angled = raw.hasPrefix("<") && raw.hasSuffix(">")
+            let body = angled ? String(raw.dropFirst().dropLast()) : raw
+            // A `#heading` fragment rides along verbatim.
+            let fragment = body.firstIndex(of: "#").map { String(body[$0...]) } ?? ""
+            let path = String(body.dropLast(fragment.count))
+            // Leave anything that isn't a vault-relative file path alone.
+            guard !path.isEmpty,
+                  path.range(of: "^[a-zA-Z][a-zA-Z0-9+.-]*:", options: .regularExpression) == nil
+            else { return nil }
+            let decoded = path.removingPercentEncoding ?? path
+            guard resolves(decoded, from: file, to: old) else { return nil }
+
+            let ext = (decoded as NSString).pathExtension
+            var component = ext.isEmpty ? newBase : newBase + "." + ext
+            // Re-encode if the link already was, or if the new name would otherwise
+            // break the destination (a space or paren ends it).
+            if !angled, path != decoded
+                || component.rangeOfCharacter(from: Self.mdDestAllowed.inverted) != nil {
+                component = component
+                    .addingPercentEncoding(withAllowedCharacters: Self.mdDestAllowed) ?? component
+            }
+            let dir = (path as NSString).deletingLastPathComponent
+            let rebuilt = (dir.isEmpty ? component
+                                       : (dir as NSString).appendingPathComponent(component)) + fragment
+            return angled ? "<" + rebuilt + ">" : rebuilt
+        }
+    }
+
+    /// Whether a Markdown link destination written in `file` points at `old` —
+    /// resolved against the note's own folder first, then the vault root, as
+    /// `openLocalLink` does.
+    private func resolves(_ path: String, from file: URL, to old: URL) -> Bool {
+        var candidates: [URL] = []
+        if path.hasPrefix("/") { candidates.append(URL(fileURLWithPath: path)) }
+        else { candidates.append(file.deletingLastPathComponent().appendingPathComponent(path)) }
+        if let root = vaultURL { candidates.append(root.appendingPathComponent(path)) }
+        let target = old.standardizedFileURL.path
+        return candidates.contains {
+            $0.standardizedFileURL.path.compare(target, options: .caseInsensitive) == .orderedSame
+        }
     }
 
     func delete(_ id: URL) {

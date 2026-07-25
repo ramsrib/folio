@@ -178,8 +178,9 @@ Stated plainly, because the alternative is you finding out later:
 - **No Source mode**, and Live Preview *dims* Markdown syntax rather than hiding it.
 - **File management is thin:** no folder create/rename/delete, no move, no drag-and-drop, no delete
   confirmation. Explorer sorting is by name only.
-- **Rename-updates-links has edges:** it rewrites plain wikilinks only. Path-qualified links
-  (`[[folder/Note]]`) and Markdown-style links are *not* updated, and you aren't told what changed.
+- **Rename-updates-links is quiet:** it rewrites wikilinks (including `[[folder/Note]]`) and
+  Markdown links (`[text](folder/Note.md)`) across the vault, but you aren't told what changed —
+  only a failed rewrite speaks up, with a beep. Links inside fenced code blocks are rewritten too.
 - **Properties are read-only**, and parsed by a line-based heuristic rather than a real YAML parser —
   multiline values, quoting, and nested mappings won't render faithfully.
 - **Markdown gaps:** no math, footnotes, Mermaid, comments (`%% %%`), custom checkbox states, heading
