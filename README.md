@@ -76,7 +76,8 @@ Everything in this list is implemented. Anything not in it, assume it isn't.
 - Open a `.md` from **Finder** ("Open With → Folio") or the terminal (`open -a Folio note.md`): if
   the file is inside the current vault or a recent one Folio switches to it, otherwise it opens the
   file's parent folder as a vault. **`folio://open?vault=…&file=…`** deep links (what **Copy Folio
-  Link** puts on the clipboard) jump straight to a note from another app or an agent.
+  Link** puts on the clipboard) jump straight to a note — or a whole vault — from another app, a
+  terminal, or an agent. See [Opening from the terminal](#opening-from-the-terminal).
 - Right-click the **Dock icon** for recent notes and recent vaults.
 
 **Links**
@@ -111,6 +112,45 @@ Everything in this list is implemented. Anything not in it, assume it isn't.
   line width (default ~70 chars/line), an optional **inline title**, and a **text rendering** choice
   (Crisp / Smooth / Smoother — browser-style stem darkening; applies on relaunch). All applied live
   except text rendering.
+
+## Opening from the terminal
+
+A note opens with plain `open`; a *vault* needs the `folio://` scheme, because `open -a Folio` on a
+directory does nothing (it only accepts Markdown files).
+
+```bash
+open -a Folio note.md                       # a note — Folio finds or opens a vault around it
+
+open "folio://open?vault=$(pwd)"            # open this folder as the vault
+open "folio://open?vault=$(pwd)&file=docs/plan.md"   # vault + a note in it (file is vault-relative)
+open "folio://open?file=$(pwd)/README.md"   # a note by absolute path, Folio picks the vault
+```
+
+The host must be `open` and the path travels as a query value: `folio://$(pwd)` is **not** a valid
+link (empty host) and just beeps. Query values are percent-encoded, so a path containing a space,
+`&`, or `#` has to be encoded — the string **Copy Folio Link** puts on the clipboard always is:
+
+```bash
+folio() {                  # folder → open it as the vault; note → open the note; no arg → cwd
+  local a="${1:-.}" p key=file
+  if [[ -d $a ]]; then p=$(cd -- "$a" && pwd); key=vault
+  elif [[ -f $a ]]; then p="$(cd -- "$(dirname -- "$a")" && pwd)/$(basename -- "$a")"
+  else echo "folio: no such file or directory: $a" >&2; return 1; fi
+  open "folio://open?$key=$(python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1],safe=""))' "$p")"
+}
+```
+
+`folio` and `folio .` open the current folder as a vault, `folio notes/plan.md` opens that note
+(finding it a vault by the 3-tier rule), and a path that doesn't exist fails in the shell instead of
+beeping at you.
+
+The `cd … && pwd` is what makes relative arguments safe: these paths **must be absolute**. Folio
+resolves a relative path against its own working directory (`/` for a Launch Services app), so a
+literal `folio://open?vault=.` quietly opens the root of the filesystem as a vault.
+
+A missing path, or a `vault=` that isn't a directory, beeps rather than opening an empty window.
+Everything opened this way lands in its **own tab** — an external open never evicts what you're
+reading.
 
 ## iOS
 
