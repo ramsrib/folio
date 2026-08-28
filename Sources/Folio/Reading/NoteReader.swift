@@ -28,7 +28,7 @@ struct NoteReader: View {
     }
 
     private var contentKey: String {
-        "\(vault.content.count)|\(vault.content.hashValue)|\(settings.preserveLineBreaks)"
+        "\(vault.content.count)|\(vault.content.hashValue)|\(settings.lineBreaks.rawValue)"
     }
 
     var body: some View {
@@ -37,7 +37,7 @@ struct NoteReader: View {
             renderKey: renderKey,
             bodySize: settings.bodyFontSize,
             family: settings.readingFont,
-            readableWidth: settings.readableWidth,
+            readableWidth: settings.columnWidth,
             background: settings.nsPaneBackground,
             noteID: vault.selection,
             find: find,
@@ -57,7 +57,7 @@ struct NoteReader: View {
                 blocks = hit
             } else {
                 let parsed = MarkdownParser.parse(vault.content,
-                                                  preserveLineBreaks: settings.preserveLineBreaks)
+                                                  lineBreaks: settings.lineBreaks)
                 if Self.parseCache.count > 24 { Self.parseCache.removeAll(keepingCapacity: true) }
                 Self.parseCache[key] = parsed
                 blocks = parsed

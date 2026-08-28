@@ -49,7 +49,11 @@ struct NoteTextView: NSViewRepresentable {
         tv.autoresizingMask = [.width]
         tv.minSize = NSSize(width: 0, height: 0)
         tv.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        tv.textContainer?.widthTracksTextView = true
+        // The column width is ours to set (see `applyReadableInset`), not something
+        // to derive from the frame — `widthTracksTextView` would re-wrap the text
+        // mid-resize using the stale inset.
+        tv.textContainer?.widthTracksTextView = false
+        tv.textContainer?.heightTracksTextView = false
         tv.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
         tv.onToggleTask = onToggleTask
 
@@ -209,14 +213,29 @@ final class NoteContentTextView: NSTextView {
         applyReadableInset()
     }
 
-    /// Center the text in a readable column by padding the container inset —
-    /// the same trick the editor uses, so both modes share a measure.
+    /// Size and center the reading column.
+    ///
+    /// Both the container width *and* the inset are set here, in that order,
+    /// because `widthTracksTextView` would otherwise resize the container from the
+    /// stale inset on every `setFrameSize` and re-wrap the text twice per frame —
+    /// the jitter you get dragging the sidebar. Setting the width ourselves means a
+    /// sidebar slide moves the column without re-wrapping it at all: the width only
+    /// changes once the pane is narrower than the column.
     func applyReadableInset() {
-        let target = max(32, (bounds.width - readableWidth) / 2)
-        if abs(textContainerInset.width - target) > 0.5 {
-            textContainerInset = NSSize(width: target, height: textContainerInset.height)
+        let available = max(bounds.width - Self.minimumMargin * 2, 200)
+        let column = min(readableWidth, available)
+        if let container = textContainer, abs(container.size.width - column) > 0.5 {
+            container.size = NSSize(width: column, height: CGFloat.greatestFiniteMagnitude)
+        }
+        // Whole points: a half-pixel inset shifts every glyph off the pixel grid
+        // and makes the text shimmer while the pane animates.
+        let inset = max(Self.minimumMargin, ((bounds.width - column) / 2).rounded())
+        if abs(textContainerInset.width - inset) > 0.5 {
+            textContainerInset = NSSize(width: inset, height: textContainerInset.height)
         }
     }
+
+    private static let minimumMargin: CGFloat = 32
 
     // MARK: Decorations
 

@@ -42,7 +42,10 @@ struct LivePreviewEditor: NSViewRepresentable {
         tv.autoresizingMask = [.width]
         tv.minSize = NSSize(width: 0, height: 0)
         tv.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        tv.textContainer?.widthTracksTextView = true
+        // See `applyReadableInset`: the column width is set explicitly so a pane
+        // resize moves the text instead of re-wrapping it twice per frame.
+        tv.textContainer?.widthTracksTextView = false
+        tv.textContainer?.heightTracksTextView = false
         tv.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
         // Lay out lazily: without this, NSTextView lays out the ENTIRE document
         // before first display — seconds of "switching to edit mode" on large

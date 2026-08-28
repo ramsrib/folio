@@ -68,7 +68,7 @@ struct ReadingView: View {
         guard ui.mode == .read else { return .min }
         // Include the line-break preference so toggling it re-parses live.
         return vault.content.count &+ vault.content.hashValue &* 31
-            &+ (settings.preserveLineBreaks ? 1 : 0)
+            &+ settings.lineBreaks.rawValue.hashValue
     }
 
     @ViewBuilder private var blockRows: some View {
@@ -98,7 +98,7 @@ struct ReadingView: View {
                         VStack(alignment: .leading, spacing: blockSpacing) { blockRows }
                     }
                 }
-                .frame(maxWidth: settings.readableWidth, alignment: .leading)
+                .frame(maxWidth: settings.columnWidth, alignment: .leading)
                 .frame(maxWidth: .infinity, minHeight: 200, alignment: .top)
                 .contentShape(Rectangle())
                 .padding(.horizontal, 32)
@@ -128,12 +128,12 @@ struct ReadingView: View {
                 // updates once with the old content before the new one lands).
                 // Reusing cached blocks also keeps their identities stable, which
                 // lets SwiftUI diff the list instead of rebuilding every row.
-                let key = "\(vault.content.count)|\(vault.content.hashValue)|\(settings.preserveLineBreaks)"
+                let key = "\(vault.content.count)|\(vault.content.hashValue)|\(settings.lineBreaks.rawValue)"
                 if let hit = Self.parseCache[key] {
                     (parsed, mergedBlocks) = hit
                 } else {
                     parsed = MarkdownParser.parse(vault.content,
-                                                  preserveLineBreaks: settings.preserveLineBreaks)
+                                                  lineBreaks: settings.lineBreaks)
                     mergedBlocks = Self.mergeParagraphRuns(parsed)
                     if Self.parseCache.count > 24 { Self.parseCache.removeAll(keepingCapacity: true) }
                     Self.parseCache[key] = (parsed, mergedBlocks)

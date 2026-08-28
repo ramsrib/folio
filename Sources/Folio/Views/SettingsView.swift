@@ -51,8 +51,14 @@ struct SettingsView: View {
                         Text("\(Int(settings.readableWidth))").monospacedDigit().frame(width: 46, alignment: .trailing)
                     }
                 }
-                Toggle("Preserve line breaks", isOn: $settings.preserveLineBreaks)
-                Text("A single newline renders as a line break (Obsidian's behavior). Turn off for CommonMark soft breaks — better for hard-wrapped repo docs like READMEs.")
+                .disabled(settings.fullWidth)
+                Toggle("Full width", isOn: $settings.fullWidth)
+                Text("Let the note fill the pane instead of sitting in a measured column. Wider lines are harder to read, but there's less to scroll.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Picker("Line breaks", selection: $settings.lineBreaks) {
+                    ForEach(LineBreakMode.allCases) { Text($0.label).tag($0) }
+                }
+                Text(settings.lineBreaks.help)
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Show inline title", isOn: $settings.showInlineTitle)
                 Text("The big page title above a note. The tab already shows the name; turning this off hides the title (rename via the file's context menu instead).")

@@ -60,6 +60,34 @@ enum FontSmoothing: String, CaseIterable, Identifiable {
     }
 }
 
+/// How a single newline inside a paragraph is treated.
+enum LineBreakMode: String, CaseIterable, Identifiable {
+    /// Decide per paragraph. Text wrapped at a column reflows; deliberate short
+    /// breaks are kept. Right far more often than either fixed choice, because
+    /// this is a property of the document, not of the reader.
+    case auto
+    /// Obsidian's behavior: every newline is a line break.
+    case preserve
+    /// CommonMark/GitHub: lines join with a space.
+    case reflow
+
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .auto:     return "Auto"
+        case .preserve: return "Preserve"
+        case .reflow:   return "Reflow"
+        }
+    }
+    var help: String {
+        switch self {
+        case .auto:     return "Reflow hard-wrapped paragraphs, keep deliberate breaks"
+        case .preserve: return "Every line break is a line break (Obsidian)"
+        case .reflow:   return "Lines join into a paragraph (CommonMark)"
+        }
+    }
+}
+
 /// User-facing appearance settings, persisted to UserDefaults and applied live.
 @MainActor
 final class AppSettings: ObservableObject {
@@ -71,12 +99,19 @@ final class AppSettings: ObservableObject {
     /// happy reading the name in the tab — but it's also the rename-in-place
     /// affordance, so it's a toggle (like Obsidian's "Show inline title"), not gone.
     @Published var showInlineTitle: Bool { didSet { d.set(showInlineTitle, forKey: kInlineTitle) } }
+    @Published var lineBreaks: LineBreakMode { didSet { d.set(lineBreaks.rawValue, forKey: kLineBreakMode) } }
+    /// Let the note fill the pane instead of sitting in a measured column. A wide
+    /// window trades reading measure for less scrolling — worth having as a choice
+    /// rather than a fixed answer.
+    @Published var fullWidth: Bool { didSet { d.set(fullWidth, forKey: kFullWidth) } }
+
+    /// Width the note should occupy. Full width hands the decision to the pane:
+    /// every consumer already clamps this against its own bounds, so an unbounded
+    /// value simply means "as wide as there is room for".
+    var columnWidth: Double { fullWidth ? .greatestFiniteMagnitude : readableWidth }
+
     /// Core Text reads `AppleFontSmoothing` from the app's defaults domain at
     /// launch, so changes take effect on next launch (the settings row says so).
-    /// Obsidian's default: a single newline inside a paragraph renders as a line
-    /// break. Off = CommonMark soft breaks (lines join with a space) — better for
-    /// reading hard-wrapped repo docs (README at 100 columns).
-    @Published var preserveLineBreaks: Bool { didSet { d.set(preserveLineBreaks, forKey: kLineBreaks) } }
     @Published var fontSmoothing: FontSmoothing {
         didSet {
             d.set(fontSmoothing.rawValue, forKey: kSmoothing)
@@ -93,7 +128,9 @@ final class AppSettings: ObservableObject {
     private let kSize = "folio.bodyFontSize", kWidth = "folio.readableWidth"
     private let kInlineTitle = "folio.showInlineTitle"
     private let kSmoothing = "folio.fontSmoothing"
-    private let kLineBreaks = "folio.preserveLineBreaks"
+    private let kLineBreaks = "folio.preserveLineBreaks"      // pre-Auto, migrated below
+    private let kLineBreakMode = "folio.lineBreaks"
+    private let kFullWidth = "folio.fullWidth"
 
     init() {
         theme = AppTheme(rawValue: d.string(forKey: kTheme) ?? "") ?? .system
@@ -103,7 +140,19 @@ final class AppSettings: ObservableObject {
         // sweet spot (60–75); the old 720 default ran ~85 and read wide.
         readableWidth = d.object(forKey: kWidth) as? Double ?? 660
         showInlineTitle = d.object(forKey: kInlineTitle) as? Bool ?? true
-        preserveLineBreaks = d.object(forKey: kLineBreaks) as? Bool ?? true
+        // Migration from the old Bool, which defaulted to true. Only `false` is
+        // evidence of an actual choice — `true` is indistinguishable from the
+        // default, and the key gets written back as a side effect of merely
+        // opening Settings, so treating it as intent would pin people to
+        // .preserve and Auto would never run for anyone.
+        if let mode = d.string(forKey: kLineBreakMode) {
+            lineBreaks = LineBreakMode(rawValue: mode) ?? .auto
+        } else if d.object(forKey: kLineBreaks) as? Bool == false {
+            lineBreaks = .reflow
+        } else {
+            lineBreaks = .auto
+        }
+        fullWidth = d.object(forKey: kFullWidth) as? Bool ?? false
         fontSmoothing = FontSmoothing(rawValue: d.string(forKey: kSmoothing) ?? "") ?? .system
     }
 

@@ -38,7 +38,9 @@ enum BlockDecoration: Equatable {
 struct NoteTextRenderer {
     let bodySize: CGFloat
     let family: ReadingFont
-    /// Column width, for sizing image and table attachments.
+    /// Upper bound for hosted block attachments (tables, the properties card).
+    /// They also clamp against the real container width, so an unbounded value
+    /// here simply means "as wide as the column".
     let contentWidth: CGFloat
     /// Resolves a relative image path against the note/vault.
     var loadImage: (String) -> NSImage? = { _ in nil }
@@ -252,14 +254,7 @@ struct NoteTextRenderer {
                              .paragraphStyle: style()])
             return placeholder
         }
-        let attachment = NSTextAttachment()
-        attachment.image = image
-        // Fit the column, never upscale.
-        let scale = min(1, contentWidth / max(image.size.width, 1))
-        attachment.bounds = NSRect(origin: .zero,
-                                   size: NSSize(width: image.size.width * scale,
-                                                height: image.size.height * scale))
-        let out = NSMutableAttributedString(attachment: attachment)
+        let out = NSMutableAttributedString(attachment: ScaledImageAttachment(image: image))
         out.addAttributes([
             .folioSource: "![\(alt)](\(source))",
             .paragraphStyle: style(),
@@ -398,6 +393,30 @@ struct NoteTextRenderer {
 
 extension NSAttributedString {
     var fullRange: NSRange { NSRange(location: 0, length: length) }
+}
+
+/// An image that fits the column it lands in, measured at layout time rather than
+/// baked in at render time — so it follows a window resize or the full-width
+/// setting without re-rendering the note. Never upscales past its natural size.
+final class ScaledImageAttachment: NSTextAttachment {
+    init(image: NSImage) {
+        super.init(data: nil, ofType: nil)
+        self.image = image
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func attachmentBounds(for textContainer: NSTextContainer?,
+                                   proposedLineFragment lineFrag: CGRect,
+                                   glyphPosition position: CGPoint,
+                                   characterIndex charIndex: Int) -> CGRect {
+        guard let size = image?.size, size.width > 0 else { return .zero }
+        let available = max(min(lineFrag.width, textContainer?.size.width ?? lineFrag.width), 1)
+        let scale = min(1, available / size.width)
+        return CGRect(x: 0, y: 0,
+                      width: (size.width * scale).rounded(),
+                      height: (size.height * scale).rounded())
+    }
 }
 
 /// `NSAttributedString` attribute values must be objects; box the enum.

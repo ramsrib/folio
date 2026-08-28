@@ -39,12 +39,37 @@ enum MarkdownParser {
     private static let calloutRx = try! NSRegularExpression(pattern: "^\\[!([A-Za-z]+)\\]\\s*(.*)$")
     private static let hrRx      = try! NSRegularExpression(pattern: "^(-{3,}|\\*{3,}|_{3,})$")
 
-    /// - Parameter preserveLineBreaks: Obsidian's default — a single newline
-    ///   inside a paragraph stays a line break ("Overall: 4/10 ⏎ Recording: …"
-    ///   renders as two lines). Off = CommonMark soft breaks (lines join with a
-    ///   space), which reads better for hard-wrapped repo docs (README at 100
-    ///   cols). Surfaced as a setting; the reading view passes it through.
-    static func parse(_ content: String, preserveLineBreaks: Bool = true) -> [Block] {
+    /// Does this run of lines look like one paragraph wrapped at a column, rather
+    /// than lines someone broke on purpose?
+    ///
+    /// Two signals, because either alone misreads real notes:
+    ///  - **Every non-final line is long.** Wrapping fills each line to the column;
+    ///    only the last comes up short. A short line in the middle was ended by
+    ///    hand.
+    ///  - **Continuations mostly start lowercase.** A wrap lands mid-sentence, so
+    ///    the next line picks up in lowercase. Length alone can't separate
+    ///    "Overall: 4/10 ⏎ Recording: https://…" (two long deliberate lines) from
+    ///    wrapped prose — the capital letter can.
+    static func looksHardWrapped(_ lines: [String]) -> Bool {
+        guard lines.count > 1 else { return false }
+        let filled = lines.dropLast().allSatisfy {
+            $0.trimmingCharacters(in: .whitespaces).count >= 50
+        }
+        guard filled else { return false }
+
+        let continuations = lines.dropFirst().compactMap {
+            $0.trimmingCharacters(in: .whitespaces).first
+        }
+        guard !continuations.isEmpty else { return false }
+        let lower = continuations.filter { $0.isLowercase || !$0.isLetter }.count
+        return lower * 2 >= continuations.count
+    }
+
+    /// - Parameter lineBreaks: how a single newline inside a paragraph is treated.
+    ///   `.preserve` is Obsidian's default ("Overall: 4/10 ⏎ Recording: …" stays two
+    ///   lines); `.reflow` is CommonMark, which reads better for hard-wrapped repo
+    ///   docs; `.auto` decides per paragraph via `looksHardWrapped`.
+    static func parse(_ content: String, lineBreaks: LineBreakMode = .auto) -> [Block] {
         let lines = content.components(separatedBy: "\n")
         var offsets: [Int] = []
         var loc = 0
@@ -52,10 +77,20 @@ enum MarkdownParser {
 
         var blocks: [Block] = []
         var paragraph: [String] = []
+
+        /// How to rejoin the lines of one block, given the mode.
+        func joiner(for lines: [String]) -> String {
+            switch lineBreaks {
+            case .preserve: return "\n"
+            case .reflow:   return " "
+            case .auto:     return looksHardWrapped(lines) ? " " : "\n"
+            }
+        }
+
         func flush() {
             if !paragraph.isEmpty {
                 blocks.append(Block(kind: .paragraph(
-                    text: paragraph.joined(separator: preserveLineBreaks ? "\n" : " "))))
+                    text: paragraph.joined(separator: joiner(for: paragraph)))))
                 paragraph = []
             }
         }
@@ -68,16 +103,20 @@ enum MarkdownParser {
         /// as an item followed by a separate, unindented paragraph.
         func appendToOpenListItem(_ text: String) -> Bool {
             guard paragraph.isEmpty, let last = blocks.last else { return false }
-            let joiner = preserveLineBreaks ? "\n" : " "
+            // Judge the item's existing text against the incoming line, so a
+            // wrapped item reflows and a hand-broken one keeps its breaks.
+            func join(_ existing: String) -> String {
+                let lines = existing.components(separatedBy: "\n") + [text]
+                return existing + joiner(for: lines) + text
+            }
             switch last.kind {
             case let .listItem(ordered, number, indent, existing):
                 blocks[blocks.count - 1] = Block(kind: .listItem(
-                    ordered: ordered, number: number, indent: indent,
-                    text: existing + joiner + text))
+                    ordered: ordered, number: number, indent: indent, text: join(existing)))
                 return true
             case let .task(checked, indent, existing, checkboxIndex):
                 blocks[blocks.count - 1] = Block(kind: .task(
-                    checked: checked, indent: indent, text: existing + joiner + text,
+                    checked: checked, indent: indent, text: join(existing),
                     checkboxIndex: checkboxIndex))
                 return true
             default:

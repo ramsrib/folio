@@ -26,10 +26,18 @@ final class MarkdownTextView: NSTextView {
         applyReadableInset()
     }
 
+    /// Size and center the writing column. Container width first, then the inset:
+    /// letting `widthTracksTextView` derive the width would re-wrap the text from
+    /// the stale inset on every resize (see the reader's `applyReadableInset`).
     func applyReadableInset() {
-        let target = max(28, (bounds.width - readableWidth) / 2)
-        if abs(textContainerInset.width - target) > 0.5 {
-            textContainerInset = NSSize(width: target, height: textContainerInset.height)
+        let available = max(bounds.width - 56, 200)
+        let column = min(readableWidth, available)
+        if let container = textContainer, abs(container.size.width - column) > 0.5 {
+            container.size = NSSize(width: column, height: CGFloat.greatestFiniteMagnitude)
+        }
+        let inset = max(28, ((bounds.width - column) / 2).rounded())
+        if abs(textContainerInset.width - inset) > 0.5 {
+            textContainerInset = NSSize(width: inset, height: textContainerInset.height)
         }
     }
 

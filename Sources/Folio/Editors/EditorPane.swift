@@ -55,7 +55,7 @@ struct EditorPane: View {
             // so it's part of the page rather than floating over the content.
             if find.active {
                 FindBar(find: find)
-                    .frame(maxWidth: max(settings.readableWidth, 640))
+                    .frame(maxWidth: max(settings.readableWidth, 640))   // not columnWidth: a full-width bar reads badly
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, 24)
                     .padding(.top, 12)
@@ -99,7 +99,7 @@ struct EditorPane: View {
                         else { withAnimation(.smooth(duration: 0.2)) { ui.mode = .read } }
                     },
                         background: settings.nsPaneBackground,
-                        readableWidth: settings.readableWidth,
+                        readableWidth: settings.columnWidth,
                         theme: Theme(settings),
                         find: find
                     )
