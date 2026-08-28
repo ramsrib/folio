@@ -116,7 +116,7 @@ struct QuickSwitcherView: View {
                     ForEach(Array(rows.enumerated()), id: \.element.id) { idx, row in
                         rowView(row, selected: idx == selected)
                             .id(idx)
-                            .onTapGesture { activate(row, newTab: false) }
+                            .onTapGesture { activate(row, newTab: commandHeld) }
                             .listRowSeparator(.hidden)
                             .listRowBackground(
                                 RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -240,6 +240,13 @@ struct QuickSwitcherView: View {
 
     // MARK: Actions
 
+    /// Whether ⌘ is down for the click being handled — `onTapGesture` doesn't
+    /// carry modifiers, so read them off the event the way the reading view's
+    /// wikilink handler does.
+    private var commandHeld: Bool {
+        NSApp.currentEvent?.modifierFlags.contains(.command) ?? false
+    }
+
     private func move(_ delta: Int) {
         guard !rows.isEmpty else { return }
         selected = min(max(selected + delta, 0), rows.count - 1)
@@ -253,7 +260,9 @@ struct QuickSwitcherView: View {
         _ = handleReturn(mods)
     }
 
-    /// ↵ opens/jumps; ⌘↵ opens in a new tab; ⇧↵ creates from the query anywhere.
+    /// ↵ opens/jumps in the current tab; ⌘↵ opens in a new tab; ⇧↵ creates from
+    /// the query anywhere. The ⌘ split matches Notion (and the browser it models):
+    /// navigating goes where you already are unless you ask for a new tab.
     private func handleReturn(_ modifiers: EventModifiers) -> KeyPress.Result {
         if modifiers.contains(.shift) {
             // Not in heading mode — a "#…" query is a jump target, not a note name.
