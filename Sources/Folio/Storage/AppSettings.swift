@@ -105,10 +105,11 @@ final class AppSettings: ObservableObject {
     /// rather than a fixed answer.
     @Published var fullWidth: Bool { didSet { d.set(fullWidth, forKey: kFullWidth) } }
 
-    /// Width the note should occupy. Full width hands the decision to the pane:
-    /// every consumer already clamps this against its own bounds, so an unbounded
-    /// value simply means "as wide as there is room for".
-    var columnWidth: Double { fullWidth ? .greatestFiniteMagnitude : readableWidth }
+    /// Width the note should occupy, or `.infinity` for full width — every
+    /// consumer clamps this against its own bounds, so "unbounded" reads as "as
+    /// wide as there is room for", and the infinity is also how the text views
+    /// know to switch to the roomier full-width margin.
+    var columnWidth: Double { fullWidth ? .infinity : readableWidth }
 
     /// Core Text reads `AppleFontSmoothing` from the app's defaults domain at
     /// launch, so changes take effect on next launch (the settings row says so).

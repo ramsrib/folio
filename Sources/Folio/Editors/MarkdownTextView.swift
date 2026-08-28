@@ -30,15 +30,22 @@ final class MarkdownTextView: NSTextView {
     /// letting `widthTracksTextView` derive the width would re-wrap the text from
     /// the stale inset on every resize (see the reader's `applyReadableInset`).
     func applyReadableInset() {
-        let available = max(bounds.width - 56, 200)
+        let margin = sideMargin
+        let available = max(bounds.width - margin * 2, 200)
         let column = min(readableWidth, available)
         if let container = textContainer, abs(container.size.width - column) > 0.5 {
             container.size = NSSize(width: column, height: CGFloat.greatestFiniteMagnitude)
         }
-        let inset = max(28, ((bounds.width - column) / 2).rounded())
+        let inset = max(margin, ((bounds.width - column) / 2).rounded())
         if abs(textContainerInset.width - inset) > 0.5 {
             textContainerInset = NSSize(width: inset, height: textContainerInset.height)
         }
+    }
+
+    /// Matches the reader: a floor in column mode, a real margin in full width.
+    private var sideMargin: CGFloat {
+        guard !readableWidth.isFinite else { return 28 }
+        return min(120, max(64, (bounds.width * 0.06).rounded()))
     }
 
     /// Invoked on ⌘F so the editor opens the *same* shared find bar as Reading mode

@@ -222,20 +222,28 @@ final class NoteContentTextView: NSTextView {
     /// sidebar slide moves the column without re-wrapping it at all: the width only
     /// changes once the pane is narrower than the column.
     func applyReadableInset() {
-        let available = max(bounds.width - Self.minimumMargin * 2, 200)
+        let margin = sideMargin
+        let available = max(bounds.width - margin * 2, 200)
         let column = min(readableWidth, available)
         if let container = textContainer, abs(container.size.width - column) > 0.5 {
             container.size = NSSize(width: column, height: CGFloat.greatestFiniteMagnitude)
         }
         // Whole points: a half-pixel inset shifts every glyph off the pixel grid
         // and makes the text shimmer while the pane animates.
-        let inset = max(Self.minimumMargin, ((bounds.width - column) / 2).rounded())
+        let inset = max(margin, ((bounds.width - column) / 2).rounded())
         if abs(textContainerInset.width - inset) > 0.5 {
             textContainerInset = NSSize(width: inset, height: textContainerInset.height)
         }
     }
 
-    private static let minimumMargin: CGFloat = 32
+    /// In column mode this is just a floor for a pane too narrow to hold the
+    /// column. Full width has no centering to create margins, so it needs a real
+    /// one — scaled to the pane, or the text ends up against the window chrome and
+    /// the scroller on a wide display.
+    private var sideMargin: CGFloat {
+        guard !readableWidth.isFinite else { return 32 }
+        return min(120, max(64, (bounds.width * 0.06).rounded()))
+    }
 
     // MARK: Decorations
 
