@@ -60,6 +60,31 @@ enum MarkdownParser {
             }
         }
 
+        /// Fold a wrapped list item's continuation line back into the item.
+        ///
+        /// A hard-wrapped list item carries its overflow on indented lines with no
+        /// marker of their own (CommonMark's indented continuation). Those used to
+        /// fall through to the paragraph accumulator, so an 80-column list rendered
+        /// as an item followed by a separate, unindented paragraph.
+        func appendToOpenListItem(_ text: String) -> Bool {
+            guard paragraph.isEmpty, let last = blocks.last else { return false }
+            let joiner = preserveLineBreaks ? "\n" : " "
+            switch last.kind {
+            case let .listItem(ordered, number, indent, existing):
+                blocks[blocks.count - 1] = Block(kind: .listItem(
+                    ordered: ordered, number: number, indent: indent,
+                    text: existing + joiner + text))
+                return true
+            case let .task(checked, indent, existing, checkboxIndex):
+                blocks[blocks.count - 1] = Block(kind: .task(
+                    checked: checked, indent: indent, text: existing + joiner + text,
+                    checkboxIndex: checkboxIndex))
+                return true
+            default:
+                return false
+            }
+        }
+
         var i = 0
         if lines.first == "---" {                       // YAML frontmatter → properties block
             var j = 1
@@ -157,6 +182,15 @@ enum MarkdownParser {
                 blocks.append(Block(kind: .listItem(ordered: false, number: 0,
                     indent: indentLevel(sub(line, m.range(at: 1))),
                     text: sub(line, m.range(at: 3)))))
+                i += 1; continue
+            }
+
+            // Indented, marker-less, and directly under a list item — a wrapped
+            // item's continuation. (A blank line first would make it a new block,
+            // and nested list markers matched above.)
+            if line.first == " " || line.first == "\t",
+               i > 0, !lines[i - 1].trimmingCharacters(in: .whitespaces).isEmpty,
+               appendToOpenListItem(trimmed) {
                 i += 1; continue
             }
 
