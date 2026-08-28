@@ -412,6 +412,9 @@ final class NoteContentTextView: NSTextView {
                 out.append((storage.string as NSString).substring(with: range))
             }
         }
+        // Soft breaks are a layout device; the pasteboard wants real newlines.
+        out.replaceOccurrences(of: "\u{2028}", with: "\n", options: [],
+                               range: NSRange(location: 0, length: out.length))
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(out as String, forType: .string)

@@ -193,7 +193,7 @@ struct NoteTextRenderer {
         }
         out.append(inline(title, font: family.nsFont(size: size, weight: .semibold)))
         if !bodyText.isEmpty {
-            out.append(NSAttributedString(string: "\n", attributes: [.font: body]))
+            out.append(NSAttributedString(string: Self.softBreak, attributes: [.font: body]))
             out.append(inline(bodyText, font: family.nsFont(size: size)))
         }
         let inset = bodySize * 0.7
@@ -211,8 +211,8 @@ struct NoteTextRenderer {
 
     private func code(language: String, text: String) -> NSAttributedString {
         let size = bodySize * Typography.codeBlock
-        let out = NSMutableAttributedString(
-            attributedString: CodeHighlighter.highlightNS(text, language: language, size: size))
+        let out = withSoftBreaks(NSMutableAttributedString(
+            attributedString: CodeHighlighter.highlightNS(text, language: language, size: size)))
         let inset = bodySize * 0.7
         out.addAttributes([
             .folioDecoration: BlockDecoration.code.boxed,
@@ -293,6 +293,22 @@ struct NoteTextRenderer {
 
     // MARK: Inline
 
+    /// Newline that breaks the line *without* ending the paragraph.
+    ///
+    /// A block's text can contain newlines — a hard-wrapped paragraph with
+    /// `preserveLineBreaks` on, the lines of a code fence, a callout's title and
+    /// body. SwiftUI's `Text` treats those as soft breaks, but TextKit treats a
+    /// literal `\n` as a paragraph terminator, which would fire `paragraphSpacing`
+    /// after every wrapped source line and blow the note apart. U+2028 is the
+    /// line separator that breaks a line inside one paragraph.
+    private static let softBreak = "\u{2028}"
+
+    private func withSoftBreaks(_ attributed: NSMutableAttributedString) -> NSMutableAttributedString {
+        attributed.mutableString.replaceOccurrences(
+            of: "\n", with: Self.softBreak, options: [], range: attributed.fullRange)
+        return attributed
+    }
+
     /// One line of inline Markdown → `NSAttributedString`, with bold/italic/code/
     /// strikethrough and links resolved. Mirrors `InlineMarkdown` (which produces
     /// the SwiftUI flavor for iOS) but maps runs onto AppKit attributes directly.
@@ -303,8 +319,8 @@ struct NoteTextRenderer {
             interpretedSyntax: .inlineOnlyPreservingWhitespace,
             failurePolicy: .returnPartiallyParsedIfPossible)
         guard let parsed = try? AttributedString(markdown: source, options: options) else {
-            return NSMutableAttributedString(string: raw, attributes: [.font: font,
-                                                                       .foregroundColor: NSColor.labelColor])
+            return withSoftBreaks(NSMutableAttributedString(
+                string: raw, attributes: [.font: font, .foregroundColor: NSColor.labelColor]))
         }
 
         let out = NSMutableAttributedString()
@@ -334,7 +350,7 @@ struct NoteTextRenderer {
             }
             out.append(NSAttributedString(string: text, attributes: attrs))
         }
-        return out
+        return withSoftBreaks(out)
     }
 
     /// An SF Symbol as an inline attachment, baseline-aligned with the text.
