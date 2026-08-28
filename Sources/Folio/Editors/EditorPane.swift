@@ -72,14 +72,14 @@ struct EditorPane: View {
                     .padding(.top, find.active ? 10 : 28)
                     .padding(.bottom, 2)
             }
-            // ReadingView stays mounted (hidden) while writing: remounting it on
+            // NoteReader stays mounted (hidden) while writing: remounting it on
             // every mode switch paid an empty frame + full parse + full document
             // layout inside the switch animation — over a second on bigger notes.
             // Kept alive it costs nothing per keystroke (its parse task freezes
-            // while hidden, see ReadingView.parseTaskID) and edit→read becomes an
+            // while hidden, see NoteReader.parseTaskID) and edit→read becomes an
             // opacity flip, plus one visible re-layout only if the text changed.
             ZStack {
-                ReadingView(find: find)
+                NoteReader(find: find)
                     .opacity(ui.mode == .read ? 1 : 0)
                     .allowsHitTesting(ui.mode == .read)
                     .accessibilityHidden(ui.mode != .read)
@@ -100,6 +100,7 @@ struct EditorPane: View {
                     },
                         background: settings.nsPaneBackground,
                         readableWidth: settings.readableWidth,
+                        theme: Theme(settings),
                         find: find
                     )
                 }

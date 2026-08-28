@@ -15,6 +15,7 @@ struct LivePreviewEditor: NSViewRepresentable {
     var onEscape: () -> Void = {}
     var background: NSColor = .textBackgroundColor
     var readableWidth: CGFloat = 720
+    var theme: Theme
     @ObservedObject var find: FindModel
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -32,11 +33,10 @@ struct LivePreviewEditor: NSViewRepresentable {
         tv.isAutomaticDashSubstitutionEnabled = false
         tv.isAutomaticTextReplacementEnabled = false
         tv.isAutomaticSpellingCorrectionEnabled = false
-        tv.font = Theme.body
         tv.textContainerInset = NSSize(width: 22, height: 18)
         tv.backgroundColor = background
         tv.readableWidth = readableWidth
-        tv.typingAttributes = [.font: Theme.body, .foregroundColor: Theme.text]
+        apply(theme, to: tv)
         tv.isVerticallyResizable = true
         tv.isHorizontallyResizable = false
         tv.autoresizingMask = [.width]
@@ -72,6 +72,12 @@ struct LivePreviewEditor: NSViewRepresentable {
         if tv.backgroundColor != background { tv.backgroundColor = background }
         if tv.readableWidth != readableWidth { tv.readableWidth = readableWidth; tv.applyReadableInset() }
 
+        // ⌘+/⌘− or a reading-font change while writing: restyle in place.
+        if context.coordinator.appliedTheme != theme {
+            apply(theme, to: tv)
+            context.coordinator.highlight()
+        }
+
         if tv.string != text {                  // external change (file switch / disk reload)
             let len = (text as NSString).length
             let prev = tv.selectedRange()
@@ -100,12 +106,24 @@ struct LivePreviewEditor: NSViewRepresentable {
         context.coordinator.applyFind(find, to: tv)
     }
 
+    /// Font + line height for the whole text view. The highlighter re-applies
+    /// these per pass; this covers the empty document and the typing attributes
+    /// (what you get when you type past the end of the styled range).
+    private func apply(_ theme: Theme, to tv: MarkdownTextView) {
+        tv.font = theme.body
+        tv.defaultParagraphStyle = theme.paragraphStyle
+        tv.typingAttributes = theme.baseAttributes
+    }
+
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: LivePreviewEditor
         weak var textView: MarkdownTextView?
         var lastFindActive = false   // detect find-bar close → refocus the editor
+        /// The theme the text view was last styled with, so `updateNSView` only
+        /// restyles when the user actually changed size or family.
+        var appliedTheme: Theme?
         init(_ parent: LivePreviewEditor) { self.parent = parent }
 
         // MARK: Find (driven by the shared FindModel)
@@ -206,7 +224,8 @@ struct LivePreviewEditor: NSViewRepresentable {
             let loc = min(tv.selectedRange().location, ns.length)
             let lineRange = ns.lineRange(for: NSRange(location: loc, length: 0))
             lastCursorLine = lineRange
-            MarkdownHighlighter.apply(to: storage, cursorLine: lineRange,
+            appliedTheme = parent.theme
+            MarkdownHighlighter.apply(to: storage, theme: parent.theme, cursorLine: lineRange,
                                       resolveWikilink: parent.resolveWikilink)
         }
 

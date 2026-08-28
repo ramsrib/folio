@@ -12,19 +12,23 @@ enum InlineMarkdown {
     /// Rendered-line memo. `render` runs a full Foundation Markdown parse per
     /// call and is invoked for every visible block on every tab switch — without
     /// this, flipping back to a tab re-parses text that hasn't changed (the
-    /// reported switch lag). Keyed by the raw source line; crude wholesale reset
-    /// when it grows past a bound (cheap to refill, and re-tuning beats an LRU).
+    /// reported switch lag). Keyed by the raw source line *and* the code size
+    /// baked into the result (⌘+/⌘− must not serve stale runs); crude wholesale
+    /// reset when it grows past a bound (cheap to refill, and re-tuning beats an LRU).
     @MainActor private static var cache: [String: AttributedString] = [:]
 
-    @MainActor static func render(_ raw: String) -> AttributedString {
-        if let hit = cache[raw] { return hit }
-        let rendered = renderUncached(raw)
+    /// - Parameter codeSize: point size for inline `code` runs, derived from the
+    ///   user's body size by the caller.
+    @MainActor static func render(_ raw: String, codeSize: CGFloat) -> AttributedString {
+        let key = "\(codeSize)|\(raw)"
+        if let hit = cache[key] { return hit }
+        let rendered = renderUncached(raw, codeSize: codeSize)
         if cache.count > 4096 { cache.removeAll(keepingCapacity: true) }
-        cache[raw] = rendered
+        cache[key] = rendered
         return rendered
     }
 
-    private static func renderUncached(_ raw: String) -> AttributedString {
+    private static func renderUncached(_ raw: String, codeSize: CGFloat) -> AttributedString {
         let transformed = transform(raw)
         let opts = AttributedString.MarkdownParsingOptions(
             allowsExtendedAttributes: true,
@@ -38,13 +42,16 @@ enum InlineMarkdown {
             ($0.inlinePresentationIntent?.contains(.code) == true) ? $0.range : nil
         }
         for r in codeRanges {
-            attr[r].font = .system(size: 14.5, design: .monospaced)
+            attr[r].font = .system(size: codeSize, design: .monospaced)
             attr[r].backgroundColor = Color.primary.opacity(0.06)
         }
         return attr
     }
 
-    private static func transform(_ raw: String) -> String {
+    /// Rewrite Folio's Markdown extensions into plain Markdown: `==highlight==`
+    /// loses its markers and `[[wikilinks]]` become real links. Shared with the
+    /// AppKit reader, which parses to `NSAttributedString` instead.
+    static func transform(_ raw: String) -> String {
         // ==highlight== -> highlight (drop markers; Markdown has no equivalent)
         var s = highlight.stringByReplacingMatches(
             in: raw, range: NSRange(location: 0, length: (raw as NSString).length), withTemplate: "$1")

@@ -1,3 +1,7 @@
+// The block-per-view reader, now iOS-only: macOS reading mode is `NoteReader`,
+// which lays the note out as one selectable text stream (`NoteTextView`). iOS
+// keeps this until it gets the same TextKit treatment.
+#if !os(macOS)
 import SwiftUI
 import os
 #if canImport(UIKit)
@@ -26,6 +30,19 @@ struct ReadingView: View {
     private var blocks: [Block] { find.active ? parsed : mergedBlocks }
     private var body0: CGFloat { settings.bodyFontSize }
     private var design: Font.Design { settings.readingFont.design }
+
+    // Everything below derives from `body0` so ⌘+/⌘− scales the whole note, not
+    // just its prose, and so one line-height constant governs every text block.
+    private var lineSpacing: CGFloat { body0 * Typography.lineSpacing }
+    private var inlineCodeSize: CGFloat { body0 * Typography.inlineCode }
+    private var blockSpacing: CGFloat { body0 * Typography.blockSpacing }
+    private var listIndent: CGFloat { body0 * Typography.listIndent }
+
+    /// Inline Markdown with `code` runs sized against the surrounding text —
+    /// body size by default, or `base` for the fixed-size metadata chrome.
+    private func inline(_ text: String, base: CGFloat? = nil) -> AttributedString {
+        InlineMarkdown.render(text, codeSize: (base ?? body0) * Typography.inlineCode)
+    }
 
     // Ordered occurrences across searchable blocks. Maps the shared model's
     // `current` index to a block (for scrolling) and its occurrence within that
@@ -76,9 +93,9 @@ struct ReadingView: View {
                     // is a visible stall — big documents keep the lazy layout
                     // (slightly drifty scroll restore is the better trade there).
                     if blocks.count > 400 || vault.content.count > 150_000 {
-                        LazyVStack(alignment: .leading, spacing: 16) { blockRows }
+                        LazyVStack(alignment: .leading, spacing: blockSpacing) { blockRows }
                     } else {
-                        VStack(alignment: .leading, spacing: 16) { blockRows }
+                        VStack(alignment: .leading, spacing: blockSpacing) { blockRows }
                     }
                 }
                 .frame(maxWidth: settings.readableWidth, alignment: .leading)
@@ -212,7 +229,7 @@ struct ReadingView: View {
     /// ranges line up with what's displayed.
     private func renderParagraph(_ text: String) -> AttributedString {
         let parts = text.components(separatedBy: "\n\n")
-        guard parts.count > 1 else { return InlineMarkdown.render(text) }
+        guard parts.count > 1 else { return inline(text) }
         var out = AttributedString()
         for (i, part) in parts.enumerated() {
             if i > 0 {
@@ -220,7 +237,7 @@ struct ReadingView: View {
                 sep.font = .system(size: body0 * 0.3, design: design)
                 out += sep
             }
-            out += InlineMarkdown.render(part)
+            out += inline(part)
         }
         return out
     }
@@ -231,12 +248,13 @@ struct ReadingView: View {
     /// highlight yet (callouts, tables, properties, images).
     private func searchAttr(_ block: Block) -> AttributedString? {
         switch block.kind {
-        case let .heading(_, t, _):     return InlineMarkdown.render(t)
+        case let .heading(_, t, _):     return inline(t)
         case let .paragraph(t):         return renderParagraph(t)
-        case let .listItem(_, _, _, t): return InlineMarkdown.render(t)
-        case let .task(_, _, t, _):     return InlineMarkdown.render(t)
-        case let .quote(t):             return InlineMarkdown.render(t)
-        case let .code(lang, t):        return CodeHighlighter.highlight(t, language: lang)
+        case let .listItem(_, _, _, t): return inline(t)
+        case let .task(_, _, t, _):     return inline(t)
+        case let .quote(t):             return inline(t)
+        case let .code(lang, t):        return CodeHighlighter.highlight(t, language: lang,
+                                                                        size: body0 * Typography.codeBlock)
         default:                        return nil
         }
     }
@@ -305,43 +323,45 @@ struct ReadingView: View {
             // above a heading should read clearly larger than the paragraph gaps
             // inside its section, so section boundaries land while scanning. No
             // extra padding when the heading opens the document.
-            Text(applyFindHighlight(InlineMarkdown.render(text), blockIndex: index))
+            Text(applyFindHighlight(inline(text), blockIndex: index))
                 .font(.system(size: headingSize(level), weight: level <= 2 ? .bold : .semibold, design: design))
-                .padding(.top, index == 0 ? 0 : (level <= 2 ? 26 : 12))
+                .tracking(Typography.tracking(forSize: headingSize(level)))
+                .lineSpacing(headingSize(level) * Typography.headingLineSpacing)
+                .padding(.top, index == 0 ? 0 : body0 * Typography.headingTopPadding(level: level))
 
         case let .paragraph(text):
             Text(applyFindHighlight(renderParagraph(text), blockIndex: index))
-                .font(.system(size: body0, design: design)).lineSpacing(body0 * 0.42)
+                .font(.system(size: body0, design: design)).lineSpacing(lineSpacing)
 
         case let .listItem(ordered, number, indent, text):
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(ordered ? "\(number)." : "•").font(.system(size: body0 - 0.5)).foregroundStyle(.secondary)
-                Text(applyFindHighlight(InlineMarkdown.render(text), blockIndex: index))
-                    .font(.system(size: body0 - 0.5, design: design)).lineSpacing(body0 * 0.36)
+                Text(ordered ? "\(number)." : "•").font(.system(size: body0)).foregroundStyle(.secondary)
+                Text(applyFindHighlight(inline(text), blockIndex: index))
+                    .font(.system(size: body0, design: design)).lineSpacing(lineSpacing)
             }
-            .padding(.leading, CGFloat(indent) * 22)
+            .padding(.leading, CGFloat(indent) * listIndent)
 
         case let .task(checked, indent, text, checkboxIndex):
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Button { vault.toggleTask(atContentIndex: checkboxIndex) } label: {
                     Image(systemName: checked ? "checkmark.square.fill" : "square")
                         .foregroundStyle(checked ? Color.accentColor : .secondary)
-                        .font(.system(size: body0 - 1))
+                        .font(.system(size: body0 * 0.94))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(checked ? "Completed task" : "Incomplete task")
                 .accessibilityAddTraits(.isButton)
-                Text(applyFindHighlight(InlineMarkdown.render(text), blockIndex: index))
-                    .font(.system(size: body0 - 0.5, design: design)).lineSpacing(body0 * 0.36)
+                Text(applyFindHighlight(inline(text), blockIndex: index))
+                    .font(.system(size: body0, design: design)).lineSpacing(lineSpacing)
                     .strikethrough(checked).foregroundStyle(checked ? .secondary : .primary)
             }
-            .padding(.leading, CGFloat(indent) * 22)
+            .padding(.leading, CGFloat(indent) * listIndent)
 
         case let .quote(text):
             HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 2).fill(.secondary.opacity(0.5)).frame(width: 3)
-                Text(applyFindHighlight(InlineMarkdown.render(text), blockIndex: index))
-                    .font(.system(size: body0 - 0.5, design: design)).lineSpacing(body0 * 0.36)
+                Text(applyFindHighlight(inline(text), blockIndex: index))
+                    .font(.system(size: body0, design: design)).lineSpacing(lineSpacing)
                     .foregroundStyle(.secondary)
             }
 
@@ -350,7 +370,9 @@ struct ReadingView: View {
 
         case let .code(language, text):
             ScrollView(.horizontal, showsIndicators: false) {
-                Text(applyFindHighlight(CodeHighlighter.highlight(text, language: language), blockIndex: index))
+                Text(applyFindHighlight(CodeHighlighter.highlight(text, language: language,
+                                                                  size: body0 * Typography.codeBlock),
+                                        blockIndex: index))
                     .textSelection(.enabled)
                     .padding(12)
             }
@@ -370,10 +392,15 @@ struct ReadingView: View {
     private func calloutView(kind: String, title: String, body: String) -> some View {
         let (icon, tint) = calloutStyle(kind)
         return HStack(alignment: .top, spacing: 10) {
-            Image(systemName: icon).foregroundStyle(tint).font(.system(size: 16, weight: .semibold))
+            Image(systemName: icon).foregroundStyle(tint)
+                .font(.system(size: body0 * 0.94, weight: .semibold))
             VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.system(size: 15, weight: .semibold))
-                if !body.isEmpty { Text(InlineMarkdown.render(body)).font(.system(size: 15)) }
+                Text(title).font(.system(size: body0 * Typography.callout, weight: .semibold))
+                if !body.isEmpty {
+                    Text(inline(body))
+                        .font(.system(size: body0 * Typography.callout, design: design))
+                        .lineSpacing(lineSpacing)
+                }
             }
             Spacer(minLength: 0)
         }
@@ -414,8 +441,8 @@ struct ReadingView: View {
     private func tableRow(_ cells: [String], columns: Int, bold: Bool) -> some View {
         HStack(spacing: 0) {
             ForEach(0..<columns, id: \.self) { c in
-                Text(c < cells.count ? InlineMarkdown.render(cells[c]) : AttributedString(""))
-                    .font(.system(size: 14, weight: bold ? .semibold : .regular))
+                Text(c < cells.count ? inline(cells[c]) : AttributedString(""))
+                    .font(.system(size: body0 * Typography.table, weight: bold ? .semibold : .regular))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 10).padding(.vertical, 6)
                 if c < columns - 1 { Divider() }
@@ -426,32 +453,11 @@ struct ReadingView: View {
     // MARK: helpers
 
     private func headingSize(_ level: Int) -> CGFloat {
-        let scale: [CGFloat] = [1.75, 1.4, 1.18, 1.06, 0.98, 0.9]
-        return body0 * scale[min(max(level - 1, 0), 5)]
+        Typography.headingSize(level, body: body0)
     }
 
-    /// Decoded-image memo (mtime-keyed): this runs in the row's *body*, so an
-    /// uncached decode would hit the disk on every render of every image row.
-    @MainActor private static var imageCache: [String: (mtime: Date, image: PlatformImage)] = [:]
-
     private func localImage(_ source: String) -> PlatformImage? {
-        guard let note = vault.selection else { return nil }
-        let candidates = [
-            note.deletingLastPathComponent().appendingPathComponent(source),
-            vault.vaultURL?.appendingPathComponent(source),
-            URL(fileURLWithPath: source)
-        ].compactMap { $0 }
-        for url in candidates where FileManager.default.fileExists(atPath: url.path) {
-            let mtime = (try? url.resourceValues(forKeys: [.contentModificationDateKey])
-                .contentModificationDate) ?? .distantPast
-            if let hit = Self.imageCache[url.path], hit.mtime == mtime { return hit.image }
-            if let img = PlatformImage.load(contentsOf: url) {
-                if Self.imageCache.count > 64 { Self.imageCache.removeAll(keepingCapacity: true) }
-                Self.imageCache[url.path] = (mtime, img)
-                return img
-            }
-        }
-        return nil
+        NoteImageLoader.load(source, noteURL: vault.selection, vaultURL: vault.vaultURL)
     }
 
     private func calloutStyle(_ kind: String) -> (String, Color) {
@@ -466,175 +472,4 @@ struct ReadingView: View {
         }
     }
 }
-
-// MARK: - Properties (frontmatter) block
-
-/// Notion/Obsidian-style frontmatter card: each row gets a type icon inferred from
-/// its key/value, dates are formatted, tag-like keys render as pill chips, and URLs
-/// or `[[wikilinks]]` stay clickable. Read-only — mirrors the note's YAML.
-/// Collapsible, and collapsed by default (a one-line "Properties · N" row): the
-/// content, not the metadata, is what you opened the note to read.
-private struct PropertiesView: View {
-    let props: [Prop]
-    @Binding var expanded: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            Button {
-                withAnimation(.smooth(duration: 0.22)) { expanded.toggle() }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .rotationEffect(.degrees(expanded ? 90 : 0))
-                    Text("Properties")
-                        .font(.system(size: 13.5, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Text("\(props.count)")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.tertiary)
-                    Spacer()
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(expanded ? "Collapse properties" : "Expand properties (\(props.count))")
-
-            if expanded { rows }
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, expanded ? 16 : 11)
-        .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-
-    private var rows: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            ForEach(props) { p in
-                let kind = PropKind.infer(key: p.key, value: p.value)
-                HStack(alignment: .top, spacing: 10) {
-                    HStack(spacing: 7) {
-                        Image(systemName: kind.icon)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.tertiary)
-                            .frame(width: 16)
-                        Text(p.key)
-                            .font(.system(size: 13.5, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                    .frame(width: 172, alignment: .leading)
-                    value(p, kind: kind)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-        }
-        .transition(.opacity)
-    }
-
-    @ViewBuilder
-    private func value(_ p: Prop, kind: PropKind) -> some View {
-        if p.value.isEmpty {
-            Text("—").font(.system(size: 14.5)).foregroundStyle(.tertiary)
-        } else if kind == .tags {
-            FlowLayout(spacing: 6) {
-                ForEach(splitList(p.value), id: \.self) { tag in
-                    Text(tag)
-                        .font(.system(size: 12.5))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 2.5)
-                        .background(Color.secondary.opacity(0.12), in: Capsule())
-                }
-            }
-        } else if kind == .date {
-            Text(Self.prettyDate(p.value))
-                .font(.system(size: 14.5))
-        } else {
-            Text(InlineMarkdown.render(p.value))
-                .font(.system(size: 14.5))
-                .lineSpacing(3)
-                .textSelection(.enabled)
-        }
-    }
-
-    private func splitList(_ s: String) -> [String] {
-        s.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-    }
-
-    // ISO `yyyy-MM-dd` → a friendlier medium style (e.g. "May 22, 2026"); leaves
-    // anything that doesn't parse untouched.
-    private static let isoParser: DateFormatter = {
-        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"; return f
-    }()
-    private static let prettyFormatter: DateFormatter = {
-        let f = DateFormatter(); f.dateStyle = .medium; f.timeStyle = .none; return f
-    }()
-    static func prettyDate(_ value: String) -> String {
-        guard let d = isoParser.date(from: value) else { return value }
-        return prettyFormatter.string(from: d)
-    }
-}
-
-/// The kind of a frontmatter value, used to pick a leading icon and renderer.
-private enum PropKind {
-    case text, date, tags, link, number
-
-    var icon: String {
-        switch self {
-        case .date:   return "calendar"
-        case .tags:   return "tag"
-        case .link:   return "link"
-        case .number: return "number"
-        case .text:   return "text.alignleft"
-        }
-    }
-
-    static func infer(key: String, value: String) -> PropKind {
-        let k = key.lowercased()
-        if ["tags", "tag", "aliases", "alias", "keywords", "categories", "category"].contains(k) { return .tags }
-        if ["date", "started", "start", "updated", "created", "due", "closed", "modified", "published"]
-            .contains(where: { k.contains($0) }) { return .date }
-        if value.range(of: "^\\d{4}-\\d{2}-\\d{2}$", options: .regularExpression) != nil { return .date }
-        if ["url", "link", "links", "source", "related", "homepage", "website", "repo", "repository"].contains(k) { return .link }
-        if value.hasPrefix("http://") || value.hasPrefix("https://") || value.contains("[[") { return .link }
-        if !value.isEmpty, Double(value) != nil { return .number }
-        return .text
-    }
-}
-
-/// Minimal wrapping layout — lays subviews left-to-right, wrapping to the next row
-/// when the proposed width runs out. Used for tag chips.
-private struct FlowLayout: Layout {
-    var spacing: CGFloat = 6
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let maxWidth = proposal.width ?? .infinity
-        var x: CGFloat = 0, rowHeight: CGFloat = 0, totalHeight: CGFloat = 0, widest: CGFloat = 0
-        for sub in subviews {
-            let size = sub.sizeThatFits(.unspecified)
-            if x + size.width > maxWidth, x > 0 {
-                totalHeight += rowHeight + spacing
-                widest = max(widest, x - spacing)
-                x = 0; rowHeight = 0
-            }
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
-        widest = max(widest, x - spacing)
-        return CGSize(width: min(widest, maxWidth), height: totalHeight + rowHeight)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x = bounds.minX, y = bounds.minY, rowHeight: CGFloat = 0
-        for sub in subviews {
-            let size = sub.sizeThatFits(.unspecified)
-            if x + size.width > bounds.maxX, x > bounds.minX {
-                x = bounds.minX; y += rowHeight + spacing; rowHeight = 0
-            }
-            sub.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
-    }
-}
+#endif

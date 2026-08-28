@@ -23,8 +23,10 @@ enum MarkdownHighlighter {
     private static let highlight  = rx("==([^=\\n]+)==")
     private static let task       = rx("^(\\s*[-*+]\\s+)(\\[[ xX]\\])(.*)$")
 
+    /// - Parameter theme: fonts/metrics for the user's current body size and
+    ///   reading font, so writing mode matches reading mode.
     /// - Parameter resolveWikilink: returns true if the target note exists.
-    static func apply(to storage: NSTextStorage, cursorLine: NSRange,
+    static func apply(to storage: NSTextStorage, theme: Theme, cursorLine: NSRange,
                       resolveWikilink: (String) -> Bool) {
         let text = storage.string
         let ns = text as NSString
@@ -33,13 +35,13 @@ enum MarkdownHighlighter {
         storage.beginEditing()
         defer { storage.endEditing() }
 
-        storage.setAttributes([.font: Theme.body, .foregroundColor: Theme.text], range: full)
+        storage.setAttributes(theme.baseAttributes, range: full)
 
         // Frontmatter is YAML, not Markdown: style it as metadata (mono, dimmed,
         // keys tinted) and — critically — exclude it from every Markdown rule
         // below. A YAML comment (`# deploy notes`) once rendered as a giant H1.
         let fm = frontmatterRange(ns)
-        if let fm { styleFrontmatter(storage, ns, fm, cursorLine) }
+        if let fm { styleFrontmatter(storage, ns, fm, theme, cursorLine) }
         let content: NSRange = fm.map {
             NSRange(location: NSMaxRange($0), length: ns.length - NSMaxRange($0))
         } ?? full
@@ -57,7 +59,7 @@ enum MarkdownHighlighter {
 
             if let m = heading.firstMatch(in: line, range: lineNS) {
                 let level = m.range(at: 1).length
-                storage.addAttribute(.font, value: Theme.heading(level), range: lineRange)
+                storage.addAttribute(.font, value: theme.heading(level), range: lineRange)
                 mark(storage, NSRange(location: lineRange.location, length: min(level + 1, lineRange.length)), cursorLine)
             } else if let m = task.firstMatch(in: line, range: lineNS) {
                 let g1 = m.range(at: 1), g2 = m.range(at: 2), g3 = m.range(at: 3)
@@ -87,10 +89,10 @@ enum MarkdownHighlighter {
 
         // Inline spans whose content is styled and delimiters dimmed. All scoped
         // to `content` so frontmatter stays pure metadata.
-        inline(boldStars,  storage, text, content, cursorLine, [.font: Theme.bold])
-        inline(italicStar, storage, text, content, cursorLine, [.font: Theme.italic])
+        inline(boldStars,  storage, text, content, cursorLine, [.font: theme.bold])
+        inline(italicStar, storage, text, content, cursorLine, [.font: theme.italic])
         inline(strike,     storage, text, content, cursorLine, [.strikethroughStyle: NSUnderlineStyle.single.rawValue])
-        inline(inlineCode, storage, text, content, cursorLine, [.font: Theme.mono, .backgroundColor: Theme.codeBg])
+        inline(inlineCode, storage, text, content, cursorLine, [.font: theme.mono, .backgroundColor: Theme.codeBg])
         inline(highlight,  storage, text, content, cursorLine, [.backgroundColor: Theme.highlightBg])
 
         // Wikilinks: resolved (accent) vs unresolved (red); whole span clickable.
@@ -122,7 +124,7 @@ enum MarkdownHighlighter {
             storage.addAttribute(.foregroundColor, value: Theme.accent, range: m.range)
         }
 
-        for r in fenced { storage.addAttributes([.font: Theme.mono, .backgroundColor: Theme.codeBg], range: r) }
+        for r in fenced { storage.addAttributes([.font: theme.mono, .backgroundColor: Theme.codeBg], range: r) }
     }
 
     // MARK: Frontmatter
@@ -149,8 +151,8 @@ enum MarkdownHighlighter {
     /// Metadata styling: mono + dimmed base, keys tinted, YAML comments dimmest,
     /// and the `---` fences on the marker/reveal treatment like other syntax.
     private static func styleFrontmatter(_ storage: NSTextStorage, _ ns: NSString,
-                                         _ fm: NSRange, _ cursorLine: NSRange) {
-        storage.addAttributes([.font: Theme.mono, .foregroundColor: Theme.quote], range: fm)
+                                         _ fm: NSRange, _ theme: Theme, _ cursorLine: NSRange) {
+        storage.addAttributes([.font: theme.mono, .foregroundColor: Theme.quote], range: fm)
         ns.enumerateSubstrings(in: fm, options: .byLines) { sub, lineRange, _, _ in
             let line = sub ?? ns.substring(with: lineRange)
             let lineNS = NSRange(location: 0, length: (line as NSString).length)

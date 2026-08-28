@@ -9,7 +9,9 @@ import AppKit
 /// Reading mode. Not a full parser — regex passes for comments, strings,
 /// numbers, and a broad set of common keywords. Good enough to make code legible.
 enum CodeHighlighter {
-    private static let mono = PlatformFont.monospacedSystemFont(ofSize: 13.5, weight: .regular)
+    private static func mono(_ size: CGFloat) -> PlatformFont {
+        PlatformFont.monospacedSystemFont(ofSize: size, weight: .regular)
+    }
 
     private static let keywords: Set<String> = [
         "func", "function", "fn", "def", "let", "var", "const", "val", "mut",
@@ -35,20 +37,27 @@ enum CodeHighlighter {
 
     /// Highlighted-block memo — same rationale as `InlineMarkdown`'s cache: the
     /// regex passes re-ran for every visible code block on every tab switch.
-    @MainActor private static var cache: [String: AttributedString] = [:]
+    @MainActor private static var cache: [String: NSAttributedString] = [:]
 
-    @MainActor static func highlight(_ code: String, language: String) -> AttributedString {
-        let key = language + "\u{0}" + code
+    @MainActor static func highlight(_ code: String, language: String, size: CGFloat) -> AttributedString {
+        AttributedString(highlightNS(code, language: language, size: size))
+    }
+
+    /// The same highlight as `highlight`, kept in its native form. Reading mode
+    /// composes one `NSAttributedString` for the whole note, so converting to
+    /// `AttributedString` and back would be pure loss.
+    @MainActor static func highlightNS(_ code: String, language: String, size: CGFloat) -> NSAttributedString {
+        let key = "\(size)\u{0}" + language + "\u{0}" + code
         if let hit = cache[key] { return hit }
-        let rendered = highlightUncached(code, language: language)
+        let rendered = highlightUncached(code, language: language, size: size)
         if cache.count > 512 { cache.removeAll(keepingCapacity: true) }
         cache[key] = rendered
         return rendered
     }
 
-    private static func highlightUncached(_ code: String, language: String) -> AttributedString {
+    private static func highlightUncached(_ code: String, language: String, size: CGFloat) -> NSAttributedString {
         let storage = NSMutableAttributedString(
-            string: code, attributes: [.font: mono, .foregroundColor: PlatformColor.pLabel])
+            string: code, attributes: [.font: mono(size), .foregroundColor: PlatformColor.pLabel])
         let full = NSRange(location: 0, length: (code as NSString).length)
         let ns = code as NSString
 
@@ -63,7 +72,7 @@ enum CodeHighlighter {
         apply(string, code, full, storage, .systemGreen)
         apply(comment, code, full, storage, .pSecondaryLabel)
 
-        return AttributedString(storage)
+        return storage
     }
 
     private static func apply(_ regex: NSRegularExpression, _ code: String, _ full: NSRange,

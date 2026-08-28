@@ -28,42 +28,8 @@ struct KeyboardScroller: NSViewRepresentable {
         let step = self.step
         DispatchQueue.main.async { coord.scrollView = view.enclosingScrollView }
 
-        if coord.monitor == nil {
-            coord.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak coord] event in
-                guard let coord, let scroll = coord.scrollView, event.window === scroll.window else { return event }
-                // Don't hijack typing — but only step aside for *editable* responders
-                // (palette search, the editor); read-only text selection still scrolls.
-                if let text = scroll.window?.firstResponder as? NSText, text.isEditable { return event }
+        coord.installMonitor(step: step)
 
-                let mods = event.modifierFlags.intersection([.command, .option, .control, .shift])
-                // ⌘/⌥ shortcuts are never ours.
-                if mods.contains(.command) || mods.contains(.option) { return event }
-                let chars = event.charactersIgnoringModifiers ?? ""
-
-                if mods.contains(.control) {
-                    switch chars {
-                    case "d": coord.page(fraction: 0.5, up: false); return nil
-                    case "u": coord.page(fraction: 0.5, up: true);  return nil
-                    case "f": coord.page(fraction: 1.0, up: false); return nil
-                    case "b": coord.page(fraction: 1.0, up: true);  return nil
-                    default:  return event   // other ⌃ combos pass through
-                    }
-                }
-
-                switch chars {
-                case "j": coord.nudge(dx: 0, dy: step);  return nil
-                case "k": coord.nudge(dx: 0, dy: -step); return nil
-                case "l": coord.nudge(dx: step, dy: 0);  return nil
-                case "h": coord.nudge(dx: -step, dy: 0); return nil
-                case "d": coord.page(fraction: 0.5, up: false); return nil
-                case "u": coord.page(fraction: 0.5, up: true);  return nil
-                case "G": coord.jump(toBottom: true);  return nil
-                case "g": coord.handleG();             return nil
-                case " ": coord.page(fraction: 1.0, up: mods.contains(.shift)); return nil
-                default:  return event
-                }
-            }
-        }
         return view
     }
 
@@ -82,6 +48,46 @@ struct KeyboardScroller: NSViewRepresentable {
         private var target: CGPoint = .zero
         private var timer: Timer?
         private var pendingG = false
+
+        /// Install the key monitor. Called by `makeNSView` and by Reading mode's
+        /// text view, which owns its scroll view directly.
+        func installMonitor(step: CGFloat = 56) {
+            guard monitor == nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self, let scroll = self.scrollView, event.window === scroll.window else { return event }
+                // Don't hijack typing — but only step aside for *editable* responders
+                // (palette search, the editor); read-only text selection still scrolls.
+                if let text = scroll.window?.firstResponder as? NSText, text.isEditable { return event }
+
+                let mods = event.modifierFlags.intersection([.command, .option, .control, .shift])
+                // ⌘/⌥ shortcuts are never ours.
+                if mods.contains(.command) || mods.contains(.option) { return event }
+                let chars = event.charactersIgnoringModifiers ?? ""
+
+                if mods.contains(.control) {
+                    switch chars {
+                    case "d": self.page(fraction: 0.5, up: false); return nil
+                    case "u": self.page(fraction: 0.5, up: true);  return nil
+                    case "f": self.page(fraction: 1.0, up: false); return nil
+                    case "b": self.page(fraction: 1.0, up: true);  return nil
+                    default:  return event   // other ⌃ combos pass through
+                    }
+                }
+
+                switch chars {
+                case "j": self.nudge(dx: 0, dy: step);  return nil
+                case "k": self.nudge(dx: 0, dy: -step); return nil
+                case "l": self.nudge(dx: step, dy: 0);  return nil
+                case "h": self.nudge(dx: -step, dy: 0); return nil
+                case "d": self.page(fraction: 0.5, up: false); return nil
+                case "u": self.page(fraction: 0.5, up: true);  return nil
+                case "G": self.jump(toBottom: true);  return nil
+                case "g": self.handleG();             return nil
+                case " ": self.page(fraction: 1.0, up: mods.contains(.shift)); return nil
+                default:  return event
+                }
+            }
+        }
 
         /// Push the scroll target by a delta and start the easing timer if idle.
         func nudge(dx: CGFloat, dy: CGFloat) {
