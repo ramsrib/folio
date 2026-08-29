@@ -25,8 +25,10 @@ final class WindowCoordinator {
     /// Vaults waiting for a window that is being born. Enqueued by `open`,
     /// dequeued exactly once per window by `claimPendingVault`.
     private var pendingVaults: [VaultRef] = []
-    /// Files whose window is still opening.
-    private var pendingFiles: [URL] = []
+    /// Opens waiting on a window that is still being born, each tagged with the
+    /// vault it belongs to. Tagging (rather than matching paths at claim time) is
+    /// what lets a `folio://` link queue alongside a plain file.
+    private var pendingOpens: [(url: URL, ref: VaultRef)] = []
     /// External opens that arrived before any window existed.
     private var bufferedURLs: [URL] = []
     private var didBootstrap = false
@@ -119,7 +121,6 @@ final class WindowCoordinator {
             return
         }
         pendingVaults.append(ref)
-        trace("open -> NEW WINDOW for \(ref.name)")
         openWindowAction?()
     }
 
@@ -133,7 +134,6 @@ final class WindowCoordinator {
         guard !didBootstrap else { return }
         didBootstrap = true
         let remaining = pendingVaults
-        trace("bootstrap opening \(remaining.count) extra")
         for _ in remaining { openWindowAction?() }
         let buffered = bufferedURLs
         bufferedURLs = []
@@ -142,46 +142,45 @@ final class WindowCoordinator {
 
     // MARK: External opens
 
-    private func trace(_ m: String) {   // TEMP
-        let l = "TRACE \(m)\n"
-        if let h = try? FileHandle(forWritingTo: URL(fileURLWithPath: "/tmp/folio-mw.log")) { h.seekToEndOfFile(); h.write(Data(l.utf8)); try? h.close() }
-        else { try? l.write(to: URL(fileURLWithPath: "/tmp/folio-mw.log"), atomically: true, encoding: .utf8) }
-    }
-
     func handleExternal(_ urls: [URL]) {
-        trace("handleExternal \(urls.map(\.lastPathComponent)) bootstrap=\(didBootstrap)")
         guard didBootstrap else { bufferedURLs.append(contentsOf: urls); return }
         for url in urls {
-            guard url.isFileURL else {
-                // folio:// carries its own vault; route it to that vault's window.
-                if let (vault, _) = VaultResolver.destination(for: url) {
-                    open(VaultRef(vault))
-                    pendingFiles.append(url)
-                } else {
-                    keyStore?.handleExternal(urls: [url])
-                }
+            // Which vault does this open belong to? A folio:// link names its own;
+            // a file is resolved against the open/recent vaults.
+            let ref: VaultRef
+            if url.isFileURL {
+                ref = window(owning: url).map { VaultRef($0.store.vaultURL!) }
+                    ?? VaultRef(VaultResolver.vault(for: url))
+            } else if let (vault, _) = VaultResolver.destination(for: url) {
+                ref = VaultRef(vault)
+            } else {
+                keyStore?.handleExternal(urls: [url])   // a link we can't place
                 continue
             }
-            if let owner = window(owning: url) {
-                owner.store.handleExternal(urls: [url])
-                owner.window?.makeKeyAndOrderFront(nil)
+
+            if let entry = entries.first(where: { $0.store?.vaultURL.map(VaultRef.init) == ref }),
+               let store = entry.store {
+                // The window exists: hand it the open directly. Queuing here would
+                // strand it, since the queue only drains when a *new* store registers.
+                store.handleExternal(urls: [url])
+                entry.window?.makeKeyAndOrderFront(nil)
                 NSApp.activate(ignoringOtherApps: true)
             } else if let empty = entries.compactMap(\.store).first(where: { $0.vaultURL == nil }) {
                 empty.handleExternal(urls: [url])
             } else {
-                pendingFiles.append(url)
-                open(VaultRef(VaultResolver.vault(for: url)))
+                pendingOpens.append((url, ref))
+                open(ref)
             }
         }
     }
 
-    /// Hand a newly-loaded window any queued file that belongs to it.
+    /// Hand a newly-loaded window whatever was queued for its vault.
     private func claimFiles(for store: VaultStore) {
-        guard !pendingFiles.isEmpty, let root = store.vaultURL else { return }
-        let bounded = Self.boundary(root)
-        let mine = pendingFiles.filter { Self.normalized($0).hasPrefix(bounded) }
+        guard !pendingOpens.isEmpty, let root = store.vaultURL else { return }
+        let ref = VaultRef(root)
+        let mine = pendingOpens.filter { $0.ref == ref }.map(\.url)
         guard !mine.isEmpty else { return }
-        pendingFiles.removeAll { mine.contains($0) }
+        pendingOpens.removeAll { $0.ref == ref }
         store.handleExternal(urls: mine)
     }
 

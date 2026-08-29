@@ -42,9 +42,6 @@ struct VaultWindow: View {
                 vault.start()
                 coordinator.register(vault)
                 coordinator.bootstrapIfNeeded()
-                let l = "pid=\(ProcessInfo.processInfo.processIdentifier) vault=\(vault.vaultURL?.lastPathComponent ?? "none")\n"
-                if let h = try? FileHandle(forWritingTo: URL(fileURLWithPath: "/tmp/folio-mw.log")) { h.seekToEndOfFile(); h.write(Data(l.utf8)); try? h.close() }
-                else { try? l.write(to: URL(fileURLWithPath: "/tmp/folio-mw.log"), atomically: true, encoding: .utf8) }
             }
     }
 }

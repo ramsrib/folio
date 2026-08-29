@@ -17,14 +17,50 @@ scene and injected everywhere:
 - **`UIState`** — window-level UI: palette flags, view mode, cross-view pulses
   (`escapePulse`, `sidebarFilterFocus`, `pendingFind`).
 
-There is deliberately **one window** (`Window`, not `WindowGroup`): these are
-single shared objects, so a second window would be a *mirror* of the first, not
-an independent workspace. True multi-window needs per-window stores plus
-focused-scene menu plumbing — do it properly or not at all.
+`VaultStore` and `UIState` are **per window**; `AppSettings` is app-wide
+(appearance belongs to the person, not the window). `VaultStore.init` is
+deliberately cheap and `start()` does the scanning: scanning inside a view's
+`StateObject` construction mutates `@Published` state mid-view-update, re-enters
+SwiftUI's update cycle, and hangs before the window ever appears.
 
-One consequence worth knowing: opening a vault (or a note outside the current
-vault) *switches* the single window's vault. There is no way to hold two vaults
-open at once.
+## Windows: one vault each
+
+`WindowCoordinator` owns window identity — the pending-vault queue, the
+store↔`NSWindow` registry, the session, and `open(_:)` as the single focus-or-open
+entry point. SwiftUI's scene is a plain `WindowGroup(id:)` whose only job is
+"materialize one more window when asked".
+
+Four things here are load-bearing, each learned the hard way:
+
+- **`.handlesExternalEvents(matching: [])`.** A `WindowGroup` handles Finder/CLI
+  opens *itself*, materializing a scene per event — on top of AppKit delivering
+  the same event to `application(_:open:)`. That minted a ghost, vault-less
+  window per external open (and drained a pending claim). The delegate is now the
+  only external-open path. Consequence: a launch *caused by* a document open then
+  presents zero windows, so `applicationDidFinishLaunching` summons one when
+  `NSApp.windows.isEmpty`.
+- **A value-typed `WindowGroup(for:)` cannot express this lifecycle.** Windows
+  acquire their vault *after* creation (launch, ⌘N, an external open landing in
+  the launch window), so they stay tagged `nil` and `openWindow(value:)` never
+  matches them. Identity lives in the coordinator instead.
+- **`.restorationBehavior(.disabled)`.** Otherwise AppKit restores one window per
+  saved window record *and* `VaultSession` restores its own — two systems racing
+  over how many windows exist. This is also why a bundle id that once quit with N
+  windows kept relaunching to N.
+- **`@FocusedObject`, not `@FocusedValue`,** for the menu commands. Focused
+  *values* only re-evaluate when which object is focused changes, not when its
+  `@Published` properties do — so `canGoBack` goes stale, and since disabled state
+  gates key equivalents, ⌘[ / ⌘] silently stop working.
+
+A window never swaps its vault (`VaultStore.adopt` asserts it): opening another
+vault opens a window. On macOS a window with no vault stays empty rather than
+reopening the last one — that fallback made every stray window masquerade as a
+real one.
+
+**Measuring windows:** use CoreGraphics (`CGWindowListCopyWindowInfo`, layer 0).
+`System Events` both over- and under-counts this app. And always test under a
+**fresh bundle identifier** — a reused one carries restoration state that silently
+changes the window count.
 
 ## Search: scan, don't index
 
