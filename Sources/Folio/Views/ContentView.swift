@@ -261,18 +261,23 @@ struct ContentView: View {
                 if let url = VaultPicker.choose() { coordinator?.open(VaultRef(url)) }
             }
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: 6) {
+                // Chevron first, Obsidian's order: it lands on the same column as
+                // the tree's disclosure triangles, so the foot lines up with what
+                // is above it, and it is what says the name is a control — the one
+                // part that must never be the thing squeezed out.
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .layoutPriority(1)
                 Text(vault.vaultURL?.lastPathComponent ?? "Folio")
                     .lineLimit(1).truncationMode(.tail)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(vaultNameHovered ? .secondary : .tertiary)
-                    // The chevron is what says the name is a control, so it is the
-                    // one part that must never be the thing that gets squeezed out.
-                    .layoutPriority(1)
             }
             .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(vaultNameHovered ? .primary : .secondary)
+            // Full strength, not `.secondary`: muted was right when this was chrome
+            // in the title bar, but at the foot it names the vault you are in.
+            // Hover is carried by the pill behind it instead of by a colour shift.
+            .foregroundStyle(.primary)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(vaultNameHovered ? Color.primary.opacity(0.07) : .clear,
