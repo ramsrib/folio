@@ -16,6 +16,8 @@ struct LivePreviewEditor: NSViewRepresentable {
     var background: NSColor = .textBackgroundColor
     /// Theme tint for selected text; nil uses the system selection color.
     var selectionHighlight: NSColor?
+    /// Theme tint for the caret; nil uses the system insertion-point color.
+    var caretColor: NSColor?
     var readableWidth: CGFloat = 720
     var theme: Theme
     @ObservedObject var find: FindModel
@@ -38,6 +40,7 @@ struct LivePreviewEditor: NSViewRepresentable {
         tv.textContainerInset = NSSize(width: 22, height: 18)
         tv.backgroundColor = background
         tv.applySelectionHighlight(selectionHighlight)
+        tv.applyCaretColor(caretColor)
         tv.readableWidth = readableWidth
         apply(theme, to: tv)
         tv.isVerticallyResizable = true
@@ -77,6 +80,7 @@ struct LivePreviewEditor: NSViewRepresentable {
         tv.previewProvider = previewForLink
         if tv.backgroundColor != background { tv.backgroundColor = background }
         tv.applySelectionHighlight(selectionHighlight)
+        tv.applyCaretColor(caretColor)
         if tv.readableWidth != readableWidth { tv.readableWidth = readableWidth; tv.applyReadableInset() }
 
         // ⌘+/⌘− or a reading-font change while writing: restyle in place.

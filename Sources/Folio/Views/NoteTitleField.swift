@@ -7,6 +7,7 @@ import SwiftUI
 struct NoteTitleField: View {
     @EnvironmentObject private var vault: VaultStore
     @EnvironmentObject private var ui: UIState
+    @EnvironmentObject private var settings: AppSettings
     @State private var title = ""
     @FocusState private var focused: Bool
 
@@ -27,6 +28,10 @@ struct NoteTitleField: View {
                     .font(titleFont)
                     .focused($focused)
                     .onSubmit(commit)
+                    // NSTextField edits through the window's shared field editor,
+                    // so its caret is unreachable from here; `.tint` is the hook
+                    // SwiftUI gives for it.
+                    .tint(settings.selectionTint)
             }
         }
         .onChange(of: vault.selection) { load() }

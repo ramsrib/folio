@@ -204,6 +204,9 @@ final class AppSettings: ObservableObject {
     var nsSecondaryTextColor: PlatformColor {
         theme == .paper ? Self.paperSecondaryText : .pSecondaryLabel
     }
+    /// The caret, at full tint strength — the system's is derived from the accent
+    /// color, which is the same blue the selection used to be. nil = system.
+    var nsCaretColor: PlatformColor? { theme == .paper ? Self.paperSelection : nil }
     /// Selecting text inside a note, in the same tint the sidebar uses — the
     /// system blue read as a foreign object on the cream. nil = system selection
     /// color, which already matches every other theme's chrome.

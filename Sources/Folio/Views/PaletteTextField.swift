@@ -13,6 +13,10 @@ import AppKit
 /// ahead of SwiftUI's `.onKeyPress`; Esc is left alone — the global palette
 /// monitor (GestureMonitor) owns it.
 struct PaletteTextField: NSViewRepresentable {
+    /// Read from the environment rather than passed in: every host of this field
+    /// already has it, and the alternative is threading a color through six
+    /// call sites that care about nothing else.
+    @EnvironmentObject private var settings: AppSettings
     @Binding var text: String
     var placeholder: String
     var fontSize: CGFloat = 17
@@ -67,6 +71,7 @@ struct PaletteTextField: NSViewRepresentable {
         tv.textContainer?.widthTracksTextView = false
         tv.textContainer?.containerSize = NSSize(width: .greatestFiniteMagnitude,
                                                  height: fontSize * 1.4)
+        tv.applyCaretColor(settings.nsCaretColor)
         tv.placeholder = placeholder
         tv.string = text
 
@@ -81,6 +86,7 @@ struct PaletteTextField: NSViewRepresentable {
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         context.coordinator.parent = self
         guard let tv = nsView.documentView as? QueryTextView else { return }
+        tv.applyCaretColor(settings.nsCaretColor)
         if tv.string != text { tv.string = text }
         if tv.placeholder != placeholder { tv.placeholder = placeholder; tv.needsDisplay = true }
         if context.coordinator.lastFocusToken != focusToken {

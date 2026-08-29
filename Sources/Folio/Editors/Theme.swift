@@ -95,6 +95,14 @@ extension NSTextView {
                                       .foregroundColor: NSColor.selectedTextColor]
         }
     }
+
+    /// Paint the caret in a theme color, or hand it back to the system. Same
+    /// idempotence rule as `applySelectionHighlight` — this runs on every update.
+    func applyCaretColor(_ color: NSColor?) {
+        let target = color ?? .textInsertionPointColor
+        guard insertionPointColor != target else { return }
+        insertionPointColor = target
+    }
 }
 
 extension ReadingFont {
