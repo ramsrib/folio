@@ -548,36 +548,8 @@ final class VaultStore: ObservableObject {
                     .trimmingCharacters(in: .whitespacesAndNewlines)))
         }
         var tags = TagSyntax.tags(in: text)
-        tags.formUnion(frontmatterTags(text))
+        tags.formUnion(Frontmatter.tags(in: text))
         return (refs, Array(tags))
-    }
-
-    private func frontmatterTags(_ text: String) -> [String] {
-        let lines = text.components(separatedBy: "\n")
-        guard lines.first == "---" else { return [] }
-        var out: [String] = []
-        var inTags = false
-        var i = 1
-        while i < lines.count, lines[i] != "---" {
-            let raw = lines[i]
-            let t = raw.trimmingCharacters(in: .whitespaces)
-            if inTags {
-                if t.hasPrefix("-") { out.append(t.dropFirst().trimmingCharacters(in: .whitespaces)) }
-                else if !(raw.first == " " || raw.first == "\t") { inTags = false }
-            }
-            if t.hasPrefix("tags:") {
-                let val = t.dropFirst("tags:".count).trimmingCharacters(in: .whitespaces)
-                if val.hasPrefix("[") {
-                    out.append(contentsOf: val.dropFirst().dropLast()
-                        .split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
-                } else if val.isEmpty { inTags = true }
-                else { out.append(val) }
-            }
-            i += 1
-        }
-        // Same rule as the inline regex — frontmatter reaches the index by its
-        // own path, so the numeric guard has to be repeated here.
-        return out.filter(TagSyntax.isValid)
     }
 
     // MARK: - Link resolution
