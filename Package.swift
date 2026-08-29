@@ -11,6 +11,12 @@ let package = Package(
             // Relaxed concurrency for the MVP; tighten to .v6 once the
             // file/index/editor boundaries settle.
             swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        .testTarget(
+            name: "FolioTests",
+            dependencies: ["Folio"],
+            path: "Tests/FolioTests",
+            swiftSettings: [.swiftLanguageMode(.v5)]
         )
     ]
 )

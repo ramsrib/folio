@@ -2,13 +2,16 @@ APP_NAME := Folio
 APP := build/$(APP_NAME).app
 DEST := /Applications/$(APP_NAME).app
 
-.PHONY: build run app open install release clean
+.PHONY: build run test app open install release clean
 
 build: ## Compile the SwiftPM target
 	swift build
 
 run: ## Run straight from SwiftPM (dev loop)
 	swift run
+
+test: ## Run the test suite
+	swift test
 
 app: ## Package build/Folio.app with the bundle id
 	./scripts/package-app.sh release

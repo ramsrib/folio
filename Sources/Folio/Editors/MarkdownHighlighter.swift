@@ -19,7 +19,9 @@ enum MarkdownHighlighter {
     private static let strike     = rx("~~([^~\\n]+)~~")
     private static let mdLink     = rx("\\[([^\\]\\n]+)\\]\\(([^)\\n]+)\\)")
     private static let wiki       = rx("\\[\\[([^\\]\\n]+)\\]\\]")
-    private static let tag        = rx("(?<!\\S)#([A-Za-z0-9_/-]+)")
+    // Shared with the index — see TagSyntax. Highlighting a token the tag list
+    // refuses to file is a lie about what the vault contains.
+    private static let tag        = TagSyntax.regex
     private static let highlight  = rx("==([^=\\n]+)==")
     private static let task       = rx("^(\\s*[-*+]\\s+)(\\[[ xX]\\])(.*)$")
 

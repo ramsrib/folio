@@ -76,7 +76,6 @@ final class VaultStore: ObservableObject {
     private typealias LinkRef = (inner: String, context: String)
     private var linkCache: [URL: (mtime: Date, refs: [LinkRef], tags: [String])] = [:]  // mtime-keyed cache
     @Published private(set) var tagsIndex: [String: [URL]] = [:]   // tag -> notes
-    private static let tagRegex = try! NSRegularExpression(pattern: "(?<!\\S)#([A-Za-z0-9_][A-Za-z0-9_/-]*)")
 
     var allTags: [(tag: String, count: Int)] {
         tagsIndex.map { (tag: $0.key, count: $0.value.count) }.sorted {
@@ -548,11 +547,7 @@ final class VaultStore: ObservableObject {
                 context: ns.substring(with: ns.lineRange(for: m.range))
                     .trimmingCharacters(in: .whitespacesAndNewlines)))
         }
-        var tags = Set<String>()
-        Self.tagRegex.enumerateMatches(in: text, range: full) { m, _, _ in
-            guard let m else { return }
-            tags.insert(ns.substring(with: m.range(at: 1)))
-        }
+        var tags = TagSyntax.tags(in: text)
         tags.formUnion(frontmatterTags(text))
         return (refs, Array(tags))
     }
@@ -580,7 +575,9 @@ final class VaultStore: ObservableObject {
             }
             i += 1
         }
-        return out.filter { !$0.isEmpty }
+        // Same rule as the inline regex — frontmatter reaches the index by its
+        // own path, so the numeric guard has to be repeated here.
+        return out.filter(TagSyntax.isValid)
     }
 
     // MARK: - Link resolution
