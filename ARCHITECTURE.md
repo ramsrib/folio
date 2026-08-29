@@ -22,6 +22,10 @@ single shared objects, so a second window would be a *mirror* of the first, not
 an independent workspace. True multi-window needs per-window stores plus
 focused-scene menu plumbing — do it properly or not at all.
 
+One consequence worth knowing: opening a vault (or a note outside the current
+vault) *switches* the single window's vault. There is no way to hold two vaults
+open at once.
+
 ## Search: scan, don't index
 
 `⇧⌘F` content search (`ContentSearchModel`) is a **brute-force scan at query
@@ -85,32 +89,64 @@ disposable cache — emptying any of them loses nothing.
 | app lifetime, bounded | parsed blocks (~24 docs), rendered lines (~4096), highlighted code (~512), decoded images (~64, mtime-keyed) | crude reset on overflow |
 | session | per-note scroll offsets, navigation history (~100), recently closed tabs (~20) | small |
 
-## Reading pipeline & the layout triangle
+## Reading pipeline
 
-Reading mode parses the note into blocks (`MarkdownParser`), merges runs of
-consecutive paragraphs into single `Text`s (macOS cannot extend a selection
-across separate SwiftUI views — merge runs are capped at 24 paragraphs so no
-single Text becomes a Core Text stall), renders inline markdown per block
-(cached), and stacks the blocks.
+macOS reading mode is **one TextKit 2 text view** holding the whole note
+(`NoteReader` → `NoteTextView`, built by `NoteTextRenderer` from
+`MarkdownParser`'s blocks). One text stream is what makes selection, ⌘A, copy,
+Look Up, drag-out and real accessibility work — the note is a single
+`AXTextArea`. It also means both modes lay text out with the same engine from
+the same `Typography` constants, so ⌘E can't reflow the page.
 
-**The triangle:** one SwiftUI view tree cannot simultaneously give fast tab
-switching, pixel-exact scroll restore, and unlimited text selection.
+This replaced a block-per-view SwiftUI stack whose selection could never cross
+a block, because macOS cannot extend a selection across separate views. That
+design also forced a trade between fast tab switching, pixel-exact scroll
+restore, and selection ("the layout triangle") — one text view dissolves it.
+**iOS still runs the block reader** (`ReadingView`, `#if !os(macOS)`) until it
+gets the same treatment.
 
-- Non-lazy `VStack` (docs ≤400 blocks *and* ≤150KB): exact geometry → scroll
-  restore is pinned to the pixel; full layout per switch is affordable because
-  every layer below it is cached.
-- `LazyVStack` (bigger docs): fast switches, but unrealized rows have
-  *estimated* heights, so scroll restore drifts slightly.
+What is *not* text:
+
+- **Tables and the properties card** are SwiftUI, hosted via
+  `NSTextAttachmentViewProvider`. An attachment is one character in the same
+  stream, so a selection runs straight through them, and copy substitutes each
+  block's Markdown source (`.folioSource`).
+- A hosted block must be measured with its **width pinned inside SwiftUI**
+  (`rootView.frame(width:)`). `NSHostingView`'s intrinsic size reports the
+  *ideal* layout, and for a wide table the height that comes back with it is
+  near zero — TextKit reads zero height as "no view" and draws the generic
+  document icon in place of the block.
+
+TextKit has no block backgrounds, so code cards, callout fills, quote bars and
+rules are **drawn** from laid-out fragment geometry in `drawBackground`. That
+is bounded to the viewport: measuring a range lays it out, so walking every
+decoration would lay out the whole document on each draw pass.
+
+Intra-block line breaks use **U+2028**, not `\n`. TextKit treats `\n` as a
+paragraph terminator, so a hard-wrapped paragraph would fire `paragraphSpacing`
+after every wrapped source line. Copy converts them back.
 
 Per-note scroll memory is AppKit-level (`ScrollMemory`: clip-view bounds
 notifications record offsets continuously; restore is suppressed while a
 switch is in flight and skipped when a find/outline jump owns the position).
 
-**The dissolving fix** for the triangle — plus selection across headings/lists/
-code, exact find jumps, and dictionary lookup — is a TextKit-backed reading
-view (one NSTextView, incremental layout, real offsets). It is the next big
-rock; several deliberate approximations in this file are cheap *because* it's
-coming.
+## Typography
+
+Everything derives from the user's body size via `Typography`, so ⌘+/⌘− scales
+the whole note rather than just its prose, and one line-height constant governs
+both modes. Writing mode reads the same values (`Theme` is built from
+`AppSettings`), which is what keeps ⌘E from reflowing the text.
+
+Both text views **own their container width** (`applyReadableInset`). With
+`widthTracksTextView`, AppKit resizes the container from the stale inset on
+every `setFrameSize`, re-wrapping the text twice per frame while a pane
+animates. Setting the width ourselves means a sidebar slide moves the column
+instead of reflowing it.
+
+`LineBreakMode.auto` (the default) decides per paragraph whether a newline is a
+wrap artifact or deliberate: wrapped runs have non-final lines that are all
+full *and* continuations that mostly start lowercase. Length alone cannot
+separate "Overall: 4/10 / Recording: …" from wrapped prose; the capital can.
 
 ## SwiftUI/AppKit traps we paid for (don't re-learn these)
 

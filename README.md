@@ -108,10 +108,14 @@ Everything in this list is implemented. Anything not in it, assume it isn't.
 **Appearance (⌘,)**
 - Themes: System, Light, Dark, Paper (warm), Frosted (glass).
 - Reading font (System / Serif / Mono), body font size (**⌘+ / ⌘− / ⌘0** work anywhere, or
-  **pinch** on the trackpad), readable
-  line width (default ~70 chars/line), an optional **inline title**, and a **text rendering** choice
-  (Crisp / Smooth / Smoother — browser-style stem darkening; applies on relaunch). All applied live
-  except text rendering.
+  **pinch** on the trackpad), readable line width (default ~70 chars/line) or **full width** (fills
+  the pane — wider lines, less scrolling), an optional **inline title**, and a **text rendering**
+  choice (Crisp / Smooth / Smoother — browser-style stem darkening; applies on relaunch).
+- **Line breaks** — *Auto* (default) decides per paragraph: text wrapped at a column reflows,
+  deliberate short breaks are kept. *Preserve* keeps every newline (Obsidian); *Reflow* joins them
+  (CommonMark). Auto is right more often than either, because wrapping is a property of the
+  document rather than of the reader.
+- All applied live except text rendering.
 
 ## Opening from the terminal
 
