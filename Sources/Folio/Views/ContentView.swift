@@ -191,59 +191,18 @@ struct ContentView: View {
         ZStack {
             // Vault title centered in the sidebar column, growing symmetrically on
             // both sides. The 78pt horizontal clearance keeps it clear of the
-            // traffic lights (left) and the trailing controls (right) when long.
-            // The vault name drops a native menu (Obsidian's shape): anchored to
-            // the control you clicked, standard chrome, instant.
-            //
-            // Deliberately independent of ⇧⌘O's searchable palette rather than a
-            // route into it — a click on a named control and a global shortcut are
-            // different gestures, and each gets the presentation that suits it.
-            Menu {
-                ForEach(vault.recentVaults.filter { FileManager.default.fileExists(atPath: $0.path) },
-                        id: \.self) { url in
-                    Button {
-                        coordinator?.open(VaultRef(url))
-                    } label: {
-                        if url.standardizedFileURL.path == vault.vaultURL?.standardizedFileURL.path {
-                            Label(url.lastPathComponent, systemImage: "checkmark")
-                        } else {
-                            Text(url.lastPathComponent)
-                        }
-                    }
-                }
-                Divider()
-                Button("Open Other Vault…") {
-                    if let url = VaultPicker.choose() { coordinator?.open(VaultRef(url)) }
-                }
-            } label: {
-                HStack(spacing: 4) {
-                    Text(vault.vaultURL?.lastPathComponent ?? "Folio")
-                        .lineLimit(1).truncationMode(.tail)
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(vaultNameHovered ? .secondary : .tertiary)
-                }
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(vaultNameHovered ? .primary : .secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(vaultNameHovered ? Color.primary.opacity(0.07) : .clear,
-                            in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            // traffic lights (left) and the trailing controls (right); a name with
+            // nothing left to grow into truncates rather than sliding under them.
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                // The priority is what puts the truncation in the right place. An
+                // unprioritised HStack offers each of three children a third of
+                // the width, so the name would shorten with the gutters still
+                // empty; prioritised, the menu is measured first against
+                // everything the gutters leave, and the spacers take the rest.
+                vaultMenu.layoutPriority(1)
+                Spacer(minLength: 0)
             }
-            .menuStyle(.button)
-            .buttonStyle(.plain)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .help("Switch Vault (⇧⌘O)")
-            .accessibilityLabel("Switch vault")
-            .onHover { vaultNameHovered = $0 }
-            .pointerStyle(.link)
-            .animation(.easeOut(duration: 0.12), value: vaultNameHovered)
-            .buttonStyle(.plain)
-            .help("Switch Vault (⇧⌘O)")
-            .accessibilityLabel("Switch vault")
-            .frame(maxWidth: .infinity, alignment: .center)
             .padding(.horizontal, 78)
 
             HStack(spacing: 6) {
@@ -265,6 +224,62 @@ struct ContentView: View {
             .padding(.trailing, 10)
         }
         // Zoom-on-double-click is handled by the whole title strip (see titleBar).
+    }
+
+    /// The vault name, dropping a native menu of recent vaults (Obsidian's shape):
+    /// anchored to the control you clicked, standard chrome, instant.
+    ///
+    /// Deliberately independent of ⇧⌘O's searchable palette rather than a route
+    /// into it — a click on a named control and a global shortcut are different
+    /// gestures, and each gets the presentation that suits it.
+    private var vaultMenu: some View {
+        Menu {
+            ForEach(vault.recentVaults.filter { FileManager.default.fileExists(atPath: $0.path) },
+                    id: \.self) { url in
+                Button {
+                    coordinator?.open(VaultRef(url))
+                } label: {
+                    if url.standardizedFileURL.path == vault.vaultURL?.standardizedFileURL.path {
+                        Label(url.lastPathComponent, systemImage: "checkmark")
+                    } else {
+                        Text(url.lastPathComponent)
+                    }
+                }
+            }
+            Divider()
+            Button("Open Other Vault…") {
+                if let url = VaultPicker.choose() { coordinator?.open(VaultRef(url)) }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(vault.vaultURL?.lastPathComponent ?? "Folio")
+                    .lineLimit(1).truncationMode(.tail)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(vaultNameHovered ? .secondary : .tertiary)
+                    // The chevron is what says the name is a control, so it is the
+                    // one part that must never be the thing that gets squeezed out.
+                    .layoutPriority(1)
+            }
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(vaultNameHovered ? .primary : .secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(vaultNameHovered ? Color.primary.opacity(0.07) : .clear,
+                        in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        // No `.fixedSize()`: it pins the label to its ideal width, which is what
+        // let a long vault name overflow the gutters and run under the traffic
+        // lights instead of truncating.
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .help("Switch Vault (⇧⌘O)")
+        .accessibilityLabel("Switch vault")
+        .onHover { vaultNameHovered = $0 }
+        .pointerStyle(.link)
+        .animation(.easeOut(duration: 0.12), value: vaultNameHovered)
     }
 
     private var contentTitleArea: some View {
