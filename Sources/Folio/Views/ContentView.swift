@@ -175,10 +175,12 @@ struct ContentView: View {
             // Vault title centered in the sidebar column, growing symmetrically on
             // both sides. The 78pt horizontal clearance keeps it clear of the
             // traffic lights (left) and the trailing controls (right) when long.
-            // The vault name is the switcher, as a native menu (Obsidian's shape):
-            // anchored to the control you clicked, standard menu chrome, instant.
-            // ⇧⌘O still opens the searchable palette, which earns its keep once
-            // there are more vaults than fit a menu comfortably.
+            // The vault name drops a native menu (Obsidian's shape): anchored to
+            // the control you clicked, standard chrome, instant.
+            //
+            // Deliberately independent of ⇧⌘O's searchable palette rather than a
+            // route into it — a click on a named control and a global shortcut are
+            // different gestures, and each gets the presentation that suits it.
             Menu {
                 ForEach(vault.recentVaults.filter { FileManager.default.fileExists(atPath: $0.path) },
                         id: \.self) { url in
@@ -196,7 +198,6 @@ struct ContentView: View {
                 Button("Open Other Vault…") {
                     if let url = VaultPicker.choose() { coordinator?.open(VaultRef(url)) }
                 }
-                Button("Switch Vault…  ⇧⌘O") { ui.showVaultSwitcher = true }
             } label: {
                 HStack(spacing: 4) {
                     Text(vault.vaultURL?.lastPathComponent ?? "Folio")
