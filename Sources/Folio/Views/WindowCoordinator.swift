@@ -14,11 +14,34 @@ import AppKit
 /// autoclosure and from `viewDidMoveToWindow` — i.e. mid-view-update — where
 /// publishing a change would re-enter SwiftUI's update cycle. (That re-entrancy
 /// is what made an earlier version hang before any window appeared.)
+/// ## The ordering contract (read this before changing anything here)
+///
+/// A window reports itself in two steps that can arrive in **either order**:
+///
+/// 1. `claimPendingVault()` — in the `StateObject` autoclosure, before the window
+///    exists. Destructive: it removes a vault from the queue.
+/// 2. `register(_:claimed:)` — from `.task`, after `start()` has loaded the vault.
+/// 3. `attach(_:to:)` — from `viewDidMoveToWindow`, which may fire **before**
+///    `.task`, i.e. before `register`.
+///
+/// So a store can be in `entries` with `vaultURL == nil` while already owning a
+/// vault it claimed at birth. That is why `Entry.claimed` exists and why every
+/// "is this window empty?" test checks it: without it, such a window looks free,
+/// gets handed another vault, and the vault it claimed is lost with no window to
+/// show it.
+///
+/// Likewise `open(_:)` must consider vaults already *requested* but not yet
+/// registered (`pendingVaults`), because `openWindowAction` is asynchronous.
 @MainActor
 final class WindowCoordinator {
     private struct Entry {
         weak var store: VaultStore?
         weak var window: NSWindow?
+        /// What this window claimed at birth. `attach` can run before `.task`, so
+        /// a store can be registered while `vaultURL` is still nil even though it
+        /// already owns a vault — without this, such a window looks "empty" and
+        /// gets handed someone else's vault, discarding its own.
+        var claimed: VaultRef?
     }
 
     private var entries: [Entry] = []
@@ -40,10 +63,15 @@ final class WindowCoordinator {
     init() {
         // Seed from the previous session; migrate the pre-multi-window key.
         var session = VaultSession.openVaults
-        if session.isEmpty,
-           let legacy = VaultRef(path: UserDefaults.standard.string(forKey: "folio.vaultPath")),
-           legacy.exists {
-            session = [legacy]
+        // One-shot: gating on an empty session alone would re-fire on any launch
+        // where nothing was open, resurrecting whatever vault was last touched.
+        let migrationKey = "folio.didMigrateSingleVault"
+        if session.isEmpty, !UserDefaults.standard.bool(forKey: migrationKey) {
+            UserDefaults.standard.set(true, forKey: migrationKey)
+            if let legacy = VaultRef(path: UserDefaults.standard.string(forKey: "folio.vaultPath")),
+               legacy.exists {
+                session = [legacy]
+            }
         }
         pendingVaults = session
     }
@@ -58,10 +86,12 @@ final class WindowCoordinator {
         pendingVaults.isEmpty ? nil : pendingVaults.removeFirst()
     }
 
-    func register(_ store: VaultStore) {
+    func register(_ store: VaultStore, claimed: VaultRef?) {
         entries.removeAll { $0.store == nil }
-        if !entries.contains(where: { $0.store === store }) {
-            entries.append(Entry(store: store, window: nil))
+        if let i = entries.firstIndex(where: { $0.store === store }) {
+            if entries[i].claimed == nil { entries[i].claimed = claimed }
+        } else {
+            entries.append(Entry(store: store, window: nil, claimed: claimed))
         }
         if let url = store.vaultURL { VaultSession.opened(VaultRef(url)) }
         claimFiles(for: store)
@@ -86,7 +116,7 @@ final class WindowCoordinator {
 
     private func observeClose(_ window: NSWindow) {
         NotificationCenter.default.addObserver(
-            forName: NSWindow.willCloseNotification, object: window, queue: .main
+            forName: NSWindow.willCloseNotification, object: window, queue: nil
         ) { [weak self] note in
             guard let window = note.object as? NSWindow else { return }
             MainActor.assumeIsolated { self?.windowWillClose(window) }
@@ -110,18 +140,33 @@ final class WindowCoordinator {
     /// new window. Every caller — menu, switcher, palette, Dock, external open —
     /// comes through here, so the one-window-per-vault rule lives in one place.
     func open(_ ref: VaultRef) {
-        if let entry = entries.first(where: { $0.store?.vaultURL.map(VaultRef.init) == ref }) {
+        if let entry = entry(holding: ref) {
+            if entry.window?.isMiniaturized == true { entry.window?.deminiaturize(nil) }
             entry.window?.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
-        if let empty = entries.compactMap(\.store).first(where: { $0.vaultURL == nil }) {
+        // A window for this vault may already be *in flight*: `openWindowAction`
+        // is async, so the window registers many runloop turns later. Without
+        // this, opening two files from one vault in a single batch queues it
+        // twice and materializes two windows for it.
+        guard !pendingVaults.contains(ref) else { return }
+        if let i = entries.firstIndex(where: { $0.store?.vaultURL == nil && $0.claimed == nil }),
+           let empty = entries[i].store {
+            entries[i].claimed = ref
             empty.adopt(ref.url)
-            entries.first { $0.store === empty }?.window?.makeKeyAndOrderFront(nil)
+            entries[i].window?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
             return
         }
         pendingVaults.append(ref)
         openWindowAction?()
+    }
+
+    /// The window showing this vault, by claim or by loaded vault — a window that
+    /// has claimed but not yet started still owns its vault.
+    private func entry(holding ref: VaultRef) -> Entry? {
+        entries.first { $0.store?.vaultURL.map(VaultRef.init) == ref || $0.claimed == ref }
     }
 
     func openEmptyWindow() { openWindowAction?() }
@@ -133,8 +178,11 @@ final class WindowCoordinator {
     func bootstrapIfNeeded() {
         guard !didBootstrap else { return }
         didBootstrap = true
+        // Clear as we request: the buffer drain below runs in this same turn, and
+        // a still-populated queue would make it re-request vaults already in flight.
         let remaining = pendingVaults
-        for _ in remaining { openWindowAction?() }
+        pendingVaults = []
+        for ref in remaining { pendingVaults.append(ref); openWindowAction?() }
         let buffered = bufferedURLs
         bufferedURLs = []
         if !buffered.isEmpty { handleExternal(buffered) }
@@ -151,10 +199,14 @@ final class WindowCoordinator {
             if url.isFileURL {
                 ref = window(owning: url).map { VaultRef($0.store.vaultURL!) }
                     ?? VaultRef(VaultResolver.vault(for: url))
-            } else if let (vault, _) = VaultResolver.destination(for: url) {
+            } else if let (vault, _) = VaultResolver.destination(for: url),
+                      VaultRef(vault).exists {
                 ref = VaultRef(vault)
             } else {
-                keyStore?.handleExternal(urls: [url])   // a link we can't place
+                // A folio:// link with no resolvable vault. Handing it to some
+                // window would make that window swap vaults — the single-window
+                // behaviour this feature exists to remove.
+                NSSound.beep()
                 continue
             }
 
@@ -165,8 +217,12 @@ final class WindowCoordinator {
                 store.handleExternal(urls: [url])
                 entry.window?.makeKeyAndOrderFront(nil)
                 NSApp.activate(ignoringOtherApps: true)
-            } else if let empty = entries.compactMap(\.store).first(where: { $0.vaultURL == nil }) {
+            } else if let i = entries.firstIndex(where: { $0.store?.vaultURL == nil && $0.claimed == nil }),
+                      let empty = entries[i].store {
+                entries[i].claimed = ref
                 empty.handleExternal(urls: [url])
+                entries[i].window?.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
             } else {
                 pendingOpens.append((url, ref))
                 open(ref)
@@ -208,13 +264,17 @@ final class WindowCoordinator {
 
     /// The store of the front window — what window-less actions (the Dock menu)
     /// should act on.
+    /// True until the first window has bootstrapped — the launch heuristic keys
+    /// off this rather than `NSApp.windows`, which is non-empty for panels and
+    /// SwiftUI's own hosts and would silently leave the app running with no UI.
+    var needsLaunchWindow: Bool { entries.isEmpty && !didBootstrap }
+
     var keyStore: VaultStore? {
         if let key = NSApp.keyWindow,
            let entry = entries.first(where: { $0.window === key }) { return entry.store }
         return entries.compactMap(\.store).last
     }
 
-    var openVaultCount: Int { entries.count }
 }
 
 private struct WindowCoordinatorKey: EnvironmentKey {

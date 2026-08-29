@@ -14,12 +14,16 @@ enum VaultResolver {
         let resolved = file.resolvingSymlinksInPath().standardizedFileURL.path
         let recents = (UserDefaults.standard.array(forKey: "folio.recentVaults") as? [String] ?? [])
             .map { URL(fileURLWithPath: $0) }
-        let containing = recents.filter {
-            resolved.hasPrefix($0.resolvingSymlinksInPath().standardizedFileURL.path + "/")
-        }
-        if let deepest = containing.max(by: { $0.standardizedFileURL.path.count < $1.standardizedFileURL.path.count }) {
-            return deepest
-        }
+        let containing = recents
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+            .filter { resolved.hasPrefix($0.resolvingSymlinksInPath().standardizedFileURL.path + "/") }
+        // Compare *resolved* lengths: a vault reached through a short symlink is
+        // not shallower than one spelled out, and the deepest vault must win so a
+        // nested vault beats its parent.
+        if let deepest = containing.max(by: {
+            $0.resolvingSymlinksInPath().standardizedFileURL.path.count
+                < $1.resolvingSymlinksInPath().standardizedFileURL.path.count
+        }) { return deepest }
         return file.deletingLastPathComponent()
     }
 
@@ -29,7 +33,10 @@ enum VaultResolver {
     static func destination(for url: URL) -> (vault: URL, file: URL?)? {
         guard url.scheme?.lowercased() == "folio" else { return nil }
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
-        guard let vaultPath = items.first(where: { $0.name == "vault" })?.value else { return nil }
+        // Empty is absent — matching `VaultStore.parseFolioLink`, or an empty
+        // `vault=` would resolve to the process's working directory.
+        guard let vaultPath = items.first(where: { $0.name == "vault" })?.value,
+              !vaultPath.isEmpty else { return nil }
         let vault = URL(fileURLWithPath: vaultPath, isDirectory: true)
         let file = items.first(where: { $0.name == "file" })?.value
             .map { vault.appendingPathComponent($0) }

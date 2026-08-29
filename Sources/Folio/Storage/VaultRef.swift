@@ -41,13 +41,19 @@ enum VaultSession {
         (d.array(forKey: key) as? [String] ?? []).compactMap { VaultRef(path: $0) }.filter(\.exists)
     }
 
+    /// Raw list, unfiltered. Reads filter for existence so a deleted vault doesn't
+    /// open a window; writes must NOT, or a vault on an unmounted volume would be
+    /// dropped from the session the first time any other vault opens or closes.
+    private static var stored: [VaultRef] {
+        (d.array(forKey: key) as? [String] ?? []).compactMap { VaultRef(path: $0) }
+    }
+
     static func opened(_ ref: VaultRef) {
-        var refs = openVaults.filter { $0 != ref }
-        refs.append(ref)
-        d.set(refs.map(\.path), forKey: key)
+        guard !stored.contains(ref) else { return }   // keep the user's ordering
+        d.set((stored + [ref]).map(\.path), forKey: key)
     }
 
     static func closed(_ ref: VaultRef) {
-        d.set(openVaults.filter { $0 != ref }.map(\.path), forKey: key)
+        d.set(stored.filter { $0 != ref }.map(\.path), forKey: key)
     }
 }

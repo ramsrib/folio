@@ -83,7 +83,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // bootstrap and releases the buffered open.
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
-                if NSApp.windows.isEmpty { self.coordinator.openWindowAction?() }
+                if self.coordinator.needsLaunchWindow { self.coordinator.openWindowAction?() }
             }
         }
     }

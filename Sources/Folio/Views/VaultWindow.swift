@@ -11,6 +11,9 @@ struct VaultWindow: View {
     @StateObject private var ui = UIState()
     @ObservedObject var settings: AppSettings
     let coordinator: WindowCoordinator
+    /// The vault this window claimed at birth, so the coordinator knows it is
+    /// spoken for even before `start()` has loaded it.
+    private let claimed: VaultRef?
 
     init(coordinator: WindowCoordinator, settings: AppSettings) {
         self.coordinator = coordinator
@@ -18,7 +21,9 @@ struct VaultWindow: View {
         // The claim must happen inside the autoclosure: it runs exactly once per
         // window, whereas this init runs on every re-evaluation of the parent —
         // claiming there would drain the queue.
-        _vault = StateObject(wrappedValue: VaultStore(vault: coordinator.claimPendingVault()?.url))
+        let claim = coordinator.claimPendingVault()
+        claimed = claim
+        _vault = StateObject(wrappedValue: VaultStore(vault: claim?.url))
     }
 
     var body: some View {
@@ -40,7 +45,7 @@ struct VaultWindow: View {
                 // before any window does — a document-driven launch presents no
                 // scene until the AppDelegate summons one).
                 vault.start()
-                coordinator.register(vault)
+                coordinator.register(vault, claimed: claimed)
                 coordinator.bootstrapIfNeeded()
             }
     }
