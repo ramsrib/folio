@@ -16,9 +16,23 @@ final class HostedBlockAttachment: NSTextAttachment {
     /// in full-width mode, which is not something you can hand to a frame.
     var measurementWidth: CGFloat { width.isFinite ? width : 900 }
 
-    /// The block, hard-pinned to a width so SwiftUI reports the wrapped height.
-    func sized(to width: CGFloat) -> AnyView {
-        AnyView(rootView.frame(width: width))
+    /// The block, hard-pinned to a width so SwiftUI reports the wrapped height,
+    /// and reporting that height whenever it changes.
+    ///
+    /// The report is what makes a block that *grows* work (the properties card
+    /// expanding). `tracksTextAttachmentViewBounds` cannot do it: it watches the
+    /// hosted view's bounds, but TextKit sets those bounds *from*
+    /// `attachmentBounds`, so the view never resizes itself and nothing ever
+    /// re-measures — the card just gets clipped to its collapsed height.
+    func sized(to width: CGFloat, onHeightChange: @escaping (CGFloat) -> Void) -> AnyView {
+        AnyView(
+            rootView
+                .frame(width: width)
+                // Take the ideal height rather than whatever TextKit last forced,
+                // or the reported height would just echo the stale value back.
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { onHeightChange($0) }
+        )
     }
 
     init(rootView: AnyView, width: CGFloat) {
@@ -50,11 +64,27 @@ final class HostedBlockViewProvider: NSTextAttachmentViewProvider {
     private static let provisionalHeight: CGFloat = 44
 
     private var hostedWidth: CGFloat = -1
+    /// The height last handed to TextKit, so a report that matches it is ignored
+    /// and the invalidate → re-measure → report cycle terminates.
+    private var reportedHeight: CGFloat = -1
 
     override func loadView() {
         guard let attachment = textAttachment as? HostedBlockAttachment else { return }
         hostedWidth = attachment.measurementWidth
-        view = NSHostingView(rootView: attachment.sized(to: hostedWidth))
+        view = NSHostingView(rootView: attachment.sized(to: hostedWidth) { [weak self] height in
+            self?.contentHeightChanged(height)
+        })
+    }
+
+    /// The hosted block changed height (the properties card expanded). Ask TextKit
+    /// to re-lay this attachment so it asks us for the new bounds.
+    private func contentHeightChanged(_ height: CGFloat) {
+        guard abs(ceil(height) - reportedHeight) > 0.5 else { return }
+        guard let layoutManager = textLayoutManager,
+              let content = layoutManager.textContentManager,
+              let end = content.location(location, offsetBy: 1),
+              let range = NSTextRange(location: location, end: end) else { return }
+        layoutManager.invalidateLayout(for: range)
     }
 
     override func attachmentBounds(for attributes: [NSAttributedString.Key: Any],
@@ -74,7 +104,9 @@ final class HostedBlockViewProvider: NSTextAttachmentViewProvider {
         // measuring near-zero and rendering as the generic attachment icon.
         if abs(hostedWidth - width) > 0.5 {
             hostedWidth = width
-            host.rootView = attachment.sized(to: width)
+            host.rootView = attachment.sized(to: width) { [weak self] height in
+                self?.contentHeightChanged(height)
+            }
             host.layoutSubtreeIfNeeded()
         }
         let measured = max(host.intrinsicContentSize.height, host.fittingSize.height)
@@ -82,7 +114,8 @@ final class HostedBlockViewProvider: NSTextAttachmentViewProvider {
         // attachment icon. `tracksTextAttachmentViewBounds` re-measures once the
         // hosted view settles, so a provisional height self-corrects.
         let height = measured > 1 ? measured : Self.provisionalHeight
-        return CGRect(x: 0, y: 0, width: width, height: ceil(height))
+        reportedHeight = ceil(height)
+        return CGRect(x: 0, y: 0, width: width, height: reportedHeight)
     }
 }
 
