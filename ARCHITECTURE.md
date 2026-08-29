@@ -191,7 +191,10 @@ separate "Overall: 4/10 / Recording: …" from wrapped prose; the capital can.
    disambiguate — it read as ~1s of UI lag on tabs and sidebar rows. Fire the
    single action immediately and detect doubles manually by timestamp
    (`NSEvent.doubleClickInterval`), designing the double action to *upgrade*
-   an already-fired single (see `openInOwnTab`).
+   an already-fired single (see `openInOwnTab`). Re-learned the hard way: the
+   sidebar title bar kept its count-2 zoom gesture, so the vault-name button
+   added inside it inherited a half-second delay before the switcher appeared.
+   `sidebarTitleArea` now detects the double by timestamp.
 2. **`@Published` fires on same-value writes.** An unconditional
    `ui.mode = .read` on every selection change re-rendered the entire window
    twice per tab switch. Guard hot-path writes: `if x != v { x = v }`.

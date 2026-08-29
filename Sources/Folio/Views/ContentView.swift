@@ -16,6 +16,11 @@ struct ContentView: View {
     /// grabs first-responder at launch and competes with the palettes for focus.
     /// Revealed by the sidebar's magnifier icon, ⇧⌘K, or the command palette.
     @State private var showFilter = false
+    @Environment(\.windowCoordinator) private var coordinator
+    @State private var showVaultPopover = false
+    @State private var vaultNameHovered = false
+    /// For manual double-click detection on the title bar (see `sidebarTitleArea`).
+    @State private var lastTitleClick = Date.distantPast
     @FocusState private var filterFocused: Bool
 
     private let expandedKey = "folio.expandedByVault"   // [vaultPath: [dirPath]]
@@ -174,22 +179,40 @@ struct ContentView: View {
             // The vault name is the switcher: the thing you'd click to change
             // vaults is the thing naming the one you're in.
             Button {
-                ui.showVaultSwitcher = true
+                showVaultPopover = true
             } label: {
                 HStack(spacing: 4) {
                     Text(vault.vaultURL?.lastPathComponent ?? "Folio")
                         .lineLimit(1).truncationMode(.tail)
                     Image(systemName: "chevron.up.chevron.down")
                         .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(vaultNameHovered ? .secondary : .tertiary)
                 }
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .contentShape(Rectangle())
+                .foregroundStyle(vaultNameHovered ? .primary : .secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                // It's a menu-ish control, so it has to read as one: nothing but
+                // a chevron marked it as clickable before.
+                .background(vaultNameHovered ? Color.primary.opacity(0.07) : .clear,
+                            in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             }
+            .onHover { vaultNameHovered = $0 }
+            .pointerStyle(.link)
+            .animation(.easeOut(duration: 0.12), value: vaultNameHovered)
             .buttonStyle(.plain)
             .help("Switch Vault (⇧⌘O)")
             .accessibilityLabel("Switch vault")
+            // Anchored to the name you clicked. ⇧⌘O still opens the centered
+            // palette — a keyboard shortcut has nothing to point at.
+            .popover(isPresented: $showVaultPopover, arrowEdge: .bottom) {
+                VaultSwitcherView(style: .popover) { showVaultPopover = false }
+                    .environmentObject(vault)
+                    .environmentObject(ui)
+                    .environmentObject(settings)
+                    .environment(\.windowCoordinator, coordinator)
+            }
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.horizontal, 78)
 
@@ -212,10 +235,21 @@ struct ContentView: View {
             .padding(.trailing, 10)
         }
         // Native title-bar double-click (zoom/minimize per System Settings) —
-        // the hidden real title bar means AppKit never sees it. Safe here: this
-        // area has no single-click action to delay (the buttons are Buttons, not
-        // tap gestures, and don't wait for recognizer disambiguation).
-        .onTapGesture(count: 2) { titleBarDoubleClicked() }
+        // the hidden real title bar means AppKit never sees it.
+        //
+        // Detected by timestamp rather than `.onTapGesture(count: 2)`: a count-2
+        // recognizer holds *every* click in this area for the double-click
+        // interval to disambiguate, which made the vault-name button feel like it
+        // lagged half a second before opening. See ARCHITECTURE.md, trap 1.
+        .onTapGesture {
+            let now = Date()
+            if now.timeIntervalSince(lastTitleClick) < NSEvent.doubleClickInterval {
+                lastTitleClick = .distantPast
+                titleBarDoubleClicked()
+            } else {
+                lastTitleClick = now
+            }
+        }
     }
 
     private var contentTitleArea: some View {
