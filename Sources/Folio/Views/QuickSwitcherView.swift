@@ -67,6 +67,10 @@ struct QuickSwitcherView: View {
         rows = isHeadingMode
             ? headingCandidates.map { Row.heading($0.0, $0.1) }
             : fileCandidates.map(Row.file) + (showsCreate ? [Row.create(trimmedQuery)] : [])
+        // A rebuild triggered by the vault changing underneath us (a watcher
+        // event while the palette is open) doesn't reset `selected` the way a
+        // query change does, so keep it in range.
+        if selected >= rows.count { selected = max(0, rows.count - 1) }
     }
 
     private var fileCandidates: [Candidate] {
@@ -165,6 +169,10 @@ struct QuickSwitcherView: View {
         .onKeyPress(.upArrow) { move(-1); return .handled }
         .onKeyPress(.return, phases: .down) { handleReturn($0.modifiers) }
         .task { buildIndex(); recompute() }
+        // Count is the cheap proxy for "the file list changed". It misses a
+        // same-count change (a rename) made *while the palette is open*; the
+        // index is rebuilt on every open, so that window is small, and the
+        // alternative is hashing 2,000 paths on every body pass.
         .onChange(of: vault.files.count) { buildIndex(); recompute() }
         .onExitCommand { ui.showQuickSwitcher = false }
     }
