@@ -20,6 +20,9 @@ struct NoteTextView: NSViewRepresentable {
     let background: NSColor
     /// Theme tint for selected text; nil uses the system selection color.
     let selectionHighlight: NSColor?
+    /// Body and dimmed text from the theme.
+    let textColor: NSColor
+    let secondaryTextColor: NSColor
     let noteID: URL?
     @ObservedObject var find: FindModel
     /// Heading anchor to scroll to (outline click / wikilink with `#heading`).
@@ -130,13 +133,20 @@ struct NoteTextView: NSViewRepresentable {
         // MARK: Content
 
         func render(_ config: NoteTextView) {
-            let key = "\(config.renderKey)|\(config.bodySize)|\(config.family.rawValue)|\(config.readableWidth)"
+            // The palette is part of the rendered string, so a theme switch has to
+            // re-render. A light/dark switch does not — those colors are dynamic
+            // and re-resolve at draw time.
+            let key = "\(config.renderKey)|\(config.bodySize)|\(config.family.rawValue)"
+                + "|\(config.readableWidth)"
+                + "|\(config.textColor.hashValue)|\(config.secondaryTextColor.hashValue)"
             guard key != renderedKey, let tv = textView else { return }
             renderedKey = key
 
             let renderer = NoteTextRenderer(bodySize: config.bodySize,
                                             family: config.family,
                                             contentWidth: config.readableWidth,
+                                            textColor: config.textColor,
+                                            secondaryTextColor: config.secondaryTextColor,
                                             loadImage: config.loadImage)
             let string = renderer.render(config.blocks)
             tv.textStorage?.setAttributedString(string)

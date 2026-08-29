@@ -165,9 +165,11 @@ final class AppSettings: ObservableObject {
 
     var colorScheme: ColorScheme? {
         switch theme {
-        case .system, .frosted: return nil    // frosted glass adapts to light/dark
-        case .light, .paper:    return .light
-        case .dark:             return .dark
+        // Frosted glass and Paper both have a light and a dark side, so they
+        // follow the system rather than pinning an appearance.
+        case .system, .frosted, .paper: return nil
+        case .light:                    return .light
+        case .dark:                     return .dark
         }
     }
 
@@ -183,29 +185,91 @@ final class AppSettings: ObservableObject {
     var sidebarBackground: Color? { theme == .paper ? Color(platform: Self.paperSidebar) : nil }
     /// Background for floating surfaces (palettes, outline, backlinks): theme tint or material.
     var surfaceStyle: AnyShapeStyle {
-        if let paper = paneBackground { return AnyShapeStyle(paper) }
-        return AnyShapeStyle(.regularMaterial)
+        theme == .paper ? AnyShapeStyle(Color(platform: Self.paperSurface))
+                        : AnyShapeStyle(.regularMaterial)
     }
 
     /// Tint for selection highlights across lists/palettes (sidebar, command palette,
-    /// quick switcher, tags). Paper uses a warm sepia so selections match the cream
+    /// quick switcher, tags). Paper uses a warm tint so selections match the ground
     /// instead of a system-blue pop; other themes use the system accent.
     var selectionTint: Color { theme == .paper ? Color(platform: Self.paperSelection) : .accentColor }
-    /// Background fill for a selected row (the tint at a theme-tuned opacity).
+    /// Background fill for a selected row, and the wash behind selected text —
+    /// one color for both, so a selected row and a run of selected text can't drift.
     var selectionFill: Color {
-        theme == .paper ? Color(platform: Self.paperSelection).opacity(selectionAlpha) : Color.accentColor.opacity(0.20)
+        theme == .paper ? Color(platform: Self.paperSelectionFill) : Color.accentColor.opacity(0.20)
     }
-    /// Selecting text inside a note, in the same warm sepia the sidebar uses —
-    /// the system blue read as a foreign object on the cream. nil = system
-    /// selection color, which already matches every other theme's chrome.
+    /// Body and dimmed text. Every theme but Paper's dark side resolves to the
+    /// system label colors, so this is a no-op everywhere else.
+    var nsTextColor: PlatformColor { theme == .paper ? Self.paperText : .pLabel }
+    var nsSecondaryTextColor: PlatformColor {
+        theme == .paper ? Self.paperSecondaryText : .pSecondaryLabel
+    }
+    /// Selecting text inside a note, in the same tint the sidebar uses — the
+    /// system blue read as a foreign object on the cream. nil = system selection
+    /// color, which already matches every other theme's chrome.
     var nsSelectionHighlight: PlatformColor? {
-        theme == .paper ? Self.paperSelection.withAlphaComponent(CGFloat(selectionAlpha)) : nil
+        theme == .paper ? Self.paperSelectionFill : nil
     }
-    /// One opacity for every selection surface, so a selected row and a run of
-    /// selected text land on the same tone.
-    private var selectionAlpha: Double { 0.28 }
 
-    private static let paper = PlatformColor(red: 0.98, green: 0.96, blue: 0.90, alpha: 1)
-    private static let paperSidebar = PlatformColor(red: 0.96, green: 0.93, blue: 0.84, alpha: 1)
-    private static let paperSelection = PlatformColor(red: 0.55, green: 0.40, blue: 0.20, alpha: 1)
+    // MARK: Paper palette
+    //
+    // One hue (~91° in OKLCh) at two lightnesses. The dark side is built fresh
+    // rather than inverted: inverting the cream lands on a navy, because warmth
+    // doesn't survive the flip.
+    //
+    // Counter-intuitively the dark side needs MORE absolute chroma than the light
+    // one, not less — the eye loses chroma sensitivity as luminance falls, so the
+    // first attempt at half the light side's chroma (C 0.010 vs 0.021) read as
+    // plain charcoal on screen. These sit near C 0.030.
+
+    private static let paper = PlatformColor.dynamic(
+        light: rgb(250, 245, 230),      // cream
+        dark:  rgb(40, 34, 17))
+    /// Chrome sits *under* the page in both modes — that relationship, not the
+    /// absolute lightness, is what makes the page read as a page on a desk. The
+    /// dark step is twice the light one (OKLab ΔL 0.048 vs 0.024): the same
+    /// separation costs more lightness when there is less of it to spend.
+    private static let paperSidebar = PlatformColor.dynamic(
+        light: rgb(245, 237, 214),
+        dark:  rgb(28, 23, 8))
+    /// Floating palettes and floaters. On the light side they can reuse the page
+    /// (it is the lightest surface there is); on the dark side they have to lift
+    /// off it, or a floater dissolves into the page behind it.
+    private static let paperSurface = PlatformColor.dynamic(
+        light: rgb(250, 245, 230),
+        dark:  rgb(52, 45, 25))
+    /// Body and dimmed text. The type carries most of a warm theme's temperature
+    /// — it is the largest high-contrast area after the ground — so leaving it at
+    /// system white is what made the first dark Paper read as merely tinted.
+    /// The light side stays on the system labels, which track Increase Contrast.
+    private static let paperText = PlatformColor.dynamic(
+        light: .pLabel,
+        dark:  rgb(229, 223, 207))      // 11.9:1 on the page
+    private static let paperSecondaryText = PlatformColor.dynamic(
+        light: .pSecondaryLabel,
+        dark:  rgb(163, 158, 145))      // 5.9:1 on the page
+    /// Selection tint at full strength (selected labels, match highlighting).
+    private static let paperSelection = PlatformColor.dynamic(
+        light: rgb(140, 102, 51),       // sepia
+        dark:  rgb(224, 188, 122))      // lifted amber, same OKLCh chroma
+    /// The same tint as a wash. Alpha is baked in per side rather than applied at
+    /// the call site: a light ground takes a selection tinted *down* toward the
+    /// hue and a dark ground one tinted *up*, and no single opacity serves both.
+    ///
+    /// The dark alpha is a deliberate compromise. Since the wash only sets a
+    /// background and leaves each run's own color alone, anything light enough to
+    /// see against the page also eats contrast from the light foregrounds sitting
+    /// on it — a search over the warm hues found no colour that satisfies both.
+    /// This is why AppKit's own dark selection overrides the foreground instead.
+    /// 0.22 keeps body text (nearly all selected content) at 7.2:1 and the wash at
+    /// 1.66:1 against the page — more visible than the light side's 1.44:1, to
+    /// offset how much harder lightness steps are to see down here. Links are the
+    /// one weak case at 2.6:1; at the 0.38 this started as they were 1.75:1.
+    private static let paperSelectionFill = PlatformColor.dynamic(
+        light: rgb(140, 102, 51, 0.28),
+        dark:  rgb(224, 188, 122, 0.22))
+
+    private static func rgb(_ r: Double, _ g: Double, _ b: Double, _ a: Double = 1) -> PlatformColor {
+        PlatformColor(red: r / 255, green: g / 255, blue: b / 255, alpha: a)
+    }
 }

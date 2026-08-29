@@ -42,6 +42,9 @@ struct NoteTextRenderer {
     /// They also clamp against the real container width, so an unbounded value
     /// here simply means "as wide as the column".
     let contentWidth: CGFloat
+    /// Body and dimmed text, from the theme — Paper's dark side warms both.
+    var textColor: NSColor = .labelColor
+    var secondaryTextColor: NSColor = .secondaryLabelColor
     /// Resolves a relative image path against the note/vault.
     var loadImage: (String) -> NSImage? = { _ in nil }
 
@@ -133,7 +136,7 @@ struct NoteTextRenderer {
     private func listItem(ordered: Bool, number: Int, indent: Int, text: String) -> NSAttributedString {
         let marker = ordered ? "\(number)." : "•"
         let out = NSMutableAttributedString(string: marker + "\t", attributes: [
-            .font: body, .foregroundColor: NSColor.secondaryLabelColor,
+            .font: body, .foregroundColor: secondaryTextColor,
         ])
         out.append(inline(text, font: body))
         out.addAttribute(.paragraphStyle, value: hangingStyle(depth: indent, marker: listIndent),
@@ -143,7 +146,7 @@ struct NoteTextRenderer {
 
     private func task(checked: Bool, indent: Int, text: String, checkboxIndex: Int) -> NSAttributedString {
         let symbol = checked ? "checkmark.square.fill" : "square"
-        let tint: NSColor = checked ? .controlAccentColor : .secondaryLabelColor
+        let tint: NSColor = checked ? .controlAccentColor : secondaryTextColor
         let out = NSMutableAttributedString()
         if let box = symbolAttachment(symbol, size: bodySize * 0.94, tint: tint) {
             out.append(box)
@@ -161,7 +164,7 @@ struct NoteTextRenderer {
         if checked {
             label.addAttributes([
                 .strikethroughStyle: NSUnderlineStyle.single.rawValue,
-                .foregroundColor: NSColor.secondaryLabelColor,
+                .foregroundColor: secondaryTextColor,
             ], range: label.fullRange)
         }
         out.append(label)
@@ -173,7 +176,7 @@ struct NoteTextRenderer {
     private func quote(_ text: String) -> NSAttributedString {
         let attr = inline(text, font: body)
         attr.addAttributes([
-            .foregroundColor: NSColor.secondaryLabelColor,
+            .foregroundColor: secondaryTextColor,
             .folioDecoration: BlockDecoration.quote.boxed,
             .paragraphStyle: style { s in
                 s.firstLineHeadIndent = listIndent
@@ -250,7 +253,7 @@ struct NoteTextRenderer {
         guard let image = loadImage(source) else {
             let placeholder = NSMutableAttributedString(
                 string: alt.isEmpty ? source : alt,
-                attributes: [.font: body, .foregroundColor: NSColor.secondaryLabelColor,
+                attributes: [.font: body, .foregroundColor: secondaryTextColor,
                              .paragraphStyle: style()])
             return placeholder
         }
@@ -315,14 +318,14 @@ struct NoteTextRenderer {
             failurePolicy: .returnPartiallyParsedIfPossible)
         guard let parsed = try? AttributedString(markdown: source, options: options) else {
             return withSoftBreaks(NSMutableAttributedString(
-                string: raw, attributes: [.font: font, .foregroundColor: NSColor.labelColor]))
+                string: raw, attributes: [.font: font, .foregroundColor: textColor]))
         }
 
         let out = NSMutableAttributedString()
         for run in parsed.runs {
             let text = String(parsed[run.range].characters)
             let intent = run.inlinePresentationIntent ?? []
-            var attrs: [NSAttributedString.Key: Any] = [.foregroundColor: NSColor.labelColor]
+            var attrs: [NSAttributedString.Key: Any] = [.foregroundColor: textColor]
 
             if intent.contains(.code) {
                 attrs[.font] = NSFont.monospacedSystemFont(ofSize: font.pointSize * Typography.inlineCode,

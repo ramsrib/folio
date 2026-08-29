@@ -60,10 +60,10 @@ enum MarkdownHighlighter {
             if let m = heading.firstMatch(in: line, range: lineNS) {
                 let level = m.range(at: 1).length
                 storage.addAttribute(.font, value: theme.heading(level), range: lineRange)
-                mark(storage, NSRange(location: lineRange.location, length: min(level + 1, lineRange.length)), cursorLine)
+                mark(storage, NSRange(location: lineRange.location, length: min(level + 1, lineRange.length)), cursorLine, theme.text)
             } else if let m = task.firstMatch(in: line, range: lineNS) {
                 let g1 = m.range(at: 1), g2 = m.range(at: 2), g3 = m.range(at: 3)
-                mark(storage, NSRange(location: lineRange.location, length: g1.length + g2.length), cursorLine)
+                mark(storage, NSRange(location: lineRange.location, length: g1.length + g2.length), cursorLine, theme.text)
                 let checked = ns.substring(
                     with: NSRange(location: lineRange.location + g2.location + 1, length: 1)).lowercased() == "x"
                 if checked {
@@ -76,10 +76,10 @@ enum MarkdownHighlighter {
                     }
                 }
             } else if trimmed.hasPrefix(">") {
-                storage.addAttribute(.foregroundColor, value: Theme.quote, range: lineRange)
+                storage.addAttribute(.foregroundColor, value: theme.secondary, range: lineRange)
             } else if let m = unordered.firstMatch(in: line, range: lineNS) {
                 let r = m.range(at: 1)
-                mark(storage, NSRange(location: lineRange.location + r.location, length: r.length), cursorLine)
+                mark(storage, NSRange(location: lineRange.location + r.location, length: r.length), cursorLine, theme.text)
             } else if let m = ordered.firstMatch(in: line, range: lineNS) {
                 let r = m.range(at: 1)
                 storage.addAttribute(.foregroundColor, value: Theme.accent,
@@ -89,11 +89,11 @@ enum MarkdownHighlighter {
 
         // Inline spans whose content is styled and delimiters dimmed. All scoped
         // to `content` so frontmatter stays pure metadata.
-        inline(boldStars,  storage, text, content, cursorLine, [.font: theme.bold])
-        inline(italicStar, storage, text, content, cursorLine, [.font: theme.italic])
-        inline(strike,     storage, text, content, cursorLine, [.strikethroughStyle: NSUnderlineStyle.single.rawValue])
-        inline(inlineCode, storage, text, content, cursorLine, [.font: theme.mono, .backgroundColor: Theme.codeBg])
-        inline(highlight,  storage, text, content, cursorLine, [.backgroundColor: Theme.highlightBg])
+        inline(boldStars,  storage, text, content, cursorLine, [.font: theme.bold], theme.text)
+        inline(italicStar, storage, text, content, cursorLine, [.font: theme.italic], theme.text)
+        inline(strike,     storage, text, content, cursorLine, [.strikethroughStyle: NSUnderlineStyle.single.rawValue], theme.text)
+        inline(inlineCode, storage, text, content, cursorLine, [.font: theme.mono, .backgroundColor: Theme.codeBg], theme.text)
+        inline(highlight,  storage, text, content, cursorLine, [.backgroundColor: Theme.highlightBg], theme.text)
 
         // Wikilinks: resolved (accent) vs unresolved (red); whole span clickable.
         wiki.enumerateMatches(in: text, range: content) { m, _, _ in
@@ -103,8 +103,8 @@ enum MarkdownHighlighter {
             let resolved = resolveWikilink(inner)
             storage.addAttribute(.foregroundColor, value: resolved ? Theme.accent : Theme.unresolved, range: content)
             if let url = wikilinkURL(inner) { storage.addAttribute(.link, value: url, range: whole) }
-            mark(storage, NSRange(location: whole.location, length: 2), cursorLine)              // [[
-            mark(storage, NSRange(location: NSMaxRange(whole) - 2, length: 2), cursorLine)       // ]]
+            mark(storage, NSRange(location: whole.location, length: 2), cursorLine, theme.text)              // [[
+            mark(storage, NSRange(location: NSMaxRange(whole) - 2, length: 2), cursorLine, theme.text)       // ]]
         }
 
         // Markdown links: text styled + clickable, brackets/url dimmed.
@@ -114,9 +114,9 @@ enum MarkdownHighlighter {
             storage.addAttributes([.foregroundColor: Theme.accent,
                                    .underlineStyle: NSUnderlineStyle.single.rawValue], range: label)
             if let url = URL(string: ns.substring(with: dest)) { storage.addAttribute(.link, value: url, range: label) }
-            mark(storage, NSRange(location: whole.location, length: label.location - whole.location), cursorLine)
+            mark(storage, NSRange(location: whole.location, length: label.location - whole.location), cursorLine, theme.text)
             let tStart = NSMaxRange(label)
-            mark(storage, NSRange(location: tStart, length: NSMaxRange(whole) - tStart), cursorLine)
+            mark(storage, NSRange(location: tStart, length: NSMaxRange(whole) - tStart), cursorLine, theme.text)
         }
 
         tag.enumerateMatches(in: text, range: content) { m, _, _ in
@@ -152,12 +152,12 @@ enum MarkdownHighlighter {
     /// and the `---` fences on the marker/reveal treatment like other syntax.
     private static func styleFrontmatter(_ storage: NSTextStorage, _ ns: NSString,
                                          _ fm: NSRange, _ theme: Theme, _ cursorLine: NSRange) {
-        storage.addAttributes([.font: theme.mono, .foregroundColor: Theme.quote], range: fm)
+        storage.addAttributes([.font: theme.mono, .foregroundColor: theme.secondary], range: fm)
         ns.enumerateSubstrings(in: fm, options: .byLines) { sub, lineRange, _, _ in
             let line = sub ?? ns.substring(with: lineRange)
             let lineNS = NSRange(location: 0, length: (line as NSString).length)
             if line.trimmingCharacters(in: .whitespaces) == "---" {
-                mark(storage, lineRange, cursorLine)   // fences dim, reveal on cursor
+                mark(storage, lineRange, cursorLine, theme.text)   // fences dim, reveal on cursor
                 return
             }
             if let m = yamlKey.firstMatch(in: line, range: lineNS) {
@@ -181,7 +181,7 @@ enum MarkdownHighlighter {
 
     private static func inline(_ regex: NSRegularExpression, _ storage: NSTextStorage,
                                _ text: String, _ full: NSRange, _ cursorLine: NSRange,
-                               _ attrs: [NSAttributedString.Key: Any]) {
+                               _ attrs: [NSAttributedString.Key: Any], _ bodyColor: NSColor) {
         regex.enumerateMatches(in: text, range: full) { m, _, _ in
             guard let m else { return }
             let whole = m.range
@@ -191,14 +191,15 @@ enum MarkdownHighlighter {
             let leading = NSRange(location: whole.location, length: content.location - whole.location)
             let tStart = content.location + content.length
             let trailing = NSRange(location: tStart, length: whole.location + whole.length - tStart)
-            if leading.length > 0 { mark(storage, leading, cursorLine) }
-            if trailing.length > 0 { mark(storage, trailing, cursorLine) }
+            if leading.length > 0 { mark(storage, leading, cursorLine, bodyColor) }
+            if trailing.length > 0 { mark(storage, trailing, cursorLine, bodyColor) }
         }
     }
 
-    private static func mark(_ storage: NSTextStorage, _ range: NSRange, _ cursorLine: NSRange) {
+    private static func mark(_ storage: NSTextStorage, _ range: NSRange, _ cursorLine: NSRange,
+                             _ bodyColor: NSColor) {
         let revealed = NSIntersectionRange(range, cursorLine).length > 0
             || NSLocationInRange(range.location, cursorLine)
-        storage.addAttribute(.foregroundColor, value: revealed ? Theme.text : Theme.marker, range: range)
+        storage.addAttribute(.foregroundColor, value: revealed ? bodyColor : Theme.marker, range: range)
     }
 }

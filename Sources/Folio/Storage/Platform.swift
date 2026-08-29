@@ -45,6 +45,20 @@ extension PlatformColor {
     }
 }
 
+extension PlatformColor {
+    /// A color that resolves per appearance, so a themed palette can be declared
+    /// once and each surface picks up the right side of it at draw time. Because
+    /// resolution is deferred, a dynamic color already stored in text storage or
+    /// on a window follows a light/dark switch without anything re-applying it.
+    static func dynamic(light: PlatformColor, dark: PlatformColor) -> PlatformColor {
+        #if canImport(UIKit) && !targetEnvironment(macCatalyst)
+        return UIColor { $0.userInterfaceStyle == .dark ? dark : light }
+        #else
+        return NSColor(name: nil) { $0.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light }
+        #endif
+    }
+}
+
 extension Color {
     /// Build a SwiftUI Color from the platform color type.
     init(platform color: PlatformColor) {

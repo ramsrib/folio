@@ -9,6 +9,10 @@ import AppKit
 struct Theme: Equatable {
     let bodySize: CGFloat
     let family: ReadingFont
+    /// Body and dimmed text. Per-theme rather than static, because Paper's dark
+    /// side warms them and every other theme keeps the system label colors.
+    let text: NSColor
+    let secondary: NSColor
 
     let body: NSFont
     let bold: NSFont
@@ -17,9 +21,12 @@ struct Theme: Equatable {
     /// Shared by every paragraph so line height matches reading mode.
     let paragraphStyle: NSParagraphStyle
 
-    init(bodySize: CGFloat, family: ReadingFont) {
+    init(bodySize: CGFloat, family: ReadingFont,
+         text: NSColor = .labelColor, secondary: NSColor = .secondaryLabelColor) {
         self.bodySize = bodySize
         self.family = family
+        self.text = text
+        self.secondary = secondary
 
         body = family.nsFont(size: bodySize)
         bold = family.nsFont(size: bodySize, weight: .bold)
@@ -37,7 +44,8 @@ struct Theme: Equatable {
     }
 
     @MainActor init(_ settings: AppSettings) {
-        self.init(bodySize: settings.bodyFontSize, family: settings.readingFont)
+        self.init(bodySize: settings.bodyFontSize, family: settings.readingFont,
+                  text: settings.nsTextColor, secondary: settings.nsSecondaryTextColor)
     }
 
     func heading(_ level: Int) -> NSFont {
@@ -47,20 +55,19 @@ struct Theme: Equatable {
     /// Base attributes for the whole document — the floor every syntax rule
     /// paints over.
     var baseAttributes: [NSAttributedString.Key: Any] {
-        [.font: body, .foregroundColor: Theme.text, .paragraphStyle: paragraphStyle]
+        [.font: body, .foregroundColor: text, .paragraphStyle: paragraphStyle]
     }
 
     static func == (a: Theme, b: Theme) -> Bool {
         a.bodySize == b.bodySize && a.family == b.family
+            && a.text == b.text && a.secondary == b.secondary
     }
 
     // MARK: Colors
 
-    static let text = NSColor.labelColor
     static let marker = NSColor.tertiaryLabelColor   // dimmed syntax when off the cursor line
     static let accent = NSColor.controlAccentColor
     static let unresolved = NSColor.systemRed      // wikilink to a non-existent note
-    static let quote = NSColor.secondaryLabelColor
     static let codeBg = NSColor(white: 0.5, alpha: 0.14)
     static let highlightBg = NSColor.systemYellow.withAlphaComponent(0.30)
     /// Writing mode's current-line wash — just enough to anchor the eye (Zed/
@@ -72,13 +79,20 @@ struct Theme: Equatable {
 
 extension NSTextView {
     /// Paint text selection in a theme color, or hand it back to the system when
-    /// there isn't one. Only the background is overridden — the text keeps its own
-    /// color, which is what makes a light wash readable.
+    /// there isn't one. Idempotent: `updateNSView` calls this on every SwiftUI
+    /// update, and re-assigning the attributes would redraw the selection each time.
     func applySelectionHighlight(_ color: NSColor?) {
+        let background = color ?? .selectedTextBackgroundColor
+        guard selectedTextAttributes[.backgroundColor] as? NSColor != background else { return }
         if let color {
+            // Background only: the wash is light enough that text keeps its own
+            // color, which is what lets a link stay a link while selected.
             selectedTextAttributes = [.backgroundColor: color]
         } else {
-            selectedTextAttributes = [.backgroundColor: NSColor.selectedTextBackgroundColor]
+            // The system default is a *pair* — dropping `selectedTextColor` would
+            // leave an accent-colored link drawn in blue on the blue selection.
+            selectedTextAttributes = [.backgroundColor: NSColor.selectedTextBackgroundColor,
+                                      .foregroundColor: NSColor.selectedTextColor]
         }
     }
 }
