@@ -187,43 +187,47 @@ struct ContentView: View {
         }
     }
 
+    /// The sidebar's half of the title strip: traffic-light clearance on the left
+    /// (the system draws them over this row), the filter/reload/toggle group on the
+    /// right, drag area between.
+    ///
+    /// The vault name used to sit centred in here and no longer does. It could not
+    /// win: 78pt of this row belongs to the traffic lights and 70pt to the controls,
+    /// so at the default 280pt sidebar a name had ~132pt — about fourteen
+    /// characters — and neither gutter was reclaimable. It lives in `vaultNameRow`
+    /// now, where it is the only tenant of its row.
     private var sidebarTitleArea: some View {
-        ZStack {
-            // Vault title centered in the sidebar column, growing symmetrically on
-            // both sides. The 78pt horizontal clearance keeps it clear of the
-            // traffic lights (left) and the trailing controls (right); a name with
-            // nothing left to grow into truncates rather than sliding under them.
-            HStack(spacing: 0) {
-                Spacer(minLength: 0)
-                // The priority is what puts the truncation in the right place. An
-                // unprioritised HStack offers each of three children a third of
-                // the width, so the name would shorten with the gutters still
-                // empty; prioritised, the menu is measured first against
-                // everything the gutters leave, and the spacers take the rest.
-                vaultMenu.layoutPriority(1)
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 78)
-
-            HStack(spacing: 6) {
-                Spacer(minLength: 0)
-                // Filter lives behind an icon (Finder-style), not a always-visible
-                // field: a mounted TextField steals first-responder at launch and
-                // fights the palettes for focus.
-                Button {
-                    if showFilter { clearFilter() } else { ui.sidebarFilterFocus &+= 1 }
-                } label: { Image(systemName: "magnifyingglass") }
-                    .buttonStyle(.borderless).help("Filter Files (⇧⌘K)").accessibilityLabel("Filter files")
-                    .foregroundStyle(showFilter ? settings.selectionTint : Color.secondary)
-                    .disabled(vault.vaultURL == nil)
-                Button { vault.refresh() } label: { Image(systemName: "arrow.clockwise") }
-                    .buttonStyle(.borderless).help("Reload Vault (⇧⌘R)").accessibilityLabel("Reload vault")
-                    .disabled(vault.vaultURL == nil)
-                toggleButton            // filter + reload + toggle pinned to the trailing edge
-            }
-            .padding(.trailing, 10)
+        HStack(spacing: 6) {
+            Spacer(minLength: 0)
+            // Filter lives behind an icon (Finder-style), not a always-visible
+            // field: a mounted TextField steals first-responder at launch and
+            // fights the palettes for focus.
+            Button {
+                if showFilter { clearFilter() } else { ui.sidebarFilterFocus &+= 1 }
+            } label: { Image(systemName: "magnifyingglass") }
+                .buttonStyle(.borderless).help("Filter Files (⇧⌘K)").accessibilityLabel("Filter files")
+                .foregroundStyle(showFilter ? settings.selectionTint : Color.secondary)
+                .disabled(vault.vaultURL == nil)
+            Button { vault.refresh() } label: { Image(systemName: "arrow.clockwise") }
+                .buttonStyle(.borderless).help("Reload Vault (⇧⌘R)").accessibilityLabel("Reload vault")
+                .disabled(vault.vaultURL == nil)
+            toggleButton            // filter + reload + toggle pinned to the trailing edge
         }
+        .padding(.trailing, 10)
         // Zoom-on-double-click is handled by the whole title strip (see titleBar).
+    }
+
+    /// The vault name as a heading over the tree, with the whole sidebar column to
+    /// itself. Its text starts at 12pt, the same leading edge as a depth-0 row, so
+    /// it reads as the tree's heading rather than as another control.
+    private var vaultNameRow: some View {
+        HStack(spacing: 0) {
+            vaultMenu
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 4)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
     }
 
     /// The vault name, dropping a native menu of recent vaults (Obsidian's shape):
@@ -275,7 +279,10 @@ struct ContentView: View {
         .menuStyle(.button)
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
-        .help("Switch Vault (⇧⌘O)")
+        // The name itself, not just the action: the row truncates a long one, and
+        // this is how you read it back without dragging the sidebar wider.
+        .help(vault.vaultURL.map { "\($0.lastPathComponent) · Switch Vault (⇧⌘O)" }
+              ?? "Switch Vault (⇧⌘O)")
         .accessibilityLabel("Switch vault")
         .onHover { vaultNameHovered = $0 }
         .pointerStyle(.link)
@@ -398,6 +405,7 @@ struct ContentView: View {
             }
         } else {
             VStack(spacing: 0) {
+                vaultNameRow
                 if showFilter {
                     filterField
                         .transition(.move(edge: .top).combined(with: .opacity))
