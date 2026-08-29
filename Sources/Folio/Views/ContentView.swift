@@ -432,12 +432,16 @@ struct ContentView: View {
                                    forceExpanded: filterActive && item.node.isDirectory,
                                    // ⌘-click opens in a new tab (Obsidian/browser convention).
                                    onSelect: {
-                                       clickedRow.id = item.node.id
+                                       clickedRow.record(item.node.id)
                                        vault.select(item.node.id, inNewTab: cmdHeld)
                                    },
                                    onOpenOwnTab: {
-                                       clickedRow.id = item.node.id
+                                       clickedRow.record(item.node.id)
                                        vault.openInOwnTab(item.node.id)
+                                   },
+                                   onOpenInNewTab: {
+                                       clickedRow.record(item.node.id)
+                                       vault.select(item.node.id, inNewTab: true)
                                    },
                                    onToggle: { toggleDir(item.node.id) },
                                    startRename: startRename)
@@ -535,20 +539,17 @@ struct ContentView: View {
     /// the filter would leave the just-selected note hidden in a collapsed folder;
     /// only the scroll is skipped (the filtered list is already flat).
     private func revealSelection(_ proxy: ScrollViewProxy) {
+        // Consume the click marker before any early return, so a click whose
+        // selection change never arrives can't leave a token behind.
+        let clickedThisRow = clickedRow.consume(vault.selection)
         guard let sel = vault.selection else { return }
-        // Read-and-clear first, before any early return: a click that never
-        // reaches the scroll (filter active, or a double-click on the note
-        // already selected, which changes tabs but not `selection`) must not
-        // leave a stale id behind to suppress the *next* reveal.
-        let clicked = clickedRow.id
-        clickedRow.id = nil
         for dir in ancestors(of: sel) { expandedDirs.insert(dir) }
         persistExpansion()
         guard !filterActive else { return }
         // A row you just clicked is by definition on screen; re-centering it
         // yanks the list out from under the cursor. Only reveal selections that
         // came from somewhere else (⌘K, tabs, back/forward, a note link).
-        guard clicked != sel else { return }
+        guard !clickedThisRow else { return }
         // Scroll after the newly-expanded rows exist in the lazy stack. Not
         // animated: this fires on every tab switch, and an animated sidebar
         // scroll compounding with the content swap read as switch lag.
@@ -621,9 +622,31 @@ struct ContentView: View {
     }
 }
 
+/// Which sidebar row the user just clicked, so `revealSelection` can tell a
+/// selection the sidebar made itself from one that arrived from elsewhere.
+///
 /// A reference box, not `@State` of its own: the reveal pass reads it during the
 /// very view update that the click provoked, so the value has to be visible
 /// immediately rather than on the next render.
 private final class ClickedRow {
-    var id: URL?
+    private var id: URL?
+    private var at = Date.distantPast
+
+    func record(_ url: URL) { id = url; at = Date() }
+
+    /// Whether `selection` is the row that was just clicked — always clearing the
+    /// marker, whatever the answer.
+    ///
+    /// The freshness window is what makes this safe. A click can set the marker
+    /// without ever producing a selection change (clicking the note that is
+    /// already selected, which `VaultStore.select` drops as a duplicate), and the
+    /// reveal pass is only mounted while the sidebar is showing. Without the
+    /// window such a marker would sit there and swallow the *next* genuine
+    /// reveal. The reveal runs in the same run-loop turn as the click, so
+    /// anything older than a moment is by definition not from this one.
+    func consume(_ selection: URL?) -> Bool {
+        defer { id = nil }
+        guard let selection, id == selection else { return false }
+        return Date().timeIntervalSince(at) < 1
+    }
 }

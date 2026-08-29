@@ -22,6 +22,10 @@ struct SidebarRow: View {
     /// Double-click on a file: "keep both" — the note being read keeps its tab,
     /// this one opens in its own (see `VaultStore.openInOwnTab`).
     let onOpenOwnTab: () -> Void
+    /// The context menu's "Open in New Tab". Routed through the parent like the
+    /// other two rather than calling `vault.select` here, so the sidebar can tell
+    /// this is a selection it made itself and skip re-centring the row.
+    let onOpenInNewTab: () -> Void
     let onToggle: () -> Void
     let startRename: (URL) -> Void
     @EnvironmentObject private var vault: VaultStore
@@ -79,7 +83,7 @@ struct SidebarRow: View {
                 Divider()
                 Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([node.id]) }
             } else {
-                Button("Open in New Tab") { vault.select(node.id, inNewTab: true) }
+                Button("Open in New Tab") { onOpenInNewTab() }
                 Button("Rename…") { startRename(node.id) }
                 Divider()
                 copyItems
