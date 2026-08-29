@@ -93,7 +93,7 @@ enum MarkdownHighlighter {
         inline(italicStar, storage, text, content, cursorLine, [.font: theme.italic], theme.text)
         inline(strike,     storage, text, content, cursorLine, [.strikethroughStyle: NSUnderlineStyle.single.rawValue], theme.text)
         inline(inlineCode, storage, text, content, cursorLine, [.font: theme.mono, .backgroundColor: Theme.codeBg], theme.text)
-        inline(highlight,  storage, text, content, cursorLine, [.backgroundColor: Theme.highlightBg], theme.text)
+        inline(highlight,  storage, text, content, cursorLine, [.backgroundColor: theme.inlineHighlight], theme.text)
 
         // Wikilinks: resolved (accent) vs unresolved (red); whole span clickable.
         wiki.enumerateMatches(in: text, range: content) { m, _, _ in

@@ -101,6 +101,7 @@ struct EditorPane: View {
                         background: settings.nsPaneBackground,
                         selectionHighlight: settings.nsSelectionHighlight,
                         caretColor: settings.nsCaretColor,
+                        findMatch: settings.findMatch,
                         readableWidth: settings.columnWidth,
                         theme: Theme(settings),
                         find: find

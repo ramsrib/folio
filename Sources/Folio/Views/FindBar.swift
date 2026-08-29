@@ -31,7 +31,7 @@ struct FindBar: View {
             }
 
             Button { find.caseSensitive.toggle() } label: { Text("Aa").font(.system(size: 14, weight: .semibold)) }
-                .foregroundStyle(find.caseSensitive ? Color.accentColor : .secondary)
+                .foregroundStyle(find.caseSensitive ? settings.selectionTint : .secondary)
                 .help("Case sensitive")
 
             Divider().frame(height: 20)

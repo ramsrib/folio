@@ -13,6 +13,8 @@ struct Theme: Equatable {
     /// side warms them and every other theme keeps the system label colors.
     let text: NSColor
     let secondary: NSColor
+    /// `==mark==` wash.
+    let inlineHighlight: NSColor
 
     let body: NSFont
     let bold: NSFont
@@ -22,11 +24,13 @@ struct Theme: Equatable {
     let paragraphStyle: NSParagraphStyle
 
     init(bodySize: CGFloat, family: ReadingFont,
-         text: NSColor = .labelColor, secondary: NSColor = .secondaryLabelColor) {
+         text: NSColor = .labelColor, secondary: NSColor = .secondaryLabelColor,
+         inlineHighlight: NSColor = NSColor.systemYellow.withAlphaComponent(0.30)) {
         self.bodySize = bodySize
         self.family = family
         self.text = text
         self.secondary = secondary
+        self.inlineHighlight = inlineHighlight
 
         body = family.nsFont(size: bodySize)
         bold = family.nsFont(size: bodySize, weight: .bold)
@@ -45,7 +49,8 @@ struct Theme: Equatable {
 
     @MainActor init(_ settings: AppSettings) {
         self.init(bodySize: settings.bodyFontSize, family: settings.readingFont,
-                  text: settings.nsTextColor, secondary: settings.nsSecondaryTextColor)
+                  text: settings.nsTextColor, secondary: settings.nsSecondaryTextColor,
+                  inlineHighlight: settings.nsInlineHighlight)
     }
 
     func heading(_ level: Int) -> NSFont {
@@ -61,6 +66,7 @@ struct Theme: Equatable {
     static func == (a: Theme, b: Theme) -> Bool {
         a.bodySize == b.bodySize && a.family == b.family
             && a.text == b.text && a.secondary == b.secondary
+            && a.inlineHighlight == b.inlineHighlight
     }
 
     // MARK: Colors
@@ -69,7 +75,6 @@ struct Theme: Equatable {
     static let accent = NSColor.controlAccentColor
     static let unresolved = NSColor.systemRed      // wikilink to a non-existent note
     static let codeBg = NSColor(white: 0.5, alpha: 0.14)
-    static let highlightBg = NSColor.systemYellow.withAlphaComponent(0.30)
     /// Writing mode's current-line wash — just enough to anchor the eye (Zed/
     /// editor convention), quiet enough to disappear while reading the draft.
     static let currentLineBg = NSColor.labelColor.withAlphaComponent(0.045)

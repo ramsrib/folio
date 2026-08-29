@@ -42,6 +42,8 @@ struct NoteReader: View {
             selectionHighlight: settings.nsSelectionHighlight,
             textColor: settings.nsTextColor,
             secondaryTextColor: settings.nsSecondaryTextColor,
+            findMatch: settings.findMatch,
+            findCurrentMatch: settings.findCurrentMatch,
             noteID: vault.selection,
             find: find,
             scrollRequest: ui.mode == .read ? vault.scrollRequest : nil,

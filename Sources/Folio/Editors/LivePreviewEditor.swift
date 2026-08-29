@@ -18,6 +18,8 @@ struct LivePreviewEditor: NSViewRepresentable {
     var selectionHighlight: NSColor?
     /// Theme tint for the caret; nil uses the system insertion-point color.
     var caretColor: NSColor?
+    /// How find matches are painted.
+    var findMatch = Highlight(background: .systemYellow.withAlphaComponent(0.4))
     var readableWidth: CGFloat = 720
     var theme: Theme
     @ObservedObject var find: FindModel
@@ -195,9 +197,11 @@ struct LivePreviewEditor: NSViewRepresentable {
         private func highlightAll(_ tv: NSTextView, ranges: [NSRange]) {
             guard let lm = tv.layoutManager else { return }
             clearFindHighlight(tv)
+            let style = parent.findMatch
+            var attrs: [NSAttributedString.Key: Any] = [.backgroundColor: style.background]
+            if let ink = style.foreground { attrs[.foregroundColor] = ink }
             for r in ranges {
-                lm.addTemporaryAttributes([.backgroundColor: NSColor.systemYellow.withAlphaComponent(0.4)],
-                                          forCharacterRange: r)
+                lm.addTemporaryAttributes(attrs, forCharacterRange: r)
             }
         }
 

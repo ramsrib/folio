@@ -72,6 +72,7 @@ struct PaletteTextField: NSViewRepresentable {
         tv.textContainer?.containerSize = NSSize(width: .greatestFiniteMagnitude,
                                                  height: fontSize * 1.4)
         tv.applyCaretColor(settings.nsCaretColor)
+        tv.applySelectionHighlight(settings.nsSelectionHighlight)
         tv.placeholder = placeholder
         tv.string = text
 
@@ -87,6 +88,7 @@ struct PaletteTextField: NSViewRepresentable {
         context.coordinator.parent = self
         guard let tv = nsView.documentView as? QueryTextView else { return }
         tv.applyCaretColor(settings.nsCaretColor)
+        tv.applySelectionHighlight(settings.nsSelectionHighlight)
         if tv.string != text { tv.string = text }
         if tv.placeholder != placeholder { tv.placeholder = placeholder; tv.needsDisplay = true }
         if context.coordinator.lastFocusToken != focusToken {

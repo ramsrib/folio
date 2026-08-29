@@ -23,6 +23,9 @@ struct NoteTextView: NSViewRepresentable {
     /// Body and dimmed text from the theme.
     let textColor: NSColor
     let secondaryTextColor: NSColor
+    /// How find matches are painted; the current one gets the stronger of the two.
+    let findMatch: Highlight
+    let findCurrentMatch: Highlight
     let noteID: URL?
     @ObservedObject var find: FindModel
     /// Heading anchor to scroll to (outline click / wikilink with `#heading`).
@@ -48,6 +51,8 @@ struct NoteTextView: NSViewRepresentable {
         tv.drawsBackground = true
         tv.backgroundColor = background
         tv.applySelectionHighlight(selectionHighlight)
+        tv.findMatch = findMatch
+        tv.findCurrentMatch = findCurrentMatch
         tv.readableWidth = readableWidth
         tv.textContainerInset = NSSize(width: 32, height: 28)
         tv.isVerticallyResizable = true
@@ -84,6 +89,8 @@ struct NoteTextView: NSViewRepresentable {
         tv.onToggleTask = onToggleTask
         if tv.backgroundColor != background { tv.backgroundColor = background }
         tv.applySelectionHighlight(selectionHighlight)
+        tv.findMatch = findMatch
+        tv.findCurrentMatch = findCurrentMatch
         if tv.readableWidth != readableWidth {
             tv.readableWidth = readableWidth
             tv.applyReadableInset()
@@ -216,6 +223,9 @@ struct NoteTextView: NSViewRepresentable {
 /// and copies attachment blocks as their Markdown source.
 final class NoteContentTextView: NSTextView {
     var readableWidth: CGFloat = 720
+    var findMatch = Highlight(background: .systemYellow.withAlphaComponent(0.4))
+    var findCurrentMatch = Highlight(background: .systemOrange.withAlphaComponent(0.9),
+                                     foreground: .black)
     var onToggleTask: (Int) -> Void = { _ in }
 
     private var decorations: [(range: NSRange, decoration: BlockDecoration)] = []
@@ -371,8 +381,10 @@ final class NoteContentTextView: NSTextView {
         for r in ranges {
             guard let textRange = layoutManager.textRange(for: r) else { continue }
             layoutManager.addRenderingAttribute(.backgroundColor,
-                                                value: NSColor.systemYellow.withAlphaComponent(0.4),
-                                                for: textRange)
+                                                value: findMatch.background, for: textRange)
+            if let ink = findMatch.foreground {
+                layoutManager.addRenderingAttribute(.foregroundColor, value: ink, for: textRange)
+            }
         }
     }
 
@@ -388,9 +400,10 @@ final class NoteContentTextView: NSTextView {
         highlightFindMatches(all)
         if let textRange = layoutManager.textRange(for: range) {
             layoutManager.addRenderingAttribute(.backgroundColor,
-                                                value: NSColor.systemOrange.withAlphaComponent(0.9),
-                                                for: textRange)
-            layoutManager.addRenderingAttribute(.foregroundColor, value: NSColor.black, for: textRange)
+                                                value: findCurrentMatch.background, for: textRange)
+            if let ink = findCurrentMatch.foreground {
+                layoutManager.addRenderingAttribute(.foregroundColor, value: ink, for: textRange)
+            }
         }
         scrollRangeToVisible(range)
         showFindIndicator(for: range)

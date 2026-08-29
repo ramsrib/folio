@@ -88,6 +88,14 @@ enum LineBreakMode: String, CaseIterable, Identifiable {
     }
 }
 
+/// A highlight is a wash plus, optionally, the ink to draw text on it. A
+/// marker-pen highlight is opaque enough that it has to darken the text under it;
+/// a soft tint leaves the text alone so a link stays a link.
+struct Highlight {
+    var background: PlatformColor
+    var foreground: PlatformColor?
+}
+
 /// User-facing appearance settings, persisted to UserDefaults and applied live.
 @MainActor
 final class AppSettings: ObservableObject {
@@ -204,6 +212,24 @@ final class AppSettings: ObservableObject {
     var nsSecondaryTextColor: PlatformColor {
         theme == .paper ? Self.paperSecondaryText : .pSecondaryLabel
     }
+    /// Find matches, and the one the find bar is currently on. Paper highlights
+    /// like a marker pen — opaque gold with dark ink — rather than the soft
+    /// translucent wash the other themes use: on a warm ground a translucent
+    /// yellow lands within a few points of the selection tint, and a find match
+    /// and a selection mean different things.
+    var findMatch: Highlight {
+        theme == .paper ? Highlight(background: Self.paperFind, foreground: Self.paperInk)
+                        : Highlight(background: .systemYellow.withAlphaComponent(0.4))
+    }
+    var findCurrentMatch: Highlight {
+        theme == .paper ? Highlight(background: Self.paperFindCurrent, foreground: Self.paperInk)
+                        : Highlight(background: .systemOrange.withAlphaComponent(0.9), foreground: .black)
+    }
+    /// Writing mode's `==highlight==` mark. Content the author marked, not
+    /// transient UI, so it stays a soft wash that keeps the text's own color.
+    var nsInlineHighlight: PlatformColor {
+        theme == .paper ? Self.paperMark : .systemYellow.withAlphaComponent(0.30)
+    }
     /// The caret, at full tint strength — the system's is derived from the accent
     /// color, which is the same blue the selection used to be. nil = system.
     var nsCaretColor: PlatformColor? { theme == .paper ? Self.paperSelection : nil }
@@ -271,6 +297,22 @@ final class AppSettings: ObservableObject {
     private static let paperSelectionFill = PlatformColor.dynamic(
         light: rgb(140, 102, 51, 0.28),
         dark:  rgb(224, 188, 122, 0.22))
+
+    /// Find highlights. Opaque enough to read as a marker stroke at a glance,
+    /// which is the one job they have; `paperInk` is what makes that legible.
+    private static let paperFind = PlatformColor.dynamic(
+        light: rgb(242, 201, 76, 0.55),
+        dark:  rgb(255, 205, 60, 0.60))
+    private static let paperFindCurrent = PlatformColor.dynamic(
+        light: rgb(240, 150, 40, 0.95),
+        dark:  rgb(255, 160, 40, 0.95))
+    /// Warm near-black — the ink a highlighter leaves text readable in. Same on
+    /// both sides: the wash under it is light in both.
+    private static let paperInk = rgb(26, 18, 6)
+    /// `==mark==`: a wash, not a stroke. Low enough that text keeps its color.
+    private static let paperMark = PlatformColor.dynamic(
+        light: rgb(230, 190, 70, 0.34),
+        dark:  rgb(240, 200, 90, 0.24))
 
     private static func rgb(_ r: Double, _ g: Double, _ b: Double, _ a: Double = 1) -> PlatformColor {
         PlatformColor(red: r / 255, green: g / 255, blue: b / 255, alpha: a)
