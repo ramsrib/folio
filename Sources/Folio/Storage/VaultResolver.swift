@@ -22,4 +22,17 @@ enum VaultResolver {
         }
         return file.deletingLastPathComponent()
     }
+
+    /// The vault (and optional file) a `folio://` link addresses, so the router
+    /// can send it to the window that owns that vault instead of to whichever
+    /// window happens to be frontmost.
+    static func destination(for url: URL) -> (vault: URL, file: URL?)? {
+        guard url.scheme?.lowercased() == "folio" else { return nil }
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        guard let vaultPath = items.first(where: { $0.name == "vault" })?.value else { return nil }
+        let vault = URL(fileURLWithPath: vaultPath, isDirectory: true)
+        let file = items.first(where: { $0.name == "file" })?.value
+            .map { vault.appendingPathComponent($0) }
+        return (vault, file)
+    }
 }

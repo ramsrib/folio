@@ -5,9 +5,12 @@ import SwiftUI
 /// without it, ⌘N in one window would add a note to another.
 struct FolioCommands: Commands {
     @ObservedObject var settings: AppSettings
-    @FocusedValue(\.vaultStore) private var vault: VaultStore?
-    @FocusedValue(\.uiState) private var ui: UIState?
-    @Environment(\.openWindow) private var openWindow
+    let coordinator: WindowCoordinator
+    /// Objects, not values: `@FocusedValue` only re-evaluates when *which* object
+    /// is focused changes, so `canGoBack` would go stale and silently disable
+    /// ⌘[ / ⌘] as you navigate.
+    @FocusedObject private var vault: VaultStore?
+    @FocusedObject private var ui: UIState?
 
     var body: some Commands {
         // Settings is an in-window overlay, not a Settings scene — replace the
@@ -17,7 +20,7 @@ struct FolioCommands: Commands {
                 .keyboardShortcut(",", modifiers: .command)
                 .disabled(ui == nil)
         }
-        CommandGroup(after: .newItem) {
+        CommandGroup(replacing: .newItem) {
             Button("New Note") { vault?.newNote() }
                 .keyboardShortcut("n", modifiers: .command)
             Button("Close Tab") { if let s = vault?.selection { vault?.closeTab(s) } }
@@ -31,16 +34,18 @@ struct FolioCommands: Commands {
             Divider()
 
             // Vaults open windows; they never replace the vault in this one.
+            Button("New Window") { coordinator.openEmptyWindow() }
+                .keyboardShortcut("n", modifiers: [.command, .option])
             Button("Switch Vault…") { ui?.showVaultSwitcher = true }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
                 .disabled(ui == nil)
             Button("Open Vault…") {
-                if let url = VaultPicker.choose() { VaultWindows.open(VaultRef(url), using: openWindow) }
+                if let url = VaultPicker.choose() { coordinator.open(VaultRef(url)) }
             }
             .keyboardShortcut("o", modifiers: [.command, .option])
             Menu("Open Recent") {
                 ForEach(vault?.recentVaults ?? [], id: \.self) { url in
-                    Button(url.lastPathComponent) { VaultWindows.open(VaultRef(url), using: openWindow) }
+                    Button(url.lastPathComponent) { coordinator.open(VaultRef(url)) }
                 }
                 if !(vault?.recentVaults.isEmpty ?? true) {
                     Divider()

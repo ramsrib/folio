@@ -111,19 +111,34 @@ final class VaultStore: ObservableObject {
             .map { URL(fileURLWithPath: $0) }
     }
 
-    /// Load the vault. Call once, after the window exists.
+    /// Load the vault this window was created for. Call once, after the window
+    /// exists.
+    ///
+    /// A window with no vault named stays **empty** on macOS rather than silently
+    /// reopening the last-used vault: which vaults open at launch is the
+    /// coordinator's decision (it seeds from the session), and a fallback here
+    /// makes every stray window masquerade as a real one.
     func start() {
         guard vaultURL == nil else { return }
         if let requestedVault, FileManager.default.fileExists(atPath: requestedVault.path) {
             setVault(requestedVault)
-        } else {
-            restoreVault()
+            return
         }
+        #if !os(macOS)
+        restoreVault()   // iOS is single-window: reopening the last vault is right there
+        #endif
     }
 
-    /// Point this window at a vault. Only ever called for *this* window's vault —
-    /// opening a different vault opens a window (see `VaultRef`), it does not
-    /// swap the vault under someone's feet.
+    /// Give a vault-less window its vault. On macOS a window never swaps vaults —
+    /// opening another vault opens a window — so this is the only legitimate way
+    /// for a window to acquire one after birth.
+    func adopt(_ url: URL) {
+        #if os(macOS)
+        precondition(vaultURL == nil, "a window never swaps its vault; open a window instead")
+        #endif
+        setVault(url)
+    }
+
     func setVault(_ url: URL) {
         flushSave()
         if let previous = vaultURL { VaultSession.closed(VaultRef(previous)) }

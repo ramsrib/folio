@@ -10,20 +10,16 @@ struct VaultWindow: View {
     @StateObject private var vault: VaultStore
     @StateObject private var ui = UIState()
     @ObservedObject var settings: AppSettings
-    let appDelegate: AppDelegate
+    let coordinator: WindowCoordinator
+    @Environment(\.openWindow) private var openWindow
 
-    /// The vault this window was opened for. Read once at creation; the window's
-    /// identity afterwards is tracked by `AppDelegate`, keyed on the store's
-    /// vault path, not by this binding.
-    @Binding var ref: VaultRef?
-
-    init(ref: Binding<VaultRef?>, settings: AppSettings, appDelegate: AppDelegate) {
-        _ref = ref
-        // The ref is fixed when the window is created, so the autoclosure running
-        // once is exactly right.
-        _vault = StateObject(wrappedValue: VaultStore(vault: ref.wrappedValue?.url))
+    init(coordinator: WindowCoordinator, settings: AppSettings) {
+        self.coordinator = coordinator
         self.settings = settings
-        self.appDelegate = appDelegate
+        // The claim must happen inside the autoclosure: it runs exactly once per
+        // window, whereas this init runs on every re-evaluation of the parent —
+        // claiming there would drain the queue.
+        _vault = StateObject(wrappedValue: VaultStore(vault: coordinator.claimPendingVault()?.url))
     }
 
     var body: some View {
@@ -31,60 +27,27 @@ struct VaultWindow: View {
             .environmentObject(vault)
             .environmentObject(ui)
             .environmentObject(settings)
+            .environment(\.windowCoordinator, coordinator)
             .frame(minWidth: 900, minHeight: 600)
             .preferredColorScheme(settings.colorScheme)
-            // Menu commands act on whichever window has focus; see FolioCommands.
-            .focusedSceneValue(\.vaultStore, vault)
-            .focusedSceneValue(\.uiState, ui)
-            // Hand the registry this window so a vault can be *focused* rather
-            // than re-opened. Note what we deliberately do NOT do: write the
-            // settled vault back into `$ref`. Assigning to a WindowGroup's value
-            // binding presents a new window for that value — it is not a rename,
-            // and using it as one spawns a window every time a vault loads.
-            .background(WindowAccessor { window in
-                appDelegate.attach(window, to: vault)
-            })
+            // Objects, not values: `@FocusedValue` only re-evaluates the menus when
+            // *which* object is focused changes, so `canGoBack` would go stale and
+            // silently disable ⌘[ / ⌘].
+            .focusedSceneObject(vault)
+            .focusedSceneObject(ui)
+            .background(WindowBinder { window in coordinator.attach(window, to: vault) })
             .task {
+                coordinator.openWindowAction = {
+                    let l = "TRACE openWindow(id:) CALLED\n"
+                    if let h = try? FileHandle(forWritingTo: URL(fileURLWithPath: "/tmp/folio-mw.log")) { h.seekToEndOfFile(); h.write(Data(l.utf8)); try? h.close() }
+                    openWindow(id: "vault")
+                }
                 vault.start()
-                appDelegate.register(vault)
+                coordinator.register(vault)
+                coordinator.bootstrapIfNeeded()
+                let l = "pid=\(ProcessInfo.processInfo.processIdentifier) vault=\(vault.vaultURL?.lastPathComponent ?? "none")\n"
+                if let h = try? FileHandle(forWritingTo: URL(fileURLWithPath: "/tmp/folio-mw.log")) { h.seekToEndOfFile(); h.write(Data(l.utf8)); try? h.close() }
+                else { try? l.write(to: URL(fileURLWithPath: "/tmp/folio-mw.log"), atomically: true, encoding: .utf8) }
             }
-            .onDisappear {
-                appDelegate.unregister(vault)
-                if let url = vault.vaultURL { VaultSession.closed(VaultRef(url)) }
-            }
-    }
-}
-
-// MARK: - Focused values
-
-private struct VaultStoreKey: FocusedValueKey { typealias Value = VaultStore }
-private struct UIStateKey: FocusedValueKey { typealias Value = UIState }
-
-extension FocusedValues {
-    /// The front window's vault store, so a menu item acts on the window you're
-    /// looking at rather than on a single app-wide store.
-    var vaultStore: VaultStore? {
-        get { self[VaultStoreKey.self] }
-        set { self[VaultStoreKey.self] = newValue }
-    }
-    var uiState: UIState? {
-        get { self[UIStateKey.self] }
-        set { self[UIStateKey.self] = newValue }
-    }
-}
-
-/// Reports the hosting `NSWindow` once it exists, so the vault→window registry
-/// can focus a window instead of opening another.
-struct WindowAccessor: NSViewRepresentable {
-    let onWindow: (NSWindow) -> Void
-
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async { if let w = view.window { onWindow(w) } }
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async { if let w = nsView.window { onWindow(w) } }
     }
 }

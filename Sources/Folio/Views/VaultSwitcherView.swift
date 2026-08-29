@@ -10,7 +10,7 @@ struct VaultSwitcherView: View {
     @EnvironmentObject private var vault: VaultStore
     @EnvironmentObject private var ui: UIState
     @EnvironmentObject private var settings: AppSettings
-    @Environment(\.openWindow) private var openWindow
+    @Environment(\.windowCoordinator) private var coordinator
     @State private var query = ""
     @State private var selected = 0
 
@@ -162,7 +162,7 @@ struct VaultSwitcherView: View {
             ui.showVaultSwitcher = false
             // Opening by value focuses the window that already holds this vault
             // instead of making a second one.
-            VaultWindows.open(VaultRef(url), using: openWindow)
+            coordinator?.open(VaultRef(url))
         case .browse:
             browse()
         }
@@ -170,7 +170,7 @@ struct VaultSwitcherView: View {
 
     private func browse() {
         ui.showVaultSwitcher = false
-        if let url = VaultPicker.choose() { VaultWindows.open(VaultRef(url), using: openWindow) }
+        if let url = VaultPicker.choose() { coordinator?.open(VaultRef(url)) }
     }
 }
 
