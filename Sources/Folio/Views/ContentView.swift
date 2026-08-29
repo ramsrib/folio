@@ -191,11 +191,9 @@ struct ContentView: View {
     /// (the system draws them over this row), the filter/reload/toggle group on the
     /// right, drag area between.
     ///
-    /// The vault name used to sit centred in here and no longer does. It could not
-    /// win: 78pt of this row belongs to the traffic lights and 70pt to the controls,
-    /// so at the default 280pt sidebar a name had ~132pt — about fourteen
-    /// characters — and neither gutter was reclaimable. It lives in `vaultNameRow`
-    /// now, where it is the only tenant of its row.
+    /// The vault name used to sit centred in here and no longer does — it could not
+    /// win against two fixed tenants. It lives in `vaultNameRow` at the foot of the
+    /// sidebar now, where it is the only tenant of its row.
     private var sidebarTitleArea: some View {
         HStack(spacing: 6) {
             Spacer(minLength: 0)
@@ -217,17 +215,25 @@ struct ContentView: View {
         // Zoom-on-double-click is handled by the whole title strip (see titleBar).
     }
 
-    /// The vault name as a heading over the tree, with the whole sidebar column to
-    /// itself. Its text starts at 12pt, the same leading edge as a depth-0 row, so
-    /// it reads as the tree's heading rather than as another control.
+    /// The vault name, anchored at the foot of the sidebar (Obsidian's shape) with
+    /// the whole column to itself.
+    ///
+    /// It sits here rather than up in the title strip because that row has two
+    /// fixed tenants — 78pt of traffic lights, a 70pt control group — which left a
+    /// name ~132pt at the default sidebar width, about fourteen characters, with
+    /// neither gutter reclaimable. Putting it directly *under* the strip fixed the
+    /// width but stranded the controls: a half-empty first row with its icons on
+    /// the right, and the name alone on the left below them. At the foot it has
+    /// full width and the strip reads as an ordinary toolbar again.
+    ///
+    /// Its text starts at 12pt, the same leading edge as a depth-0 tree row.
     private var vaultNameRow: some View {
         HStack(spacing: 0) {
             vaultMenu
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 4)
-        .padding(.top, 8)
-        .padding(.bottom, 4)
+        .padding(.vertical, 5)
     }
 
     /// The vault name, dropping a native menu of recent vaults (Obsidian's shape):
@@ -405,12 +411,13 @@ struct ContentView: View {
             }
         } else {
             VStack(spacing: 0) {
-                vaultNameRow
                 if showFilter {
                     filterField
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
                 fileTree
+                Divider()
+                vaultNameRow
             }
             .background(sidebarBackdrop)
             .onAppear { restoreExpansion() }        // initial launch (onChange won't fire)
