@@ -17,6 +17,7 @@ struct CommandPaletteView: View {
     @EnvironmentObject private var vault: VaultStore
     @EnvironmentObject private var ui: UIState
     @EnvironmentObject private var settings: AppSettings
+    @Environment(\.windowCoordinator) private var coordinator
     @State private var query = ""
     @State private var selected = 0
 
@@ -26,10 +27,10 @@ struct CommandPaletteView: View {
     private var commands: [AppCommand] {
         var c: [AppCommand] = [
             AppCommand(title: "New Note", subtitle: "⌘N") { vault.newNote() },
-            AppCommand(title: "Open Vault…", subtitle: "⇧⌘O") { vault.pickVault() },
+            AppCommand(title: "Switch Vault…", subtitle: "⇧⌘O") { ui.showVaultSwitcher = true },
         ]
         for url in vault.recentVaults where url != vault.vaultURL {
-            c.append(AppCommand(title: "Switch Vault: \(url.lastPathComponent)", subtitle: nil) { vault.setVault(url) })
+            c.append(AppCommand(title: "Open Vault: \(url.lastPathComponent)", subtitle: nil) { coordinator?.open(VaultRef(url)) })
         }
         c.append(AppCommand(title: "Reload Vault", subtitle: "⇧⌘R") { vault.refresh() })
         if let sel = vault.selection {

@@ -10,6 +10,7 @@ final class UIState: ObservableObject {
     @Published var showTags = false
     @Published var showShortcuts = false
     @Published var showSearch = false          // ⇧⌘F global content search
+    @Published var showVaultSwitcher = false   // ⇧⌘O switch/open a vault
     /// A jump requested by global search: open the note's find bar on this query,
     /// focused on the given occurrence. Consumed (and cleared) by EditorPane.
     @Published var pendingFind: PendingFind?
@@ -33,7 +34,7 @@ final class UIState: ObservableObject {
     /// so a swipe/pinch can't act on the note *behind* an open palette.
     var anyPaletteShown: Bool {
         showQuickSwitcher || showCommandPalette || showTags || showShortcuts || showSearch
-            || showSettings
+            || showSettings || showVaultSwitcher
     }
 
     /// Close every palette/overlay — the single dismiss path used by the outside
@@ -45,6 +46,7 @@ final class UIState: ObservableObject {
         showShortcuts = false
         showSearch = false
         showSettings = false
+        showVaultSwitcher = false
     }
 }
 

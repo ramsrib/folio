@@ -105,6 +105,15 @@ Everything in this list is implemented. Anything not in it, assume it isn't.
 - Autosave, debounced ~500 ms, written atomically.
 - The page title is editable and renames the file on commit (when the inline title is enabled in ⌘,).
 
+**Vaults & windows**
+- **One vault per window.** Several vaults can be open at once, each in its own window.
+- **⇧⌘O** opens the vault switcher — or click the vault name at the top of the sidebar. Choosing a
+  vault focuses its window if it is already open, and never replaces the vault in the window you
+  are reading.
+- **⌥⌘N** opens an empty window; **⌘N** is New Note.
+- Opening a note from Finder or the terminal goes to the window whose vault contains it.
+- The set of open vaults is the session, restored on relaunch.
+
 **Appearance (⌘,)**
 - Themes: System, Light, Dark, Paper (warm), Frosted (glass).
 - Reading font (System / Serif / Mono), body font size (**⌘+ / ⌘− / ⌘0** work anywhere, or
