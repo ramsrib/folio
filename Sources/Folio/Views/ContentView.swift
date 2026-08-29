@@ -153,9 +153,21 @@ struct ContentView: View {
         // The custom title-bar strip is the window's (only) drag handle, like a
         // native toolbar. Buttons and the tab strip's own onDrag still win —
         // child interactions take precedence over this parent gesture.
-        // (The zoom double-click deliberately does NOT live here: a count-2
-        // recognizer over the tab strip delays every tab click by the
-        // double-click interval. It's on the sidebar title area instead.)
+        //
+        // Zoom-on-double-click lives here now, covering the empty space beside
+        // the tabs the way a native title bar does. It could not before: a
+        // `count: 2` recognizer holds every click in its area for the
+        // double-click interval, which delayed every tab click. Detecting the
+        // double by timestamp has no such cost (ARCHITECTURE.md, trap 1).
+        .onTapGesture {
+            let now = Date()
+            if now.timeIntervalSince(lastTitleClick) < NSEvent.doubleClickInterval {
+                lastTitleClick = .distantPast
+                titleBarDoubleClicked()
+            } else {
+                lastTitleClick = now
+            }
+        }
         .gesture(WindowDragGesture())
     }
 
@@ -247,22 +259,7 @@ struct ContentView: View {
             }
             .padding(.trailing, 10)
         }
-        // Native title-bar double-click (zoom/minimize per System Settings) —
-        // the hidden real title bar means AppKit never sees it.
-        //
-        // Detected by timestamp rather than `.onTapGesture(count: 2)`: a count-2
-        // recognizer holds *every* click in this area for the double-click
-        // interval to disambiguate, which made the vault-name button feel like it
-        // lagged half a second before opening. See ARCHITECTURE.md, trap 1.
-        .onTapGesture {
-            let now = Date()
-            if now.timeIntervalSince(lastTitleClick) < NSEvent.doubleClickInterval {
-                lastTitleClick = .distantPast
-                titleBarDoubleClicked()
-            } else {
-                lastTitleClick = now
-            }
-        }
+        // Zoom-on-double-click is handled by the whole title strip (see titleBar).
     }
 
     private var contentTitleArea: some View {
