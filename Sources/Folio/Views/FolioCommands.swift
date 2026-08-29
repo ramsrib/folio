@@ -35,12 +35,12 @@ struct FolioCommands: Commands {
                 .keyboardShortcut("o", modifiers: [.command, .shift])
                 .disabled(ui == nil)
             Button("Open Vault…") {
-                if let url = VaultPicker.choose() { openWindow(value: VaultRef(url)) }
+                if let url = VaultPicker.choose() { VaultWindows.open(VaultRef(url), using: openWindow) }
             }
             .keyboardShortcut("o", modifiers: [.command, .option])
             Menu("Open Recent") {
                 ForEach(vault?.recentVaults ?? [], id: \.self) { url in
-                    Button(url.lastPathComponent) { openWindow(value: VaultRef(url)) }
+                    Button(url.lastPathComponent) { VaultWindows.open(VaultRef(url), using: openWindow) }
                 }
                 if !(vault?.recentVaults.isEmpty ?? true) {
                     Divider()

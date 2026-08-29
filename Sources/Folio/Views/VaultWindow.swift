@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// One window = one vault.
 ///
@@ -11,10 +12,9 @@ struct VaultWindow: View {
     @ObservedObject var settings: AppSettings
     let appDelegate: AppDelegate
 
-    /// The window's own scene value. Written back once the store settles on a
-    /// vault: a window opened without one (launch, ⌘N) would otherwise stay
-    /// anonymous, and `openWindow(value:)` would open a *second* window for the
-    /// vault this one is already showing.
+    /// The vault this window was opened for. Read once at creation; the window's
+    /// identity afterwards is tracked by `AppDelegate`, keyed on the store's
+    /// vault path, not by this binding.
     @Binding var ref: VaultRef?
 
     init(ref: Binding<VaultRef?>, settings: AppSettings, appDelegate: AppDelegate) {
@@ -36,14 +36,17 @@ struct VaultWindow: View {
             // Menu commands act on whichever window has focus; see FolioCommands.
             .focusedSceneValue(\.vaultStore, vault)
             .focusedSceneValue(\.uiState, ui)
+            // Hand the registry this window so a vault can be *focused* rather
+            // than re-opened. Note what we deliberately do NOT do: write the
+            // settled vault back into `$ref`. Assigning to a WindowGroup's value
+            // binding presents a new window for that value — it is not a rename,
+            // and using it as one spawns a window every time a vault loads.
+            .background(WindowAccessor { window in
+                appDelegate.attach(window, to: vault)
+            })
             .task {
                 vault.start()
-                if let url = vault.vaultURL { ref = VaultRef(url) }
-                appDelegate.register(vault)          // loading happens here, not in init
-            }
-            // Keep the scene value in step if the window's vault ever changes.
-            .onChange(of: vault.vaultURL) { _, url in
-                if let url { ref = VaultRef(url) }
+                appDelegate.register(vault)
             }
             .onDisappear {
                 appDelegate.unregister(vault)
@@ -67,5 +70,21 @@ extension FocusedValues {
     var uiState: UIState? {
         get { self[UIStateKey.self] }
         set { self[UIStateKey.self] = newValue }
+    }
+}
+
+/// Reports the hosting `NSWindow` once it exists, so the vault→window registry
+/// can focus a window instead of opening another.
+struct WindowAccessor: NSViewRepresentable {
+    let onWindow: (NSWindow) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async { if let w = view.window { onWindow(w) } }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async { if let w = nsView.window { onWindow(w) } }
     }
 }

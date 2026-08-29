@@ -30,7 +30,7 @@ struct CommandPaletteView: View {
             AppCommand(title: "Switch Vault…", subtitle: "⇧⌘O") { ui.showVaultSwitcher = true },
         ]
         for url in vault.recentVaults where url != vault.vaultURL {
-            c.append(AppCommand(title: "Open Vault: \(url.lastPathComponent)", subtitle: nil) { openWindow(value: VaultRef(url)) })
+            c.append(AppCommand(title: "Open Vault: \(url.lastPathComponent)", subtitle: nil) { VaultWindows.open(VaultRef(url), using: openWindow) })
         }
         c.append(AppCommand(title: "Reload Vault", subtitle: "⇧⌘R") { vault.refresh() })
         if let sel = vault.selection {

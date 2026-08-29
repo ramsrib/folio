@@ -162,7 +162,7 @@ struct VaultSwitcherView: View {
             ui.showVaultSwitcher = false
             // Opening by value focuses the window that already holds this vault
             // instead of making a second one.
-            openWindow(value: VaultRef(url))
+            VaultWindows.open(VaultRef(url), using: openWindow)
         case .browse:
             browse()
         }
@@ -170,7 +170,7 @@ struct VaultSwitcherView: View {
 
     private func browse() {
         ui.showVaultSwitcher = false
-        if let url = VaultPicker.choose() { openWindow(value: VaultRef(url)) }
+        if let url = VaultPicker.choose() { VaultWindows.open(VaultRef(url), using: openWindow) }
     }
 }
 

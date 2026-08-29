@@ -31,7 +31,8 @@ struct FolioApp: App {
         WindowGroup(for: VaultRef.self) { $ref in
             VaultWindow(ref: $ref, settings: settings, appDelegate: appDelegate)
                 .onAppear {
-                    appDelegate.openWindow = { openWindow(value: $0) }
+                    VaultWindows.delegate = appDelegate
+                    appDelegate.openWindow = { VaultWindows.open($0, using: openWindow) }
                     appDelegate.flushPendingOpens()
                 }
         }
@@ -46,9 +47,6 @@ struct FolioApp: App {
                 height: min(1000, visible.height * 0.88)))
         }
         .windowStyle(.hiddenTitleBar)
-        // A value-typed WindowGroup opens on demand and presents nothing at
-        // launch, which for a single-scene app means launching to no window.
-        .defaultLaunchBehavior(.presented)
         .commands { FolioCommands(settings: settings) }
         // No Settings scene: SettingsView presents as an in-window overlay
         // (ContentView.paletteOverlay) via the ⌘, command in FolioCommands.
@@ -62,6 +60,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// never to whichever window happens to be frontmost.
     private var stores: [WeakStore] = []
     private struct WeakStore { weak var store: VaultStore? }
+    /// vault store → its window, so a vault can be brought forward instead of
+    /// opened again. SwiftUI's own value-matching can't do this for us: a window
+    /// opened without a value (launch, ⌘N) settles on its vault *afterwards*, and
+    /// writing that vault back into the scene value opens another window rather
+    /// than re-tagging this one.
+    private var windows: [ObjectIdentifier: NSWindow] = [:]
+
+    @MainActor func attach(_ window: NSWindow, to store: VaultStore) {
+        windows[ObjectIdentifier(store)] = window
+    }
+
+    /// Bring the window already showing this vault to the front. Returns false if
+    /// no window holds it, in which case the caller should open one.
+    @MainActor func focus(vault ref: VaultRef) -> Bool {
+        guard let store = stores.compactMap(\.store).first(where: {
+            guard let url = $0.vaultURL else { return false }
+            return VaultRef(url) == ref
+        }), let window = windows[ObjectIdentifier(store)] else { return false }
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        return true
+    }
 
     /// Opens a window for a vault, focusing an existing one if there is a match.
     var openWindow: ((VaultRef) -> Void)?
@@ -76,6 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @MainActor func unregister(_ store: VaultStore) {
+        windows.removeValue(forKey: ObjectIdentifier(store))
         stores.removeAll { $0.store == nil || $0.store === store }
     }
 
