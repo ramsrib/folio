@@ -104,7 +104,7 @@ struct VaultSwitcherView: View {
                 Image(systemName: isCurrent ? "shippingbox.fill" : "shippingbox")
                     .foregroundStyle(isCurrent ? settings.selectionTint : .secondary)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(highlighted(url.lastPathComponent, match)).lineLimit(1)
+                    Text(FuzzyMatch.highlighted(url.lastPathComponent, match, tint: settings.selectionTint)).lineLimit(1)
                     Text(url.deletingLastPathComponent().path.abbreviatingHome)
                         .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
@@ -131,22 +131,6 @@ struct VaultSwitcherView: View {
         }
     }
 
-    private func highlighted(_ string: String, _ match: FuzzyMatch.Result?) -> AttributedString {
-        guard let match, !match.matchedIndices.isEmpty else { return AttributedString(string) }
-        let hits = Set(match.matchedIndices)
-        var result = AttributedString()
-        var i = string.startIndex
-        while i < string.endIndex {
-            var piece = AttributedString(String(string[i]))
-            if hits.contains(i) {
-                piece.inlinePresentationIntent = .stronglyEmphasized
-                piece.foregroundColor = settings.selectionTint
-            }
-            result += piece
-            i = string.index(after: i)
-        }
-        return result
-    }
 
     // MARK: Actions
 

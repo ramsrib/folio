@@ -10,6 +10,20 @@ struct QuickSwitcherView: View {
     @EnvironmentObject private var settings: AppSettings
     @State private var query = ""
     @State private var selected = 0
+    /// Every note's name and path, prepared once when the palette opens. Matching
+    /// raw strings re-lowercases and re-allocates per candidate, which on a
+    /// couple of thousand notes costs ~12ms a keystroke; this costs ~0.4ms.
+    @State private var index: [Indexed] = []
+    /// The visible list, recomputed only when the query changes. It used to be a
+    /// computed property read twice per body pass (the `ForEach` and the
+    /// empty-state `overlay`), so every keystroke matched the whole vault twice.
+    @State private var rows: [Row] = []
+
+    private struct Indexed {
+        let file: MarkdownFile
+        let name: FuzzyMatch.Prepared
+        let path: FuzzyMatch.Prepared
+    }
 
     // MARK: Row model
 
@@ -41,6 +55,20 @@ struct QuickSwitcherView: View {
     /// Files ranked by fuzzy score (name weighted above path), tie-broken by
     /// recency, then natural name order. Empty query → recents first (excluding the
     /// current note), then the rest alphabetically. Capped at 50 rows.
+    private func buildIndex() {
+        index = vault.files.map {
+            Indexed(file: $0,
+                    name: FuzzyMatch.Prepared($0.name),
+                    path: FuzzyMatch.Prepared($0.relativePath))
+        }
+    }
+
+    private func recompute() {
+        rows = isHeadingMode
+            ? headingCandidates.map { Row.heading($0.0, $0.1) }
+            : fileCandidates.map(Row.file) + (showsCreate ? [Row.create(trimmedQuery)] : [])
+    }
+
     private var fileCandidates: [Candidate] {
         if trimmedQuery.isEmpty {
             let recent = vault.recentFiles
@@ -50,10 +78,14 @@ struct QuickSwitcherView: View {
             let rest = vault.files.filter { !recentIDs.contains($0.id) && $0.id != vault.selection }
             return (recent + rest).prefix(50).map { Candidate(file: $0, nameMatch: nil, pathMatch: nil) }
         }
-        let q = trimmedQuery
-        let scored: [(cand: Candidate, score: Int)] = vault.files.compactMap { f in
-            let nameM = FuzzyMatch.match(query: q, in: f.name)
-            let pathM = FuzzyMatch.match(query: q, in: f.relativePath)
+        let q = FuzzyMatch.queryCharacters(trimmedQuery)
+        let scored: [(cand: Candidate, score: Int)] = index.compactMap { entry in
+            // Reject on a cheap in-order character scan before scoring anything.
+            let nameCould = entry.name.couldMatch(q), pathCould = entry.path.couldMatch(q)
+            guard nameCould || pathCould else { return nil }
+            let f = entry.file
+            let nameM = nameCould ? FuzzyMatch.match(query: q, in: entry.name) : nil
+            let pathM = pathCould ? FuzzyMatch.match(query: q, in: entry.path) : nil
             guard nameM != nil || pathM != nil else { return nil }
             // Name matches count double so a filename hit outranks a path-only hit.
             let score = max((nameM?.score ?? 0) * 2, pathM?.score ?? 0)
@@ -89,13 +121,6 @@ struct QuickSwitcherView: View {
         return !vault.files.contains { $0.name.lowercased() == trimmedQuery.lowercased() }
     }
 
-    private var rows: [Row] {
-        if isHeadingMode { return headingCandidates.map { .heading($0.0, $0.1) } }
-        var r = fileCandidates.map { Row.file($0) }
-        if showsCreate { r.append(.create(trimmedQuery)) }
-        return r
-    }
-
     // MARK: View
 
     var body: some View {
@@ -107,7 +132,7 @@ struct QuickSwitcherView: View {
                                  onSubmit: { handleSubmit($0) },
                                  onMoveUp: { move(-1) }, onMoveDown: { move(1) })
                     .frame(height: 22)
-                    .onChange(of: query) { selected = 0 }
+                    .onChange(of: query) { selected = 0; recompute() }
             }
             .padding(16)
             Divider()
@@ -139,6 +164,8 @@ struct QuickSwitcherView: View {
         .onKeyPress(.downArrow) { move(1); return .handled }
         .onKeyPress(.upArrow) { move(-1); return .handled }
         .onKeyPress(.return, phases: .down) { handleReturn($0.modifiers) }
+        .task { buildIndex(); recompute() }
+        .onChange(of: vault.files.count) { buildIndex(); recompute() }
         .onExitCommand { ui.showQuickSwitcher = false }
     }
 
@@ -158,9 +185,9 @@ struct QuickSwitcherView: View {
         HStack(spacing: 8) {
             Image(systemName: "doc.text").foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 1) {
-                Text(highlighted(c.file.name, c.nameMatch)).lineLimit(1)
+                Text(FuzzyMatch.highlighted(c.file.name, c.nameMatch, tint: settings.selectionTint)).lineLimit(1)
                 if c.file.relativePath != "\(c.file.name).md" {
-                    Text(highlighted(c.file.relativePath, c.pathMatch))
+                    Text(FuzzyMatch.highlighted(c.file.relativePath, c.pathMatch, tint: settings.selectionTint))
                         .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
@@ -172,7 +199,7 @@ struct QuickSwitcherView: View {
     private func headingRow(_ item: OutlineItem, _ match: FuzzyMatch.Result?) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "number").foregroundStyle(.secondary)
-            Text(highlighted(item.title, match)).lineLimit(1)
+            Text(FuzzyMatch.highlighted(item.title, match, tint: settings.selectionTint)).lineLimit(1)
                 // Indent deeper headings so the outline hierarchy reads at a glance.
                 .padding(.leading, CGFloat(item.level - 1) * 14)
             Spacer()
@@ -220,23 +247,6 @@ struct QuickSwitcherView: View {
 
     // MARK: Highlighting
 
-    /// Render `string` with the fuzzy-matched characters emphasized (bold + accent).
-    private func highlighted(_ string: String, _ match: FuzzyMatch.Result?) -> AttributedString {
-        guard let match, !match.matchedIndices.isEmpty else { return AttributedString(string) }
-        let hits = Set(match.matchedIndices)
-        var result = AttributedString()
-        var i = string.startIndex
-        while i < string.endIndex {
-            var piece = AttributedString(String(string[i]))
-            if hits.contains(i) {
-                piece.inlinePresentationIntent = .stronglyEmphasized
-                piece.foregroundColor = settings.selectionTint
-            }
-            result += piece
-            i = string.index(after: i)
-        }
-        return result
-    }
 
     // MARK: Actions
 

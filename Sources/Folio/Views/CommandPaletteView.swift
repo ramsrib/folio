@@ -24,6 +24,11 @@ struct CommandPaletteView: View {
     /// Every command the app exposes. Selection-dependent entries (Reveal, Copy
     /// Path, Trash, Close Tab) appear only when a note is open; recent vaults expand
     /// into "Switch Vault:" rows; themes into "Set Theme:" rows.
+    /// Split out of the row body: inlined, the type-checker times out on it.
+    private func title(_ entry: (cmd: AppCommand, match: FuzzyMatch.Result?)) -> AttributedString {
+        FuzzyMatch.highlighted(entry.cmd.title, entry.match, tint: settings.selectionTint)
+    }
+
     private var commands: [AppCommand] {
         var c: [AppCommand] = [
             AppCommand(title: "New Note", subtitle: "⌘N") { vault.newNote() },
@@ -116,23 +121,7 @@ struct CommandPaletteView: View {
             ScrollViewReader { proxy in
                 List {
                     ForEach(Array(results.enumerated()), id: \.element.cmd.id) { idx, entry in
-                        HStack {
-                            Text(highlighted(entry.cmd.title, entry.match))
-                            Spacer()
-                            if let s = entry.cmd.subtitle {
-                                Text(s).font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.vertical, 5)
-                        .padding(.horizontal, 8)
-                        .contentShape(Rectangle())
-                        .id(idx)
-                        .onTapGesture { run(entry.cmd) }
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(idx == selected ? settings.selectionFill : .clear)
-                        )
+                        row(idx, entry)
                     }
                 }
                 .listStyle(.plain)
@@ -150,23 +139,30 @@ struct CommandPaletteView: View {
         .onExitCommand { ui.showCommandPalette = false }
     }
 
-    /// Emphasize the fuzzy-matched characters (bold + accent).
-    private func highlighted(_ string: String, _ match: FuzzyMatch.Result?) -> AttributedString {
-        guard let match, !match.matchedIndices.isEmpty else { return AttributedString(string) }
-        let hits = Set(match.matchedIndices)
-        var result = AttributedString()
-        var i = string.startIndex
-        while i < string.endIndex {
-            var piece = AttributedString(String(string[i]))
-            if hits.contains(i) {
-                piece.inlinePresentationIntent = .stronglyEmphasized
-                piece.foregroundColor = settings.selectionTint
+    /// One result row. Extracted from `body` rather than inlined: the whole view
+    /// is a single expression, and it sits right at the type-checker's limit.
+    @ViewBuilder
+    private func row(_ idx: Int, _ entry: (cmd: AppCommand, match: FuzzyMatch.Result?)) -> some View {
+        HStack {
+            Text(title(entry))
+            Spacer()
+            if let s = entry.cmd.subtitle {
+                Text(s).font(.caption).foregroundStyle(.secondary)
             }
-            result += piece
-            i = string.index(after: i)
         }
-        return result
+        .padding(.vertical, 5)
+        .padding(.horizontal, 8)
+        .contentShape(Rectangle())
+        .id(idx)
+        .onTapGesture { run(entry.cmd) }
+        .listRowSeparator(.hidden)
+        .listRowBackground(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(idx == selected ? settings.selectionFill : .clear)
+        )
     }
+
+    /// Emphasize the fuzzy-matched characters (bold + accent).
 
     private func move(_ delta: Int) {
         guard !results.isEmpty else { return }
