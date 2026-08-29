@@ -193,8 +193,17 @@ final class AppSettings: ObservableObject {
     var selectionTint: Color { theme == .paper ? Color(platform: Self.paperSelection) : .accentColor }
     /// Background fill for a selected row (the tint at a theme-tuned opacity).
     var selectionFill: Color {
-        theme == .paper ? Color(platform: Self.paperSelection).opacity(0.28) : Color.accentColor.opacity(0.20)
+        theme == .paper ? Color(platform: Self.paperSelection).opacity(selectionAlpha) : Color.accentColor.opacity(0.20)
     }
+    /// Selecting text inside a note, in the same warm sepia the sidebar uses —
+    /// the system blue read as a foreign object on the cream. nil = system
+    /// selection color, which already matches every other theme's chrome.
+    var nsSelectionHighlight: PlatformColor? {
+        theme == .paper ? Self.paperSelection.withAlphaComponent(CGFloat(selectionAlpha)) : nil
+    }
+    /// One opacity for every selection surface, so a selected row and a run of
+    /// selected text land on the same tone.
+    private var selectionAlpha: Double { 0.28 }
 
     private static let paper = PlatformColor(red: 0.98, green: 0.96, blue: 0.90, alpha: 1)
     private static let paperSidebar = PlatformColor(red: 0.96, green: 0.93, blue: 0.84, alpha: 1)

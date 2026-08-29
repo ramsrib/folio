@@ -39,6 +39,7 @@ struct NoteReader: View {
             family: settings.readingFont,
             readableWidth: settings.columnWidth,
             background: settings.nsPaneBackground,
+            selectionHighlight: settings.nsSelectionHighlight,
             noteID: vault.selection,
             find: find,
             scrollRequest: ui.mode == .read ? vault.scrollRequest : nil,

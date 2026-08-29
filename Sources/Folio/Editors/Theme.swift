@@ -70,6 +70,19 @@ struct Theme: Equatable {
     static let yamlComment = NSColor.tertiaryLabelColor
 }
 
+extension NSTextView {
+    /// Paint text selection in a theme color, or hand it back to the system when
+    /// there isn't one. Only the background is overridden — the text keeps its own
+    /// color, which is what makes a light wash readable.
+    func applySelectionHighlight(_ color: NSColor?) {
+        if let color {
+            selectedTextAttributes = [.backgroundColor: color]
+        } else {
+            selectedTextAttributes = [.backgroundColor: NSColor.selectedTextBackgroundColor]
+        }
+    }
+}
+
 extension ReadingFont {
     /// AppKit counterpart of `design`: writing mode needs real `NSFont`s, and it
     /// has to honor the same family the reader is using.

@@ -14,6 +14,8 @@ struct LivePreviewEditor: NSViewRepresentable {
     var previewForLink: (URL) -> String? = { _ in nil }
     var onEscape: () -> Void = {}
     var background: NSColor = .textBackgroundColor
+    /// Theme tint for selected text; nil uses the system selection color.
+    var selectionHighlight: NSColor?
     var readableWidth: CGFloat = 720
     var theme: Theme
     @ObservedObject var find: FindModel
@@ -35,6 +37,7 @@ struct LivePreviewEditor: NSViewRepresentable {
         tv.isAutomaticSpellingCorrectionEnabled = false
         tv.textContainerInset = NSSize(width: 22, height: 18)
         tv.backgroundColor = background
+        tv.applySelectionHighlight(selectionHighlight)
         tv.readableWidth = readableWidth
         apply(theme, to: tv)
         tv.isVerticallyResizable = true
@@ -73,6 +76,7 @@ struct LivePreviewEditor: NSViewRepresentable {
         tv.onClickLink = onOpenLink
         tv.previewProvider = previewForLink
         if tv.backgroundColor != background { tv.backgroundColor = background }
+        tv.applySelectionHighlight(selectionHighlight)
         if tv.readableWidth != readableWidth { tv.readableWidth = readableWidth; tv.applyReadableInset() }
 
         // ⌘+/⌘− or a reading-font change while writing: restyle in place.

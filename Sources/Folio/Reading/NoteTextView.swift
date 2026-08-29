@@ -18,6 +18,8 @@ struct NoteTextView: NSViewRepresentable {
     let family: ReadingFont
     let readableWidth: CGFloat
     let background: NSColor
+    /// Theme tint for selected text; nil uses the system selection color.
+    let selectionHighlight: NSColor?
     let noteID: URL?
     @ObservedObject var find: FindModel
     /// Heading anchor to scroll to (outline click / wikilink with `#heading`).
@@ -42,6 +44,7 @@ struct NoteTextView: NSViewRepresentable {
         tv.isAutomaticLinkDetectionEnabled = false
         tv.drawsBackground = true
         tv.backgroundColor = background
+        tv.applySelectionHighlight(selectionHighlight)
         tv.readableWidth = readableWidth
         tv.textContainerInset = NSSize(width: 32, height: 28)
         tv.isVerticallyResizable = true
@@ -77,6 +80,7 @@ struct NoteTextView: NSViewRepresentable {
         coordinator.parent = self
         tv.onToggleTask = onToggleTask
         if tv.backgroundColor != background { tv.backgroundColor = background }
+        tv.applySelectionHighlight(selectionHighlight)
         if tv.readableWidth != readableWidth {
             tv.readableWidth = readableWidth
             tv.applyReadableInset()

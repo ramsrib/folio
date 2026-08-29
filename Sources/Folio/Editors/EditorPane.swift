@@ -99,6 +99,7 @@ struct EditorPane: View {
                         else { withAnimation(.smooth(duration: 0.2)) { ui.mode = .read } }
                     },
                         background: settings.nsPaneBackground,
+                        selectionHighlight: settings.nsSelectionHighlight,
                         readableWidth: settings.columnWidth,
                         theme: Theme(settings),
                         find: find
