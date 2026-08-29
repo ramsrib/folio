@@ -11,7 +11,6 @@ struct VaultWindow: View {
     @StateObject private var ui = UIState()
     @ObservedObject var settings: AppSettings
     let coordinator: WindowCoordinator
-    @Environment(\.openWindow) private var openWindow
 
     init(coordinator: WindowCoordinator, settings: AppSettings) {
         self.coordinator = coordinator
@@ -37,11 +36,9 @@ struct VaultWindow: View {
             .focusedSceneObject(ui)
             .background(WindowBinder { window in coordinator.attach(window, to: vault) })
             .task {
-                coordinator.openWindowAction = {
-                    let l = "TRACE openWindow(id:) CALLED\n"
-                    if let h = try? FileHandle(forWritingTo: URL(fileURLWithPath: "/tmp/folio-mw.log")) { h.seekToEndOfFile(); h.write(Data(l.utf8)); try? h.close() }
-                    openWindow(id: "vault")
-                }
+                // `openWindowAction` is wired at the App level (it must exist
+                // before any window does — a document-driven launch presents no
+                // scene until the AppDelegate summons one).
                 vault.start()
                 coordinator.register(vault)
                 coordinator.bootstrapIfNeeded()

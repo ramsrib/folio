@@ -21,6 +21,11 @@ struct FolioApp: App {
     }
 
     var body: some Scene {
+        // Wire the coordinator's "give me one more window" action here, not from a
+        // window's `.task`: `body` runs before any window exists, so the action is
+        // available even on a launch that presents no scene (see the
+        // `handlesExternalEvents` note below). Idempotent — `body` re-evaluates.
+        let _ = { appDelegate.coordinator.openWindowAction = { [openWindow] in openWindow(id: "vault") } }()
         // A PLAIN WindowGroup. The value-typed variant cannot express this app's
         // lifecycle: windows acquire their vault *after* creation (launch, ⌘N, an
         // external open landing in the launch window), and there is no way to tell
@@ -32,6 +37,18 @@ struct FolioApp: App {
         // restoration on means two systems racing to decide how many windows
         // exist, which is unwinnable.
         .restorationBehavior(.disabled)
+        // Files and folio:// URLs are handled by the AppDelegate
+        // (`application(_:open:)`) and routed by the coordinator. Without this,
+        // SwiftUI ALSO reacts to every external open by materializing a fresh
+        // (vault-less) scene from this group — one ghost window per Finder/CLI
+        // open, on top of whatever the coordinator decides to do. The measured
+        // "one openWindow call yields two windows" was exactly this ghost.
+        //
+        // Side effect: a launch *caused by* a document open then presents no
+        // scene at all (`.defaultLaunchBehavior(.presented)` does not override
+        // it). The AppDelegate summons the launch window in that case — see
+        // `applicationDidFinishLaunching`.
+        .handlesExternalEvents(matching: [])
         // First-launch size: proportional to whichever display the window lands on
         // (laptop panel vs. big monitor get sensibly different frames), capped so a
         // 5K display doesn't produce a wall of text.
@@ -53,11 +70,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor private static let sharedCoordinator = WindowCoordinator()
     @MainActor var coordinator: WindowCoordinator { Self.sharedCoordinator }
 
-    /// Legacy registry, superseded by `coordinator`.
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         configureAppIcon()
         NSApp.activate(ignoringOtherApps: true)
+        // With the WindowGroup opted out of external events, a launch triggered
+        // BY a document/URL open presents no window at all (SwiftUI treats the
+        // launch as event-driven and finds no scene willing to take the event).
+        // On a normal launch the window is already up before this notification
+        // fires — measured — so an empty window list here means exactly that
+        // case: summon the launch window, whose `.task` runs the coordinator's
+        // bootstrap and releases the buffered open.
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                if NSApp.windows.isEmpty { self.coordinator.openWindowAction?() }
+            }
+        }
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
