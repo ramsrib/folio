@@ -103,9 +103,10 @@ final class AppSettings: ObservableObject {
     @Published var readingFont: ReadingFont { didSet { d.set(readingFont.rawValue, forKey: kFont) } }
     @Published var bodyFontSize: Double { didSet { d.set(bodyFontSize, forKey: kSize) } }
     @Published var readableWidth: Double { didSet { d.set(readableWidth, forKey: kWidth) } }
-    /// The big Notion-style page title at the top of a note. Redundant if you're
-    /// happy reading the name in the tab — but it's also the rename-in-place
-    /// affordance, so it's a toggle (like Obsidian's "Show inline title"), not gone.
+    /// The big Notion-style page title at the top of a note. Off by default —
+    /// the tab already names the note, so the heading mostly costs vertical
+    /// space. It's the rename-in-place affordance too, though, so it stays a
+    /// toggle (like Obsidian's "Show inline title") rather than going away.
     @Published var showInlineTitle: Bool { didSet { d.set(showInlineTitle, forKey: kInlineTitle) } }
     @Published var lineBreaks: LineBreakMode { didSet { d.set(lineBreaks.rawValue, forKey: kLineBreakMode) } }
     /// Let the note fill the pane instead of sitting in a measured column. A wide
@@ -148,7 +149,7 @@ final class AppSettings: ObservableObject {
         // ~660pt at 17pt body ≈ 70–75 characters per line — the long-form
         // sweet spot (60–75); the old 720 default ran ~85 and read wide.
         readableWidth = d.object(forKey: kWidth) as? Double ?? 660
-        showInlineTitle = d.object(forKey: kInlineTitle) as? Bool ?? true
+        showInlineTitle = d.object(forKey: kInlineTitle) as? Bool ?? false
         // Migration from the old Bool, which defaulted to true. Only `false` is
         // evidence of an actual choice — `true` is indistinguishable from the
         // default, and the key gets written back as a side effect of merely
