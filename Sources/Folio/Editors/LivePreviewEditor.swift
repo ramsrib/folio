@@ -92,6 +92,9 @@ struct LivePreviewEditor: NSViewRepresentable {
         }
 
         if tv.string != text {                  // external change (file switch / disk reload)
+            // Does not go through `textDidChange`, so bump the revision here too —
+            // this is the note-switch half of the stale-highlight bug.
+            context.coordinator.documentRevision &+= 1
             let len = (text as NSString).length
             let prev = tv.selectedRange()
             tv.string = text
@@ -134,6 +137,15 @@ struct LivePreviewEditor: NSViewRepresentable {
         var parent: LivePreviewEditor
         weak var textView: MarkdownTextView?
         var lastFindActive = false   // detect find-bar close → refocus the editor
+        /// Bumped on every document mutation, and used as the find cache's notion
+        /// of "which document is this".
+        ///
+        /// The key used `text.length`, which is not an identity: overtyping a
+        /// character, pasting over a same-length selection, or switching to a note
+        /// of the same UTF-16 length all leave it unchanged, so stale match ranges
+        /// and a stale count survived the change. Hashing the string would be
+        /// exact but O(n) on the typing path; a counter is O(1) and just as exact.
+        var documentRevision = 0
         /// The theme the text view was last styled with, so `updateNSView` only
         /// restyles when the user actually changed size or family.
         var appliedTheme: Theme?
@@ -157,7 +169,7 @@ struct LivePreviewEditor: NSViewRepresentable {
             let text = tv.string as NSString
             // The palette is part of what was painted, so a theme switch with find
             // open has to repaint — otherwise the old wash (and Paper's ink) stay.
-            let highlightKey = "\(find.caseSensitive)|\(text.length)|\(find.query)"
+            let highlightKey = "\(find.caseSensitive)|\(documentRevision)|\(find.query)"
                 + "|\(parent.findMatch.background.hashValue)"
             if highlightKey != lastHighlightKey {
                 lastHighlightKey = highlightKey
@@ -219,6 +231,7 @@ struct LivePreviewEditor: NSViewRepresentable {
 
         func textDidChange(_ notification: Notification) {
             guard let tv = textView else { return }
+            documentRevision &+= 1
             parent.text = tv.string
             highlight()
             parent.onChange()
