@@ -226,13 +226,21 @@ struct ContentView: View {
     /// the right, and the name alone on the left below them. At the foot it has
     /// full width and the strip reads as an ordinary toolbar again.
     ///
-    /// Its text starts at 12pt, the same leading edge as a depth-0 tree row.
+    /// Centred rather than left-aligned. Obsidian's own foot is left-aligned, but
+    /// it fills the other half of the bar with help and settings icons; ours holds
+    /// one control, and pinned to the leading edge it read as a half-finished row
+    /// hanging off the side — especially against a tree of indented rows, where
+    /// nothing above it shares that margin. Centred, a lone control looks placed.
+    ///
+    /// Same spacer + priority shape as the old title-strip slot, so a name too long
+    /// for the sidebar truncates instead of overflowing.
     private var vaultNameRow: some View {
         HStack(spacing: 0) {
-            vaultMenu
+            Spacer(minLength: 0)
+            vaultMenu.layoutPriority(1)
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 8)
         .padding(.vertical, 5)
     }
 
@@ -262,10 +270,9 @@ struct ContentView: View {
             }
         } label: {
             HStack(spacing: 6) {
-                // Chevron first, Obsidian's order: it lands on the same column as
-                // the tree's disclosure triangles, so the foot lines up with what
-                // is above it, and it is what says the name is a control — the one
-                // part that must never be the thing squeezed out.
+                // Chevron first, Obsidian's order. It is what says the name is a
+                // control, so it carries its own priority: never the part that
+                // gets squeezed out when the name is too long for the bar.
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.secondary)
