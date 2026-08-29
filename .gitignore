@@ -22,3 +22,6 @@ build-ios/
 
 # Release artifacts
 dist/
+
+# Agent worktrees and session state — never part of the project.
+.claude/
