@@ -16,8 +16,6 @@ struct ContentView: View {
     /// grabs first-responder at launch and competes with the palettes for focus.
     /// Revealed by the sidebar's magnifier icon, ⇧⌘K, or the command palette.
     @State private var showFilter = false
-    @Environment(\.windowCoordinator) private var coordinator
-    @State private var showVaultPopover = false
     @State private var vaultNameHovered = false
     /// For manual double-click detection on the title bar (see `sidebarTitleArea`).
     @State private var lastTitleClick = Date.distantPast
@@ -179,7 +177,7 @@ struct ContentView: View {
             // The vault name is the switcher: the thing you'd click to change
             // vaults is the thing naming the one you're in.
             Button {
-                showVaultPopover = true
+                ui.showVaultSwitcher = true
             } label: {
                 HStack(spacing: 4) {
                     Text(vault.vaultURL?.lastPathComponent ?? "Folio")
@@ -204,15 +202,6 @@ struct ContentView: View {
             .buttonStyle(.plain)
             .help("Switch Vault (⇧⌘O)")
             .accessibilityLabel("Switch vault")
-            // Anchored to the name you clicked. ⇧⌘O still opens the centered
-            // palette — a keyboard shortcut has nothing to point at.
-            .popover(isPresented: $showVaultPopover, arrowEdge: .bottom) {
-                VaultSwitcherView(style: .popover) { showVaultPopover = false }
-                    .environmentObject(vault)
-                    .environmentObject(ui)
-                    .environmentObject(settings)
-                    .environment(\.windowCoordinator, coordinator)
-            }
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.horizontal, 78)
 

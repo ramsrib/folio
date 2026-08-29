@@ -7,13 +7,6 @@ import SwiftUI
 /// same chrome. The only new idea here is the row for a vault that isn't in
 /// recents yet.
 struct VaultSwitcherView: View {
-    /// Centered palette (⇧⌘O, like the other palettes) or a popover anchored to
-    /// the sidebar's vault name. A click on a specific control should answer
-    /// *at* that control; a global shortcut has nothing to anchor to.
-    enum Style { case palette, popover }
-    var style: Style = .palette
-    var onDismiss: () -> Void = {}
-
     @EnvironmentObject private var vault: VaultStore
     @EnvironmentObject private var ui: UIState
     @EnvironmentObject private var settings: AppSettings
@@ -83,19 +76,16 @@ struct VaultSwitcherView: View {
                 .animation(.easeOut(duration: 0.12), value: selected)
                 .onChange(of: selected) { proxy.scrollTo(selected, anchor: .center) }
             }
-            if style == .palette {
-                Divider()
-                HStack(spacing: 10) {
-                    hint("↵", "open window"); hint("⌘↵", "browse…")
-                    Spacer()
-                }
-                .font(.caption).foregroundStyle(.secondary)
-                .padding(.horizontal, 14).padding(.vertical, 8)
+            Divider()
+            HStack(spacing: 10) {
+                hint("↵", "open window"); hint("⌘↵", "browse…")
+                Spacer()
             }
+            .font(.caption).foregroundStyle(.secondary)
+            .padding(.horizontal, 14).padding(.vertical, 8)
         }
-        .frame(width: style == .popover ? 340 : 560)
-        .frame(height: style == .popover ? nil : 400)
-        .modifier(SwitcherSurface(style: style))
+        .frame(width: 560, height: 400)
+        .paletteSurface()
         .onKeyPress(.downArrow) { move(1); return .handled }
         .onKeyPress(.upArrow) { move(-1); return .handled }
         .onKeyPress(.return, phases: .down) { press in
@@ -165,10 +155,7 @@ struct VaultSwitcherView: View {
         selected = min(max(selected + delta, 0), rows.count - 1)
     }
 
-    private func dismiss() {
-        ui.showVaultSwitcher = false
-        onDismiss()
-    }
+    private func dismiss() { ui.showVaultSwitcher = false }
 
     private func activate() {
         guard rows.indices.contains(selected) else { return }
@@ -186,14 +173,6 @@ struct VaultSwitcherView: View {
     private func browse() {
         dismiss()
         if let url = VaultPicker.choose() { coordinator?.open(VaultRef(url)) }
-    }
-}
-
-/// Palette chrome for the centered style; a popover brings its own.
-private struct SwitcherSurface: ViewModifier {
-    let style: VaultSwitcherView.Style
-    func body(content: Content) -> some View {
-        if style == .popover { content } else { content.paletteSurface() }
     }
 }
 
