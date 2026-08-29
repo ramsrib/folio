@@ -94,30 +94,41 @@ final class VaultStore: ObservableObject {
     private static let headingRegex = try! NSRegularExpression(
         pattern: "^(#{1,6})\\s+(.+)$", options: [.anchorsMatchLines])
 
-    init() {
+    /// - Parameter vault: the vault this window holds. `nil` means "whatever was
+    ///   last open" — the launch case, and what a plain ⌘N gets.
+    /// The vault this store was created for, loaded by `start()`.
+    private let requestedVault: URL?
+
+    /// Deliberately cheap. Scanning a vault here would mutate `@Published` state
+    /// while SwiftUI is constructing the window's `StateObject`, which re-enters
+    /// the update cycle and hangs before the window ever appears — the store used
+    /// to be built by the `App`, where nothing was watching yet.
+    /// - Parameter vault: the vault this window holds. `nil` means "whatever was
+    ///   last open" — the launch case, and what a plain ⌘N gets.
+    init(vault: URL? = nil) {
+        requestedVault = vault
         recentVaults = (UserDefaults.standard.array(forKey: recentKey) as? [String] ?? [])
             .map { URL(fileURLWithPath: $0) }
-        restoreVault()
     }
 
-    // MARK: - Vault selection
-
-    func pickVault() {
-        #if os(macOS)
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.prompt = "Open Vault"
-        panel.message = "Choose a folder of Markdown notes"
-        if panel.runModal() == .OK, let url = panel.url { setVault(url) }
-        #endif
-        // iOS opens vaults via UIDocumentPicker from the app layer → setVault(_:).
+    /// Load the vault. Call once, after the window exists.
+    func start() {
+        guard vaultURL == nil else { return }
+        if let requestedVault, FileManager.default.fileExists(atPath: requestedVault.path) {
+            setVault(requestedVault)
+        } else {
+            restoreVault()
+        }
     }
 
+    /// Point this window at a vault. Only ever called for *this* window's vault —
+    /// opening a different vault opens a window (see `VaultRef`), it does not
+    /// swap the vault under someone's feet.
     func setVault(_ url: URL) {
         flushSave()
+        if let previous = vaultURL { VaultSession.closed(VaultRef(previous)) }
         vaultURL = url
+        VaultSession.opened(VaultRef(url))
         UserDefaults.standard.set(url.path, forKey: vaultPathKey)
         #if canImport(UIKit) && !targetEnvironment(macCatalyst)
         // iOS: persist a security-scoped bookmark so we can reopen the (often
@@ -156,6 +167,7 @@ final class VaultStore: ObservableObject {
         guard let url = try? URL(resolvingBookmarkData: data, bookmarkDataIsStale: &stale) else { return }
         _ = url.startAccessingSecurityScopedResource()
         vaultURL = url
+        VaultSession.opened(VaultRef(url))
         addRecent(url)
         refresh()
         startWatching()           // no-op on iOS
@@ -165,6 +177,7 @@ final class VaultStore: ObservableObject {
         let url = URL(fileURLWithPath: path, isDirectory: true)
         guard FileManager.default.fileExists(atPath: url.path) else { return }
         vaultURL = url
+        VaultSession.opened(VaultRef(url))
         addRecent(url)
         refresh()
         startWatching()

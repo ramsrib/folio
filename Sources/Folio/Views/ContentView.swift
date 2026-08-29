@@ -100,6 +100,7 @@ struct ContentView: View {
                     if ui.showCommandPalette { CommandPaletteView() }
                     else if ui.showQuickSwitcher { QuickSwitcherView() }
                     else if ui.showSearch { SearchPaletteView() }
+                    else if ui.showVaultSwitcher { VaultSwitcherView() }
                     else if ui.showTags { TagsView() }
                     else if ui.showShortcuts { ShortcutsView() }
                     else if ui.showSettings { SettingsView() }
@@ -170,11 +171,27 @@ struct ContentView: View {
             // Vault title centered in the sidebar column, growing symmetrically on
             // both sides. The 78pt horizontal clearance keeps it clear of the
             // traffic lights (left) and the trailing controls (right) when long.
-            Text(vault.vaultURL?.lastPathComponent ?? "Folio")
-                .font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
-                .lineLimit(1).truncationMode(.tail)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.horizontal, 78)
+            // The vault name is the switcher: the thing you'd click to change
+            // vaults is the thing naming the one you're in.
+            Button {
+                ui.showVaultSwitcher = true
+            } label: {
+                HStack(spacing: 4) {
+                    Text(vault.vaultURL?.lastPathComponent ?? "Folio")
+                        .lineLimit(1).truncationMode(.tail)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Switch Vault (⇧⌘O)")
+            .accessibilityLabel("Switch vault")
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.horizontal, 78)
 
             HStack(spacing: 6) {
                 Spacer(minLength: 0)
@@ -312,7 +329,7 @@ struct ContentView: View {
             } description: {
                 Text("Open a folder of Markdown notes to get started.")
             } actions: {
-                Button("Open Vault…") { vault.pickVault() }
+                Button("Open Vault…") { ui.showVaultSwitcher = true }
                     .buttonStyle(.borderedProminent)
             }
         } else {

@@ -4,8 +4,9 @@ import AppKit
 @main
 struct FolioApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @StateObject private var vault = VaultStore()
-    @StateObject private var ui = UIState()
+    @Environment(\.openWindow) private var openWindow
+    /// App-wide, unlike the vault and UI state: appearance belongs to the person,
+    /// not the window.
     @StateObject private var settings = AppSettings()
 
     init() {
@@ -20,24 +21,18 @@ struct FolioApp: App {
     }
 
     var body: some Scene {
-        // A single `Window` scene, deliberately: the vault/tab state is one shared
-        // @StateObject, so a WindowGroup's extra windows were *mirrors* of the same
-        // store (navigate in one, every window follows) — worse than no second
-        // window. True multi-window needs per-window stores + focused-scene menu
-        // plumbing; until that lands, one honest window.
-        Window("Folio", id: "main") {
-            ContentView()
-                .environmentObject(vault)
-                .environmentObject(ui)
-                .environmentObject(settings)
-                .frame(minWidth: 900, minHeight: 600)
-                .preferredColorScheme(settings.colorScheme)
-                // The delegate has no reference to this @StateObject and may have
-                // buffered file/URL opens that arrived before SwiftUI existed; hand
-                // it the store here and flush whatever queued up.
+        // One window per vault (Obsidian's model). The stores moved into
+        // `VaultWindow` so each window is an independent workspace; keeping them
+        // here is what made a second window a mirror of the first.
+        // No `defaultValue`: a nil ref means "no vault named", which the store
+        // reads as "reopen the last one, or show the empty state". Naming a
+        // fallback folder here is a trap — pointing it at the home directory sends
+        // the store off to scan all of ~.
+        WindowGroup(for: VaultRef.self) { $ref in
+            VaultWindow(ref: $ref, settings: settings, appDelegate: appDelegate)
                 .onAppear {
-                    appDelegate.store = vault
-                    appDelegate.urlHandler = { [weak vault] in vault?.handleExternal(urls: $0) }
+                    appDelegate.openWindow = { openWindow(value: $0) }
+                    appDelegate.flushPendingOpens()
                 }
         }
         // First-launch size: proportional to whichever display the window lands on
@@ -51,94 +46,99 @@ struct FolioApp: App {
                 height: min(1000, visible.height * 0.88)))
         }
         .windowStyle(.hiddenTitleBar)
-        .commands {
-            // Settings is an in-window overlay, not a Settings scene — replace the
-            // system item so ⌘, opens ours (see SettingsView for the rationale).
-            CommandGroup(replacing: .appSettings) {
-                Button("Settings…") { ui.showSettings = true }
-                    .keyboardShortcut(",", modifiers: .command)
-            }
-            CommandGroup(after: .newItem) {
-                Button("New Note") { vault.newNote() }
-                    .keyboardShortcut("n", modifiers: .command)
-                Button("Close Tab") { if let s = vault.selection { vault.closeTab(s) } }
-                    .keyboardShortcut("w", modifiers: .command)
-                Button("Reopen Closed Tab") { vault.reopenClosedTab() }
-                    .keyboardShortcut("t", modifiers: [.command, .shift])
-                Button("Next Tab") { vault.cycleTab(1) }
-                    .keyboardShortcut(.tab, modifiers: .control)
-                Button("Previous Tab") { vault.cycleTab(-1) }
-                    .keyboardShortcut(.tab, modifiers: [.control, .shift])
-                Button("Open Vault…") { vault.pickVault() }
-                    .keyboardShortcut("o", modifiers: [.command, .shift])
-                Menu("Open Recent") {
-                    ForEach(vault.recentVaults, id: \.self) { url in
-                        Button(url.lastPathComponent) { vault.setVault(url) }
-                    }
-                    if !vault.recentVaults.isEmpty {
-                        Divider()
-                        Button("Clear Menu") { vault.clearRecentVaults() }
-                    }
-                }
-                .disabled(vault.recentVaults.isEmpty)
-                Button("Reload Vault") { vault.refresh() }
-                    .keyboardShortcut("r", modifiers: [.command, .shift])
-                Divider()
-                // Navigation history (Obsidian muscle memory). ⌘⌥← / ⌘⌥→ are bound
-                // as hidden shortcuts in ContentView so both key combos reach it.
-                Button("Back") { vault.goBack() }
-                    .keyboardShortcut("[", modifiers: .command)
-                    .disabled(!vault.canGoBack)
-                Button("Forward") { vault.goForward() }
-                    .keyboardShortcut("]", modifiers: .command)
-                    .disabled(!vault.canGoForward)
-                Divider()
-                Button("Search Files…") { ui.showQuickSwitcher = true }
-                    .keyboardShortcut("k", modifiers: .command)
-                Button("Search in Vault…") { ui.showSearch = true }
-                    .keyboardShortcut("f", modifiers: [.command, .shift])
-                Button("Filter Files") { ui.sidebarFilterFocus &+= 1 }
-                    .keyboardShortcut("k", modifiers: [.command, .shift])
-                Button("Command Palette…") { ui.showCommandPalette = true }
-                    .keyboardShortcut("p", modifiers: .command)
-                Button("Browse Tags…") { ui.showTags = true }
-                    .keyboardShortcut("y", modifiers: [.command, .shift])
-                Divider()
-                Button(ui.mode == .read ? "Writing Mode" : "Reading Mode") {
-                    ui.mode = ui.mode == .read ? .edit : .read
-                }
-                .keyboardShortcut("e", modifiers: .command)
-                // ⌘= reads as ⌘+ on a US layout — the browser/reader convention.
-                Button("Bigger Text") { settings.biggerText() }
-                    .keyboardShortcut("=", modifiers: .command)
-                Button("Smaller Text") { settings.smallerText() }
-                    .keyboardShortcut("-", modifiers: .command)
-                Button("Reset Text Size") { settings.resetTextSize() }
-                    .keyboardShortcut("0", modifiers: .command)
-                Button("Keyboard Shortcuts") { ui.showShortcuts = true }
-                    .keyboardShortcut("/", modifiers: .command)
-            }
-        }
+        // A value-typed WindowGroup opens on demand and presents nothing at
+        // launch, which for a single-scene app means launching to no window.
+        .defaultLaunchBehavior(.presented)
+        .commands { FolioCommands(settings: settings) }
         // No Settings scene: SettingsView presents as an in-window overlay
-        // (ContentView.paletteOverlay) via the ⌘, command above.
+        // (ContentView.paletteOverlay) via the ⌘, command in FolioCommands.
     }
 }
 
 /// Behave as a regular foreground app even when launched unbundled via `swift run`.
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    /// Set from the WindowGroup's `.onAppear` once the store exists. Weak because
-    /// the store is owned by the SwiftUI scene, not the delegate.
-    weak var store: VaultStore?
-    /// Route for external file/URL opens. nil until SwiftUI is up; opens that
-    /// arrive before then are buffered and flushed the moment it's assigned.
-    var urlHandler: (([URL]) -> Void)? {
-        didSet {
-            guard let urlHandler, !bufferedURLs.isEmpty else { return }
-            let pending = bufferedURLs; bufferedURLs = []
-            urlHandler(pending)
+    /// Every open window's store, weakly held (SwiftUI owns them). External opens
+    /// are routed against this: a file goes to the window whose vault contains it,
+    /// never to whichever window happens to be frontmost.
+    private var stores: [WeakStore] = []
+    private struct WeakStore { weak var store: VaultStore? }
+
+    /// Opens a window for a vault, focusing an existing one if there is a match.
+    var openWindow: ((VaultRef) -> Void)?
+    /// URLs that arrived before any window existed (open-at-launch).
+    private var bufferedURLs: [URL] = []
+
+    @MainActor func register(_ store: VaultStore) {
+        stores.removeAll { $0.store == nil }
+        if !stores.contains(where: { $0.store === store }) { stores.append(WeakStore(store: store)) }
+        claimPendingFiles(for: store)
+        flushPendingOpens()
+    }
+
+    @MainActor func unregister(_ store: VaultStore) {
+        stores.removeAll { $0.store == nil || $0.store === store }
+    }
+
+    /// The most recently registered live store — the fallback for window-less
+    /// actions like the Dock menu.
+    @MainActor var store: VaultStore? { stores.compactMap(\.store).last }
+
+    @MainActor func flushPendingOpens() {
+        guard !bufferedURLs.isEmpty, !stores.isEmpty else { return }
+        let pending = bufferedURLs
+        bufferedURLs = []
+        route(pending)
+    }
+
+    /// Send each URL to the window that owns it.
+    ///
+    /// A file inside an open vault goes to that window; otherwise a window opens
+    /// for the vault that contains it. Nothing ever swaps the vault under a window
+    /// that is showing something else — the rule that made "open a note" able to
+    /// close the vault you were reading.
+    @MainActor func route(_ urls: [URL]) {
+        for url in urls {
+            if url.isFileURL, let owner = window(owning: url) {
+                owner.handleExternal(urls: [url])
+            } else if url.isFileURL, let empty = stores.compactMap(\.store).first(where: { $0.vaultURL == nil }) {
+                // A window with no vault yet (fresh launch) takes the file rather
+                // than sitting empty beside a new window.
+                empty.handleExternal(urls: [url])
+            } else if url.isFileURL {
+                let vault = VaultResolver.vault(for: url)
+                openWindow?(VaultRef(vault))
+                // The window opens asynchronously; hand it the file once it exists.
+                pendingFileOpens.append(url)
+            } else if let store = store {
+                store.handleExternal(urls: [url])   // folio:// links carry their own vault
+            } else {
+                bufferedURLs.append(url)
+            }
         }
     }
-    private var bufferedURLs: [URL] = []
+
+    /// Files waiting for the window that will show them to finish opening.
+    private var pendingFileOpens: [URL] = []
+
+    /// A newly registered store claims any queued file that belongs to it.
+    @MainActor private func claimPendingFiles(for store: VaultStore) {
+        guard !pendingFileOpens.isEmpty, let root = store.vaultURL else { return }
+        let mine = pendingFileOpens.filter { $0.path.hasPrefix(root.resolvingSymlinksInPath().path) }
+        guard !mine.isEmpty else { return }
+        pendingFileOpens.removeAll { mine.contains($0) }
+        store.handleExternal(urls: mine)
+    }
+
+    @MainActor private func window(owning url: URL) -> VaultStore? {
+        let path = url.resolvingSymlinksInPath().standardizedFileURL.path
+        return stores.compactMap(\.store).first { store in
+            guard let root = store.vaultURL?.resolvingSymlinksInPath().standardizedFileURL.path
+            else { return false }
+            return path == root || path.hasPrefix(root.hasSuffix("/") ? root : root + "/")
+        }
+    }
+
+
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -212,14 +212,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor @objc private func openRecentVault(_ sender: NSMenuItem) {
         guard let url = sender.representedObject as? URL,
               FileManager.default.fileExists(atPath: url.path) else { NSSound.beep(); return }
-        store?.setVault(url)
+        openWindow?(VaultRef(url))   // a vault opens a window; it never replaces one
     }
 
     /// The single AppKit entry point for both Finder double-clicks / `open -a Folio`
     /// (file URLs) and `folio://` deep links. URLs can arrive before the window
     /// exists (open-at-launch), so buffer until `urlHandler` is wired.
     func application(_ application: NSApplication, open urls: [URL]) {
-        if let urlHandler { urlHandler(urls) } else { bufferedURLs.append(contentsOf: urls) }
+        MainActor.assumeIsolated {
+            if stores.isEmpty { bufferedURLs.append(contentsOf: urls) } else { route(urls) }
+        }
     }
 
     private func configureAppIcon() {
