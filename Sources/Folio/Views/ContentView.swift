@@ -226,21 +226,32 @@ struct ContentView: View {
     /// the right, and the name alone on the left below them. At the foot it has
     /// full width and the strip reads as an ordinary toolbar again.
     ///
-    /// Left-aligned like Obsidian's, but inset: the chevron starts at 20pt rather
-    /// than on the tree's own 12pt margin. At 12 it read as hanging off the edge,
-    /// and centring it (the other thing we tried) was worse — a footer that floats
-    /// in the middle with nothing either side of it. Inset, it stays anchored to
-    /// the leading edge with enough air to look deliberate.
+    /// Which vault you are in, and the ways out of it: the name switches vaults,
+    /// `?` lists the shortcuts, the gear opens Settings. Obsidian's foot bar, and
+    /// the pairing is what makes the row work — the name alone, pinned left, read
+    /// as half a row; centred, it floated. With both ends occupied it simply looks
+    /// like a footer.
     ///
-    /// Keeps the spacer + priority shape of the old title-strip slot, so a name too
-    /// long for the sidebar truncates instead of overflowing.
+    /// It also gives those two their first on-screen home; until now ⌘/ and ⌘, and
+    /// the menu bar were the only ways in.
+    ///
+    /// The name keeps the spacer + priority shape of the old title-strip slot, so a
+    /// long one truncates against the gear instead of pushing it off the edge.
     private var vaultNameRow: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 6) {
             vaultMenu.layoutPriority(1)
-            Spacer(minLength: 0)
+            Spacer(minLength: 8)
+            HStack(spacing: 8) {
+                Button { ui.showShortcuts = true } label: { Image(systemName: "questionmark.circle") }
+                    .help("Keyboard Shortcuts (⌘/)").accessibilityLabel("Keyboard shortcuts")
+                Button { ui.showSettings = true } label: { Image(systemName: "gearshape") }
+                    .help("Settings (⌘,)").accessibilityLabel("Settings")
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
         }
         .padding(.leading, 12)      // + the label's own 8pt → chevron at 20pt
-        .padding(.trailing, 8)
+        .padding(.trailing, 10)     // matches the title strip's icon group
         .padding(.vertical, 5)
     }
 
