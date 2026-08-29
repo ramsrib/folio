@@ -20,7 +20,6 @@ struct ContentView: View {
     @Environment(\.windowCoordinator) private var coordinator
     /// For manual double-click detection on the title bar (see `sidebarTitleArea`).
     @State private var lastTitleClick = Date.distantPast
-    @FocusState private var filterFocused: Bool
 
     private let expandedKey = "folio.expandedByVault"   // [vaultPath: [dirPath]]
     private var filterActive: Bool { !filter.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -63,7 +62,6 @@ struct ContentView: View {
                 if !showSidebar { showSidebar = true }
                 showFilter = true
             }
-            DispatchQueue.main.async { filterFocused = true }
         }
         .overlay { paletteOverlay }
         .animation(.easeOut(duration: 0.14), value: paletteShown)
@@ -394,12 +392,13 @@ struct ContentView: View {
     private var filterField: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(.secondary)
-            TextField("Filter", text: $filter)
-                .textFieldStyle(.plain)
-                .font(.system(size: 12))
-                .focused($filterFocused)
-                .autocorrectionDisabled(true)
-                .onExitCommand { clearFilter() }
+            // Same NSTextView-not-NSTextField reasoning as the palettes (see
+            // PaletteTextField): the shared field editor puts the caret and the
+            // selection out of reach, so a themed field can't be an NSTextField.
+            PaletteTextField(text: $filter, placeholder: "Filter", fontSize: 12,
+                             focusToken: ui.sidebarFilterFocus,
+                             onEscape: { clearFilter() })
+                .frame(height: 17)
             if !filter.isEmpty {
                 Button { clearFilter() } label: {
                     Image(systemName: "xmark.circle.fill").font(.system(size: 11))
@@ -457,7 +456,6 @@ struct ContentView: View {
     /// sidebar never keeps an idle first-responder around.
     private func clearFilter() {
         filter = ""
-        filterFocused = false
         withAnimation(.smooth(duration: 0.2)) { showFilter = false }
     }
 
