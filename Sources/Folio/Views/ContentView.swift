@@ -20,6 +20,9 @@ struct ContentView: View {
     @Environment(\.windowCoordinator) private var coordinator
     /// For manual double-click detection on the title bar (see `sidebarTitleArea`).
     @State private var lastTitleClick = Date.distantPast
+    /// Which row the user clicked, so the reveal pass can tell a selection the
+    /// sidebar made itself from one that arrived from elsewhere.
+    @State private var clickedRow = ClickedRow()
 
     private let expandedKey = "folio.expandedByVault"   // [vaultPath: [dirPath]]
     private var filterActive: Bool { !filter.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -428,8 +431,14 @@ struct ContentView: View {
                                    selected: vault.selection == item.node.id,
                                    forceExpanded: filterActive && item.node.isDirectory,
                                    // ⌘-click opens in a new tab (Obsidian/browser convention).
-                                   onSelect: { vault.select(item.node.id, inNewTab: cmdHeld) },
-                                   onOpenOwnTab: { vault.openInOwnTab(item.node.id) },
+                                   onSelect: {
+                                       clickedRow.id = item.node.id
+                                       vault.select(item.node.id, inNewTab: cmdHeld)
+                                   },
+                                   onOpenOwnTab: {
+                                       clickedRow.id = item.node.id
+                                       vault.openInOwnTab(item.node.id)
+                                   },
                                    onToggle: { toggleDir(item.node.id) },
                                    startRename: startRename)
                             .id(item.node.id)          // reveal target for scroll-to
@@ -527,9 +536,19 @@ struct ContentView: View {
     /// only the scroll is skipped (the filtered list is already flat).
     private func revealSelection(_ proxy: ScrollViewProxy) {
         guard let sel = vault.selection else { return }
+        // Read-and-clear first, before any early return: a click that never
+        // reaches the scroll (filter active, or a double-click on the note
+        // already selected, which changes tabs but not `selection`) must not
+        // leave a stale id behind to suppress the *next* reveal.
+        let clicked = clickedRow.id
+        clickedRow.id = nil
         for dir in ancestors(of: sel) { expandedDirs.insert(dir) }
         persistExpansion()
         guard !filterActive else { return }
+        // A row you just clicked is by definition on screen; re-centering it
+        // yanks the list out from under the cursor. Only reveal selections that
+        // came from somewhere else (⌘K, tabs, back/forward, a note link).
+        guard clicked != sel else { return }
         // Scroll after the newly-expanded rows exist in the lazy stack. Not
         // animated: this fires on every tab switch, and an animated sidebar
         // scroll compounding with the content swap read as switch lag.
@@ -600,4 +619,11 @@ struct ContentView: View {
         renameText = url.lastPathComponent
         renameTarget = url
     }
+}
+
+/// A reference box, not `@State` of its own: the reveal pass reads it during the
+/// very view update that the click provoked, so the value has to be visible
+/// immediately rather than on the next render.
+private final class ClickedRow {
+    var id: URL?
 }
