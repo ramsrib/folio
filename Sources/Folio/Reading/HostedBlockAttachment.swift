@@ -12,6 +12,14 @@ final class HostedBlockAttachment: NSTextAttachment {
     let rootView: AnyView
     /// Width of the reading column; the hosted view is measured against it.
     let width: CGFloat
+    /// A concrete width to lay the hosted view out at. `width` may be `.infinity`
+    /// in full-width mode, which is not something you can hand to a frame.
+    var measurementWidth: CGFloat { width.isFinite ? width : 900 }
+
+    /// The block, hard-pinned to a width so SwiftUI reports the wrapped height.
+    func sized(to width: CGFloat) -> AnyView {
+        AnyView(rootView.frame(width: width))
+    }
 
     init(rootView: AnyView, width: CGFloat) {
         self.rootView = rootView
@@ -38,12 +46,15 @@ final class HostedBlockAttachment: NSTextAttachment {
 }
 
 final class HostedBlockViewProvider: NSTextAttachmentViewProvider {
+    /// Stand-in height for a hosted view that hasn't reported a size yet.
+    private static let provisionalHeight: CGFloat = 44
+
+    private var hostedWidth: CGFloat = -1
+
     override func loadView() {
         guard let attachment = textAttachment as? HostedBlockAttachment else { return }
-        let host = NSHostingView(rootView: attachment.rootView)
-        // Grow vertically with the content, stay pinned to the column width.
-        host.sizingOptions = [.intrinsicContentSize]
-        view = host
+        hostedWidth = attachment.measurementWidth
+        view = NSHostingView(rootView: attachment.sized(to: hostedWidth))
     }
 
     override func attachmentBounds(for attributes: [NSAttributedString.Key: Any],
@@ -55,11 +66,22 @@ final class HostedBlockViewProvider: NSTextAttachmentViewProvider {
               let host = view as? NSHostingView<AnyView> else {
             return .zero
         }
-        let width = min(attachment.width, max(proposedLineFragment.width, 1))
-        // Pin the width, then ask what height the content needs at that width.
-        host.frame.size.width = width
-        host.layoutSubtreeIfNeeded()
-        let height = max(host.fittingSize.height, host.intrinsicContentSize.height)
+        let proposed = proposedLineFragment.width > 1 ? proposedLineFragment.width : attachment.measurementWidth
+        let width = max(min(attachment.width, proposed), 1)
+        // Re-host at the real width rather than resizing the frame: the width has
+        // to be pinned *inside* SwiftUI, or the hosting view reports the height of
+        // its ideal (unwrapped) layout — which is how a wide table ended up
+        // measuring near-zero and rendering as the generic attachment icon.
+        if abs(hostedWidth - width) > 0.5 {
+            hostedWidth = width
+            host.rootView = attachment.sized(to: width)
+            host.layoutSubtreeIfNeeded()
+        }
+        let measured = max(host.intrinsicContentSize.height, host.fittingSize.height)
+        // Never return zero: TextKit reads that as "no view" and draws the generic
+        // attachment icon. `tracksTextAttachmentViewBounds` re-measures once the
+        // hosted view settles, so a provisional height self-corrects.
+        let height = measured > 1 ? measured : Self.provisionalHeight
         return CGRect(x: 0, y: 0, width: width, height: ceil(height))
     }
 }
