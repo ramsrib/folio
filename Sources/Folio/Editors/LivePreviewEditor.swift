@@ -141,7 +141,7 @@ struct LivePreviewEditor: NSViewRepresentable {
 
         // MARK: Find (driven by the shared FindModel)
         private var findRanges: [NSRange] = []
-        private var lastHighlightKey: String?   // query + case + text length → recompute + highlight
+        private var lastHighlightKey: String?   // query + case + text length + palette → recompute + highlight
         private var lastRevealKey: String?      // query + case + current → move selection
 
         /// Sync the editor with the shared find state: (re)highlight all matches when
@@ -155,7 +155,10 @@ struct LivePreviewEditor: NSViewRepresentable {
                 return
             }
             let text = tv.string as NSString
+            // The palette is part of what was painted, so a theme switch with find
+            // open has to repaint — otherwise the old wash (and Paper's ink) stay.
             let highlightKey = "\(find.caseSensitive)|\(text.length)|\(find.query)"
+                + "|\(parent.findMatch.background.hashValue)"
             if highlightKey != lastHighlightKey {
                 lastHighlightKey = highlightKey
                 findRanges = ranges(of: find.query, in: text, options: find.options)
@@ -207,8 +210,11 @@ struct LivePreviewEditor: NSViewRepresentable {
 
         private func clearFindHighlight(_ tv: NSTextView) {
             guard let lm = tv.layoutManager else { return }
-            lm.removeTemporaryAttribute(.backgroundColor,
-                                        forCharacterRange: NSRange(location: 0, length: (tv.string as NSString).length))
+            let full = NSRange(location: 0, length: (tv.string as NSString).length)
+            lm.removeTemporaryAttribute(.backgroundColor, forCharacterRange: full)
+            // A marker-pen highlight also darkens the text under it; leaving that
+            // behind would strand near-black ink on the page after the find closes.
+            lm.removeTemporaryAttribute(.foregroundColor, forCharacterRange: full)
         }
 
         func textDidChange(_ notification: Notification) {

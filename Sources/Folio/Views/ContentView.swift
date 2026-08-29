@@ -63,6 +63,10 @@ struct ContentView: View {
                 showFilter = true
             }
         }
+        // Reading mode consumes Esc globally (GestureMonitor) before any responder
+        // sees it, so the filter field's own Esc handler only fires while writing.
+        // This is the same pulse the find bar closes on.
+        .onChange(of: ui.escapePulse) { if showFilter { clearFilter() } }
         .overlay { paletteOverlay }
         .animation(.easeOut(duration: 0.14), value: paletteShown)
         .onChange(of: vault.selection) {
