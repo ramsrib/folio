@@ -17,6 +17,7 @@ struct ContentView: View {
     /// Revealed by the sidebar's magnifier icon, ⇧⌘K, or the command palette.
     @State private var showFilter = false
     @State private var vaultNameHovered = false
+    @Environment(\.windowCoordinator) private var coordinator
     /// For manual double-click detection on the title bar (see `sidebarTitleArea`).
     @State private var lastTitleClick = Date.distantPast
     @FocusState private var filterFocused: Bool
@@ -174,10 +175,28 @@ struct ContentView: View {
             // Vault title centered in the sidebar column, growing symmetrically on
             // both sides. The 78pt horizontal clearance keeps it clear of the
             // traffic lights (left) and the trailing controls (right) when long.
-            // The vault name is the switcher: the thing you'd click to change
-            // vaults is the thing naming the one you're in.
-            Button {
-                ui.showVaultSwitcher = true
+            // The vault name is the switcher, as a native menu (Obsidian's shape):
+            // anchored to the control you clicked, standard menu chrome, instant.
+            // ⇧⌘O still opens the searchable palette, which earns its keep once
+            // there are more vaults than fit a menu comfortably.
+            Menu {
+                ForEach(vault.recentVaults.filter { FileManager.default.fileExists(atPath: $0.path) },
+                        id: \.self) { url in
+                    Button {
+                        coordinator?.open(VaultRef(url))
+                    } label: {
+                        if url.standardizedFileURL.path == vault.vaultURL?.standardizedFileURL.path {
+                            Label(url.lastPathComponent, systemImage: "checkmark")
+                        } else {
+                            Text(url.lastPathComponent)
+                        }
+                    }
+                }
+                Divider()
+                Button("Open Other Vault…") {
+                    if let url = VaultPicker.choose() { coordinator?.open(VaultRef(url)) }
+                }
+                Button("Switch Vault…  ⇧⌘O") { ui.showVaultSwitcher = true }
             } label: {
                 HStack(spacing: 4) {
                     Text(vault.vaultURL?.lastPathComponent ?? "Folio")
@@ -190,12 +209,16 @@ struct ContentView: View {
                 .foregroundStyle(vaultNameHovered ? .primary : .secondary)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                // It's a menu-ish control, so it has to read as one: nothing but
-                // a chevron marked it as clickable before.
                 .background(vaultNameHovered ? Color.primary.opacity(0.07) : .clear,
                             in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                 .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Switch Vault (⇧⌘O)")
+            .accessibilityLabel("Switch vault")
             .onHover { vaultNameHovered = $0 }
             .pointerStyle(.link)
             .animation(.easeOut(duration: 0.12), value: vaultNameHovered)
