@@ -226,21 +226,21 @@ struct ContentView: View {
     /// the right, and the name alone on the left below them. At the foot it has
     /// full width and the strip reads as an ordinary toolbar again.
     ///
-    /// Centred rather than left-aligned. Obsidian's own foot is left-aligned, but
-    /// it fills the other half of the bar with help and settings icons; ours holds
-    /// one control, and pinned to the leading edge it read as a half-finished row
-    /// hanging off the side — especially against a tree of indented rows, where
-    /// nothing above it shares that margin. Centred, a lone control looks placed.
+    /// Left-aligned like Obsidian's, but inset: the chevron starts at 20pt rather
+    /// than on the tree's own 12pt margin. At 12 it read as hanging off the edge,
+    /// and centring it (the other thing we tried) was worse — a footer that floats
+    /// in the middle with nothing either side of it. Inset, it stays anchored to
+    /// the leading edge with enough air to look deliberate.
     ///
-    /// Same spacer + priority shape as the old title-strip slot, so a name too long
-    /// for the sidebar truncates instead of overflowing.
+    /// Keeps the spacer + priority shape of the old title-strip slot, so a name too
+    /// long for the sidebar truncates instead of overflowing.
     private var vaultNameRow: some View {
         HStack(spacing: 0) {
-            Spacer(minLength: 0)
             vaultMenu.layoutPriority(1)
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 8)
+        .padding(.leading, 12)      // + the label's own 8pt → chevron at 20pt
+        .padding(.trailing, 8)
         .padding(.vertical, 5)
     }
 
