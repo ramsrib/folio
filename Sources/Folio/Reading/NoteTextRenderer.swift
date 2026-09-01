@@ -57,8 +57,13 @@ struct NoteTextRenderer {
 
     func render(_ blocks: [Block]) -> NSAttributedString {
         let out = NSMutableAttributedString()
+        // The properties card is chrome, not content: the block after it is the
+        // top of the page and gets first-block spacing, or a title following the
+        // card would pay its full section-break padding twice over.
+        var firstContent = 0
+        if let first = blocks.first, case .properties = first.kind { firstContent = 1 }
         for (i, block) in blocks.enumerated() {
-            let piece = render(block, isFirst: i == 0)
+            let piece = render(block, isFirst: i <= firstContent)
             out.append(piece)
             // Every block is its own paragraph; spacing comes from the paragraph
             // style, so the separator is a bare newline.
