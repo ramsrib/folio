@@ -29,13 +29,17 @@ final class HostedBlockAttachment: NSTextAttachment {
     /// the block renders or collapses to the generic attachment icon.
     private var measurer: NSHostingView<AnyView>?
     private var measuredWidth: CGFloat = -1
-    /// Height last reported by a live displayed view. It wins over the measured
-    /// height when present: only the real view knows it has been expanded.
+    /// Height last reported by a live displayed view, and the width it was laid
+    /// out at. It wins over the measured height when present — only the real
+    /// view knows it has been expanded — but never at a different width: a
+    /// height carried across a resize would reserve the wrong space until the
+    /// view reloads, and the page would visibly jump.
     private var liveHeight: CGFloat = 0
+    private var liveWidth: CGFloat = -1
 
     /// Height of the block at `width`, from the off-screen twin.
     func height(at width: CGFloat) -> CGFloat {
-        if liveHeight > 1 { return liveHeight }
+        if liveHeight > 1, abs(liveWidth - width) <= 0.5 { return liveHeight }
         if measurer == nil || abs(measuredWidth - width) > 0.5 {
             measuredWidth = width
             let pinned = AnyView(measureView
@@ -49,7 +53,11 @@ final class HostedBlockAttachment: NSTextAttachment {
 
     /// A displayed view settled at a height — the properties card expanding, or
     /// simply finishing its first layout.
-    func report(height: CGFloat) { liveHeight = height > 1 ? height : liveHeight }
+    func report(height: CGFloat, at width: CGFloat) {
+        guard height > 1 else { return }
+        liveHeight = height
+        liveWidth = width
+    }
     /// Current answer, so a report that changes nothing doesn't churn layout.
     var currentHeight: CGFloat { liveHeight }
     /// The column changed width; the old live height no longer describes it.
@@ -177,7 +185,7 @@ final class HostedBlockViewProvider: NSTextAttachmentViewProvider {
         guard let attachment = textAttachment as? HostedBlockAttachment else { return }
         let settled = ceil(height)
         guard settled > 1, abs(settled - attachment.currentHeight) > 0.5 else { return }
-        attachment.report(height: settled)
+        attachment.report(height: settled, at: hostedWidth)
         invalidateOwnLayout()
     }
 
@@ -187,7 +195,12 @@ final class HostedBlockViewProvider: NSTextAttachmentViewProvider {
                                    proposedLineFragment: CGRect,
                                    position: CGPoint) -> CGRect {
         guard let attachment = textAttachment as? HostedBlockAttachment else { return .zero }
-        return attachment.measuredBounds(proposedWidth: proposedLineFragment.width)
+        let rect = attachment.measuredBounds(proposedWidth: proposedLineFragment.width)
+        // Bounds can be asked before TextKit loads the view. Remember the real
+        // width so `loadView` hosts at it, not at the fallback — hosting wide
+        // and correcting a beat later reads as a reflow flicker.
+        if view == nil { hostedWidth = rect.width }
+        return rect
     }
 
     /// Re-lay just this attachment's character.

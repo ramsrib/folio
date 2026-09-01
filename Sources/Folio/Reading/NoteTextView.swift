@@ -292,12 +292,19 @@ final class NoteContentTextView: NSTextView {
     // MARK: Decorations
 
     func cacheDecorations() {
-        guard let storage = textStorage else { decorations = []; return }
+        guard let storage = textStorage else { decorations = []; hostedBlockRanges = []; return }
         var found: [(NSRange, BlockDecoration)] = []
         storage.enumerateAttribute(.folioDecoration, in: storage.fullRange) { value, range, _ in
             if let box = value as? DecorationBox { found.append((range, box.value)) }
         }
         decorations = found
+        // Hosted-block positions, so the heal pass doesn't sweep the whole
+        // storage on every scroll frame.
+        var hosted: [NSRange] = []
+        storage.enumerateAttribute(.attachment, in: storage.fullRange) { value, range, _ in
+            if value is HostedBlockAttachment { hosted.append(range) }
+        }
+        hostedBlockRanges = hosted
         needsDisplay = true
     }
 
@@ -508,17 +515,21 @@ final class NoteContentTextView: NSTextView {
     /// that for every hosted block whose view isn't installed, and runs at the
     /// moments visibility can have changed: joining a window, returning to
     /// reading mode, and scrolling (fragments enter the viewport pre-laid-out).
+    private var hostedBlockRanges: [NSRange] = []
+
     func healHostedBlocks() {
         guard window != nil, !isHiddenOrHasHiddenAncestor,
               let layoutManager = textLayoutManager, let storage = textStorage else { return }
         let viewport = layoutManager.textViewportLayoutController.viewportRange
-        storage.enumerateAttribute(.attachment, in: storage.fullRange) { value, range, _ in
-            guard let attachment = value as? HostedBlockAttachment,
+        for range in hostedBlockRanges {
+            guard range.location < storage.length,
+                  let attachment = storage.attribute(.attachment, at: range.location,
+                                                     effectiveRange: nil) as? HostedBlockAttachment,
                   attachment.liveProvider?.view?.superview == nil,
-                  let textRange = layoutManager.textRange(for: range) else { return }
+                  let textRange = layoutManager.textRange(for: range) else { continue }
             // Only blocks the viewport can see: an off-screen block gets its
             // chance when it scrolls in (the scroll observer re-runs this).
-            if let viewport, !viewport.intersects(textRange) { return }
+            if let viewport, !viewport.intersects(textRange) { continue }
             layoutManager.invalidateLayout(for: textRange)
         }
     }
