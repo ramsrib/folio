@@ -53,8 +53,8 @@ struct EditorPane: View {
     /// names its shortcut, the way Cursor and Obsidian fill an empty editor.
     private var emptyPane: some View {
         Grid(alignment: .center, horizontalSpacing: 16, verticalSpacing: 13) {
-            emptyAction("Search files", keys: "⌘K") { ui.showQuickSwitcher = true }
             emptyAction("New note", keys: "⌘N") { vault.newNote() }
+            emptyAction("Search files", keys: "⌘K") { ui.showQuickSwitcher = true }
             emptyAction("Search in vault", keys: "⇧⌘F") { ui.showSearch = true }
             emptyAction("Command palette", keys: "⌘P") { ui.showCommandPalette = true }
             emptyAction("All shortcuts", keys: "⌘/") { ui.showShortcuts = true }
