@@ -44,8 +44,39 @@ struct EditorPane: View {
                 // silent — Esc has no further meaning while reading.
                 .onChange(of: ui.escapePulse) { if find.active { find.close() } }
         } else {
-            ContentUnavailableView("Select a note", systemImage: "doc.text",
-                description: Text("Pick a note from the sidebar to start writing."))
+            emptyPane
+        }
+    }
+
+    /// The no-note pane: instead of a bare "select a note" placeholder, the
+    /// actions someone actually takes from here — each row is clickable and
+    /// names its shortcut, the way Cursor and Obsidian fill an empty editor.
+    private var emptyPane: some View {
+        Grid(alignment: .center, horizontalSpacing: 16, verticalSpacing: 13) {
+            emptyAction("Search files", keys: "⌘K") { ui.showQuickSwitcher = true }
+            emptyAction("New note", keys: "⌘N") { vault.newNote() }
+            emptyAction("Search in vault", keys: "⇧⌘F") { ui.showSearch = true }
+            emptyAction("Command palette", keys: "⌘P") { ui.showCommandPalette = true }
+            emptyAction("All shortcuts", keys: "⌘/") { ui.showShortcuts = true }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func emptyAction(_ label: String, keys: String, action: @escaping () -> Void) -> some View {
+        GridRow {
+            Button(action: action) {
+                Text(label).foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .gridColumnAlignment(.trailing)
+            // Keycaps styled like the ⌘/ cheat sheet, so the two read as one system.
+            Text(keys)
+                .font(.callout.monospaced())
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(.primary.opacity(0.06),
+                            in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .gridColumnAlignment(.leading)
         }
     }
 
