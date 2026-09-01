@@ -268,8 +268,9 @@ struct NoteTextRenderer {
     // MARK: Hosted blocks
 
     private func table(headers: [String], rows: [[String]]) -> NSAttributedString {
-        hosted(TableBlockView(headers: headers, rows: rows, bodySize: bodySize),
-               source: MarkdownSource.table(headers: headers, rows: rows))
+        let table = TableBlockView(headers: headers, rows: rows, bodySize: bodySize)
+        return hosted(table, measuring: AnyView(table.grid),
+                      source: MarkdownSource.table(headers: headers, rows: rows))
     }
 
     private func propertiesBlock(_ props: [Prop]) -> NSAttributedString {
@@ -279,8 +280,10 @@ struct NoteTextRenderer {
 
     /// Embed a SwiftUI view as a block-level attachment. It sits in the text
     /// stream as one character, so a selection can run straight through it.
-    private func hosted<V: View>(_ view: V, source: String) -> NSAttributedString {
-        let attachment = HostedBlockAttachment(rootView: AnyView(view), width: contentWidth)
+    private func hosted<V: View>(_ view: V, measuring: AnyView? = nil, source: String) -> NSAttributedString {
+        let attachment = HostedBlockAttachment(rootView: AnyView(view),
+                                               measureView: measuring,
+                                               width: contentWidth)
         let out = NSMutableAttributedString(attachment: attachment)
         out.addAttributes([
             .folioSource: source,

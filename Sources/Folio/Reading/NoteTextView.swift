@@ -27,6 +27,9 @@ struct NoteTextView: NSViewRepresentable {
     let findMatch: Highlight
     let findCurrentMatch: Highlight
     let noteID: URL?
+    /// Whether reading mode is the mode on screen. The reader stays mounted while
+    /// writing (see `EditorPane`), so this is the only signal that it is visible.
+    let isActive: Bool
     @ObservedObject var find: FindModel
     /// Heading anchor to scroll to (outline click / wikilink with `#heading`).
     let scrollRequest: Int?
@@ -97,6 +100,7 @@ struct NoteTextView: NSViewRepresentable {
         }
 
         coordinator.render(self)
+        coordinator.becameActive(isActive, in: tv)
 
         // A find/outline jump owns the scroll position for this switch; otherwise
         // the note's remembered offset does.
@@ -130,6 +134,7 @@ struct NoteTextView: NSViewRepresentable {
         let keys = KeyboardScroller.Coordinator()
         let memory = ScrollMemory.Coordinator()
 
+        private var wasActive = true
         private var renderedKey: String?
         private var findKey: String?
         private var revealKey: String?
@@ -158,10 +163,25 @@ struct NoteTextView: NSViewRepresentable {
             let string = renderer.render(config.blocks)
             tv.textStorage?.setAttributedString(string)
             tv.cacheDecorations()
+            // The new string carries brand-new hosted blocks; nothing else fires
+            // for a re-render that moves neither window, mode, nor scroll offset
+            // (⌘+/⌘−, switching between notes both resting at the top).
+            tv.scheduleHealPass()
             // The text changed under it, so every find highlight is stale.
             findKey = nil
             revealKey = nil
             findRanges = []
+        }
+
+        /// Reading mode came back to the front. Hosted blocks (tables, the
+        /// properties card) have to be laid out again: TextKit can lay a fragment
+        /// out while the reader is hidden behind the editor, and a fragment laid
+        /// out then never gets its hosted view — it draws the generic attachment
+        /// icon in its place, and nothing re-measures it afterwards.
+        func becameActive(_ active: Bool, in tv: NoteContentTextView) {
+            defer { wasActive = active }
+            guard active, !wasActive else { return }
+            tv.scheduleHealPass()
         }
 
         // MARK: Find in page
@@ -474,9 +494,74 @@ final class NoteContentTextView: NSTextView {
         pasteboard.setString(out as String, forType: .string)
     }
 
+    // MARK: Hosted-block healing
+
+    /// TextKit 2 installs an attachment's view only during a viewport layout
+    /// pass that happens while the text view is actually displayed. A fragment
+    /// laid out at any other moment — before the view joins the window, while
+    /// the reader sits hidden behind the editor, during the mode-switch
+    /// animation — keeps that layout as final, and its view is never installed:
+    /// the block renders as the generic attachment icon, or as nothing at all.
+    ///
+    /// The one reliable recovery is to invalidate the fragment while the view is
+    /// displayed and the fragment is in the viewport. This pass does exactly
+    /// that for every hosted block whose view isn't installed, and runs at the
+    /// moments visibility can have changed: joining a window, returning to
+    /// reading mode, and scrolling (fragments enter the viewport pre-laid-out).
+    func healHostedBlocks() {
+        guard window != nil, !isHiddenOrHasHiddenAncestor,
+              let layoutManager = textLayoutManager, let storage = textStorage else { return }
+        let viewport = layoutManager.textViewportLayoutController.viewportRange
+        storage.enumerateAttribute(.attachment, in: storage.fullRange) { value, range, _ in
+            guard let attachment = value as? HostedBlockAttachment,
+                  attachment.liveProvider?.view?.superview == nil,
+                  let textRange = layoutManager.textRange(for: range) else { return }
+            // Only blocks the viewport can see: an off-screen block gets its
+            // chance when it scrolls in (the scroll observer re-runs this).
+            if let viewport, !viewport.intersects(textRange) { return }
+            layoutManager.invalidateLayout(for: textRange)
+        }
+    }
+
+    /// Coalesced trigger for `healHostedBlocks` — scrolling fires the clip-view
+    /// notification for every frame of the scroll.
+    private var healScheduled = false
+    func scheduleHealPass() {
+        guard !healScheduled else { return }
+        healScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.healScheduled = false
+            self.healHostedBlocks()
+        }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        scheduleHealPass()
+    }
+
+    private var scrollObserver: NSObjectProtocol?
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        if let observer = scrollObserver { NotificationCenter.default.removeObserver(observer) }
+        scrollObserver = nil
+        guard let clip = superview as? NSClipView else { return }
+        clip.postsBoundsChangedNotifications = true
+        scrollObserver = NotificationCenter.default.addObserver(
+            forName: NSView.boundsDidChangeNotification, object: clip, queue: .main
+        ) { [weak self] _ in
+            self?.scheduleHealPass()
+        }
+    }
+
     /// A non-editable text view still has to take first responder, or ⌘A and the
     /// selection-extending keys never reach it.
     override var acceptsFirstResponder: Bool { true }
+
+    deinit {
+        if let observer = scrollObserver { NotificationCenter.default.removeObserver(observer) }
+    }
 }
 
 // MARK: - TextKit 2 range bridging

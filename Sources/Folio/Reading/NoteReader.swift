@@ -45,6 +45,7 @@ struct NoteReader: View {
             findMatch: settings.findMatch,
             findCurrentMatch: settings.findCurrentMatch,
             noteID: vault.selection,
+            isActive: ui.mode == .read,
             find: find,
             scrollRequest: ui.mode == .read ? vault.scrollRequest : nil,
             loadImage: { source in
