@@ -207,12 +207,20 @@ The iOS app can't be expressed in plain SwiftPM, so it needs
 
 ```bash
 brew install xcodegen
-xcodegen generate          # writes FolioiOS.xcodeproj (gitignored)
-open FolioiOS.xcodeproj
+make ios-run               # xcodegen generate + build + install + launch in the simulator
+make ios-test              # unit tests (hosted in the app) + UI tests, on the simulator
+open FolioiOS.xcodeproj    # or drive it from Xcode; the project is gitignored and regenerated
 ```
 
-Build to an **iOS 26** simulator. Code signing is disabled in `project.yml`, so running on a physical
+Both targets default to an **iPhone 17 Pro** simulator; pass `SIM="iPad Pro 13-inch (M4)"` for another.
+Xcode needs the iOS platform matching its SDK installed (`xcodebuild -downloadPlatform iOS`) — older
+runtimes alone don't count. Code signing is disabled in `project.yml`, so running on a physical
 device means setting your own team and identity first.
+
+Tests live in `Tests/FolioiOSTests` (the shared store compiled for iOS: tree, tags, open, edit, save,
+bookmark restore) and `Tests/FolioiOSUITests` (the real app driven through the screen: browse, search,
+read, edit, tags). UI tests launch the app with `--ui-testing --vault <path>`, a debug-only hook that
+opens a folder the test just wrote instead of the saved bookmark.
 
 ## Limitations
 

@@ -43,3 +43,50 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         SWIFT_VERSION: "5.0"
+
+  # Unit tests, hosted in the app so `@testable import Folio` sees the shared
+  # store compiled for iOS (the SwiftPM tests only ever build it for macOS).
+  FolioiOSTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: Tests/FolioiOSTests
+    dependencies:
+      - target: FolioiOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sriramb.folio.tests
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Folio.app/Folio"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+  # Drives the real app in the simulator through the accessibility tree.
+  FolioiOSUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: Tests/FolioiOSUITests
+    dependencies:
+      - target: FolioiOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sriramb.folio.uitests
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_TARGET_NAME: FolioiOS
+
+schemes:
+  FolioiOS:
+    build:
+      targets:
+        FolioiOS: all
+        FolioiOSTests: [test]
+        FolioiOSUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - FolioiOSTests
+        - FolioiOSUITests
