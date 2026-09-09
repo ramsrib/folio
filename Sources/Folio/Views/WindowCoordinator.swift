@@ -227,6 +227,14 @@ final class WindowCoordinator {
             } else if let i = entries.firstIndex(where: { $0.store?.vaultURL == nil && $0.claimed == nil }),
                       let empty = entries[i].store {
                 entries[i].claimed = ref
+                // Adopt the vault the router picked *before* handing over the URL.
+                // Left to itself the store re-resolves the same file against the
+                // recents it snapshotted at init, and a window that has sat empty
+                // across vault changes answers differently than the router just
+                // did — the note lands under one root while `claimed` records
+                // another, and the next request for that vault focuses a window
+                // holding something else.
+                empty.adopt(ref.url)
                 empty.handleExternal(urls: [url])
                 entries[i].window?.makeKeyAndOrderFront(nil)
                 NSApp.activate(ignoringOtherApps: true)
