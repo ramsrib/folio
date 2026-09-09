@@ -12,7 +12,13 @@ import AppKit
 final class VaultStore: ObservableObject {
     @Published var vaultURL: URL?
     @Published private(set) var tree: [VaultNode] = []
-    @Published private(set) var files: [MarkdownFile] = []     // flat, for lookup
+    @Published private(set) var files: [MarkdownFile] = [] {   // flat, for lookup
+        didSet { fileIDs = Set(files.map(\.id)) }
+    }
+    /// `files` as a set. The tab bar asks "is this note still on disk?" once per
+    /// open tab on every render, which a linear scan of a few thousand files
+    /// would answer far too slowly.
+    private var fileIDs: Set<URL> = []
     @Published var selection: MarkdownFile.ID?
     @Published var content: String = ""
     @Published private(set) var savedAt: Date?
@@ -59,6 +65,15 @@ final class VaultStore: ObservableObject {
     ]
     private var loadedURL: URL?
     private var diskContent = ""   // last content known to be on disk (dirty check)
+    /// The last text read for each note, so one that disappears from disk stays
+    /// readable instead of blanking. Kept for every open tab — that's the
+    /// guarantee: a tab you have read stays readable when its file dies — plus the
+    /// few most recently read notes beyond those, so a tab that briefly leaves the
+    /// strip and comes back (a sidebar double-click replaces then restores it)
+    /// doesn't lose its text.
+    private var lastKnownContent: [URL: String] = [:]
+    private var contentCacheOrder: [URL] = []   // read order, oldest first
+    private let contentCacheSlack = 8           // entries kept beyond the open tabs
     private var saveTask: Task<Void, Never>?
     private var watcher: VaultWatcher?
     private var recentlyClosed: [URL] = []   // stack for "reopen closed tab"
@@ -155,6 +170,7 @@ final class VaultStore: ObservableObject {
         #endif
         addRecent(url)
         selection = nil; content = ""; loadedURL = nil
+        lastKnownContent = [:]; contentCacheOrder = []
         outline = []; backlinks = []; openTabs = []
         recentFiles = []
         backStack = []; forwardStack = []; updateHistoryFlags()
@@ -222,6 +238,7 @@ final class VaultStore: ObservableObject {
     }
 
     private func persistSession() {
+        pruneContentCache()
         guard let root = vaultURL else { return }
         var tabs = UserDefaults.standard.dictionary(forKey: tabsKey) as? [String: [String]] ?? [:]
         tabs[root.path] = openTabs.map(\.path)
@@ -454,7 +471,7 @@ final class VaultStore: ObservableObject {
         rebuildLinkIndex()
         let tIndex = ContinuousClock.now
         updateBacklinks()
-        maybeReloadOpenNote()
+        reconcileOpenNote()
         revision &+= 1
 
         let treeMs = (tTree - t0).ms, indexMs = (tIndex - tTree).ms
@@ -468,16 +485,93 @@ final class VaultStore: ObservableObject {
         }
     }
 
+    /// Reconcile the open note with what's actually on disk, in **both**
+    /// directions — this is the one place a note becomes missing, or stops being.
+    ///
+    /// Gone: keep the text on screen (it's the last version we read, more use than
+    /// a blank pane) but drop the write target, which is what makes the note
+    /// read-only everywhere — `loadedURL == nil` stands every save path down.
+    /// The tab picks the state up through `isMissing(_:)`.
+    ///
+    /// Back again (a Put Back, a branch switch, a sync catching up, a wikilink
+    /// that recreated it): re-adopt it from disk. Without this the note would look
+    /// healthy — unstruck tab, Write enabled — while still holding no write
+    /// target, so edits would land nowhere and vanish on the next tab switch.
+    private func reconcileOpenNote() {
+        guard let sel = selection else { return }
+        // The read has to succeed to re-adopt: a path Folio can list but not read
+        // (invalid UTF-8, a permissions blip, a file deleted again between the
+        // scan and here) would otherwise blank the note, overwrite its snapshot
+        // with "" and hand back a write target over a file that does exist.
+        if loadedURL == nil, openTabs.contains(sel), fileIDs.contains(sel) {
+            guard let disk = try? String(contentsOf: sel, encoding: .utf8) else {
+                // Listed but unreadable is not a note that came back. Keep it
+                // missing *and* out of the index, so the tab stays struck through
+                // and Write stays off — the state has to match the write target.
+                fileIDs.remove(sel)
+                return
+            }
+            // Disk wins: the note was read-only while it was gone, so there are no
+            // local edits to lose, and the file may well have come back different.
+            content = disk
+            diskContent = disk
+            loadedURL = sel
+            cacheContent(disk, for: sel)
+            updateOutline()
+            return
+        }
+        maybeReloadOpenNote()
+    }
+
     /// If the open note changed on disk (cloud sync / another app / the iOS app)
     /// and we have no pending local save, pull the new content in. Skipping when
     /// a save is pending preserves unsaved local edits.
     private func maybeReloadOpenNote() {
-        guard let url = loadedURL, saveTask == nil else { return }
+        guard let url = loadedURL else { return }
+        // Checked *before* the pending-save guard below, and so before any read: a
+        // save protects unsaved edits from being overwritten by a reload, but it
+        // must not outlive the file it was going to write. Left pending, it would
+        // recreate the note — or, if the path is taken over in the meantime,
+        // overwrite the new file with text from before the deletion.
+        guard FileManager.default.fileExists(atPath: url.path) else { markMissing(url); return }
+        guard saveTask == nil else { return }
+        // A read can still fail on a file that exists (invalid UTF-8, a
+        // permissions blip); leave the note as it is rather than blank it.
         guard let disk = try? String(contentsOf: url, encoding: .utf8), disk != content else { return }
         content = disk
         diskContent = disk
+        cacheContent(disk, for: url)
         updateOutline()
     }
+
+    /// The open note's file is gone: snapshot what we're showing and give up the
+    /// write target, so nothing can write the file back into existence.
+    private func markMissing(_ url: URL) {
+        saveTask?.cancel(); saveTask = nil
+        cacheContent(content, for: url)
+        loadedURL = nil
+        // Drop it from the index here too, not just at the next refresh: the tab
+        // has to strike through and Write has to switch off in the same beat the
+        // write target goes away, or the UI invites edits that can never land.
+        fileIDs.remove(url)
+    }
+
+    /// Whether an open note's file is no longer in the vault — trashed, or moved
+    /// or renamed by something other than Folio (Finder, git, a sync client). Its
+    /// tab deliberately stays open, struck through and read-only: the file may
+    /// well come back, and closing tabs out from under someone is worse than
+    /// showing one that's crossed out.
+    ///
+    /// A deletion by *another Folio window* is the one case the watcher doesn't
+    /// report: `VaultWatcher` sets `kFSEventStreamCreateFlagIgnoreSelf`, which
+    /// suppresses events from this **process**, and windows share one. Such a tab
+    /// only strikes through once something else refreshes the vault — clicking it
+    /// still lands in the missing state, because `select` trusts the read.
+    func isMissing(_ url: URL) -> Bool { !fileIDs.contains(url) }
+
+    /// `isMissing` for the active note — the one question the note pane, the mode
+    /// switch and ⌘E all ask.
+    var isSelectionMissing: Bool { selection.map(isMissing) ?? false }
 
     private func buildTree(_ dir: URL, root: URL, flat: inout [MarkdownFile]) -> [VaultNode] {
         let fm = FileManager.default
@@ -533,8 +627,7 @@ final class VaultStore: ObservableObject {
             for tag in info.tags { tags[tag, default: []].append(f.url) }
         }
         tagsIndex = tags
-        let current = Set(files.map(\.url))               // drop cache for deleted files
-        linkCache = linkCache.filter { current.contains($0.key) }
+        linkCache = linkCache.filter { fileIDs.contains($0.key) }   // drop deleted files
     }
 
     private func extractInfo(_ url: URL) -> (refs: [LinkRef], tags: [String]) {
@@ -584,10 +677,15 @@ final class VaultStore: ObservableObject {
     ///  - `inNewTab` set, or nothing open yet → append a new tab;
     ///  - otherwise → replace the *active* tab's URL in place, so a stream of opens
     ///    leaves one tab trail instead of one tab per file.
+    ///
+    /// An **open tab whose file has gone missing stays selectable** — clicking it
+    /// used to be a silent no-op, which read as the app being broken. It opens
+    /// read-only on the last text we read; see `isMissing(_:)`.
     func select(_ id: MarkdownFile.ID?, inNewTab: Bool = false) {
         // Ignore nil/folder/duplicate selections so a folder click never blanks
         // the open note (folders toggle expansion in the explorer instead).
-        guard let id, files.contains(where: { $0.id == id }), id != selection else { return }
+        guard let id, id != selection,
+              fileIDs.contains(id) || openTabs.contains(id) else { return }
         flushSave()
 
         // History: record where we're leaving from (unless this *is* a replay), and
@@ -613,9 +711,26 @@ final class VaultStore: ObservableObject {
 
         let t0 = ContinuousClock.now
         selection = id
-        content = (try? String(contentsOf: id, encoding: .utf8)) ?? ""
-        diskContent = content
-        loadedURL = id
+        // The *read* decides whether this note is missing, not the index: a
+        // deletion the watcher hasn't delivered yet still has the note in `files`,
+        // and trusting that would blank the pane, overwrite the cached text with
+        // "" and take a write target on a file that no longer exists.
+        let text: String? = isMissing(id) ? nil : try? String(contentsOf: id, encoding: .utf8)
+        if let text {
+            content = text
+            diskContent = text
+            loadedURL = id
+            cacheContent(text, for: id)
+        } else {
+            // Read-only by construction: with no `loadedURL` every save path
+            // stands down, so nothing here can resurrect the file on disk.
+            content = lastKnownContent[id] ?? ""
+            diskContent = content
+            loadedURL = nil
+            // Drop it from the index straight away so the tab strikes through and
+            // Write switches off now, rather than at the next refresh.
+            fileIDs.remove(id)
+        }
         savedAt = nil
         noteOpened(id)
         updateOutline()
@@ -923,6 +1038,7 @@ final class VaultStore: ObservableObject {
     /// Toggle a task checkbox character (' ' <-> 'x') at a content offset — used
     /// by Reading mode's tappable checkboxes.
     func toggleTask(atContentIndex idx: Int) {
+        guard loadedURL != nil else { return }   // note is gone from disk: read-only
         let ns = content as NSString
         guard idx >= 0, idx < ns.length else { return }
         let current = ns.substring(with: NSRange(location: idx, length: 1)).lowercased()
@@ -957,6 +1073,16 @@ final class VaultStore: ObservableObject {
             try? await Task.sleep(for: .milliseconds(500))
             if Task.isCancelled { return }
             guard let url else { return }
+            // A save only ever *updates* a note. If the file went away while the
+            // debounce was running (trashed in Finder, dropped by a branch switch,
+            // renamed out from under us) writing would resurrect it — Folio is a
+            // reader, so a deleted note stays deleted. Fall into the missing state
+            // instead, keeping the text on screen.
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                self?.saveTask = nil
+                self?.refresh()
+                return
+            }
             try? text.write(to: url, atomically: true, encoding: .utf8)
             self?.diskContent = text
             self?.savedAt = Date()
@@ -964,9 +1090,27 @@ final class VaultStore: ObservableObject {
         }
     }
 
+    /// Record the text we just read for `url` (most-recently-read last).
+    private func cacheContent(_ text: String, for url: URL) {
+        lastKnownContent[url] = text
+        contentCacheOrder.removeAll { $0 == url }
+        contentCacheOrder.append(url)
+    }
+
+    /// Keep the open tabs' snapshots plus the last few notes read; drop the rest.
+    /// Called wherever the tab set changes (every such path persists the session).
+    private func pruneContentCache() {
+        guard lastKnownContent.count > openTabs.count + contentCacheSlack else { return }
+        let keep = Set(openTabs).union(contentCacheOrder.suffix(contentCacheSlack))
+        lastKnownContent = lastKnownContent.filter { keep.contains($0.key) }
+        contentCacheOrder = contentCacheOrder.filter { keep.contains($0) }
+    }
+
     func flushSave() {
         saveTask?.cancel(); saveTask = nil
         guard let url = loadedURL, content != diskContent else { return }   // skip if unchanged
+        // Same rule as the debounced save: never bring a deleted note back.
+        guard FileManager.default.fileExists(atPath: url.path) else { markMissing(url); return }
         try? content.write(to: url, atomically: true, encoding: .utf8)
         diskContent = content
     }
@@ -1042,6 +1186,11 @@ final class VaultStore: ObservableObject {
         if !Self.mdExtensions.contains((fileName as NSString).pathExtension.lowercased()) { fileName += ".md" }
         let dest = id.deletingLastPathComponent().appendingPathComponent(fileName)
         guard dest != id else { return }
+        // Settle any pending save *before* the move: a debounced write captured the
+        // old URL, and after the move that URL is gone — the save would be dropped
+        // (losing the edit) and the reload that follows would replace the editor's
+        // text with the pre-edit contents the move carried across.
+        flushSave()
         do {
             try FileManager.default.moveItem(at: id, to: dest)
             let changed = updateLinks(from: id, to: dest)
@@ -1065,6 +1214,10 @@ final class VaultStore: ObservableObject {
     /// structure; rewrite them all so recency ranking, Back/Forward, and Reopen
     /// Closed Tab keep working across the rename instead of silently skipping it.
     private func remapNavigationState(from old: URL, to new: URL) {
+        if let text = lastKnownContent.removeValue(forKey: old) {
+            lastKnownContent[new] = text
+            contentCacheOrder = contentCacheOrder.map { $0 == old ? new : $0 }
+        }
         recentFiles = recentFiles.map { $0 == old ? new : $0 }
         backStack = backStack.map { $0 == old ? new : $0 }
         forwardStack = forwardStack.map { $0 == old ? new : $0 }
@@ -1230,7 +1383,7 @@ final class VaultStore: ObservableObject {
             if let idx, !openTabs.isEmpty {
                 select(openTabs[min(idx, openTabs.count - 1)])
             } else {
-                content = ""; outline = []; backlinks = []
+                content = ""; outline = []; backlinks = []; loadedURL = nil
             }
         }
         persistSession()

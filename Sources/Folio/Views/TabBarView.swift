@@ -102,6 +102,19 @@ private struct TabChip: View {
 
     private var name: String { (url.lastPathComponent as NSString).deletingPathExtension }
 
+    /// The file is gone from disk (trashed, or moved/renamed outside Folio). The
+    /// tab stays put and reads struck through — the VS Code/Cursor treatment —
+    /// because a tab that looks ordinary but does nothing when clicked is the
+    /// worst of the options.
+    private var isMissing: Bool { vault.isMissing(url) }
+
+    /// Missing notes stay dimmed even while active: the strikethrough is the
+    /// signal, and full-strength text would fight it.
+    private var labelColor: Color {
+        if isMissing { return .secondary }
+        return isActive ? Color.primary : .secondary
+    }
+
     /// Active tab uses the editor's page color so the framed cell reads distinctly;
     /// inactive tabs are transparent with only a faint hover hint.
     private var chipBackground: Color {
@@ -113,10 +126,11 @@ private struct TabChip: View {
         HStack(spacing: 6) {
             Image(systemName: "doc.text")
                 .font(.system(size: 11))
-                .foregroundStyle(isActive ? Color.primary : .secondary)
+                .foregroundStyle(labelColor)
             Text(name)
                 .font(.system(size: 13, weight: isActive ? .semibold : .regular))
-                .foregroundStyle(isActive ? Color.primary : .secondary)
+                .foregroundStyle(labelColor)
+                .strikethrough(isMissing, color: labelColor)
                 .lineLimit(1)
                 .layoutPriority(1)   // the note name must never truncate away
             if let qualifier {
@@ -158,7 +172,11 @@ private struct TabChip: View {
         // this needs disambiguation — clicks select instantly.
         .onTapGesture { vault.select(url) }
         .onHover { hover = $0 }
-        .help(vault.relativePath(for: url))   // hover = full path, the last-resort disambiguator
+        // Hover = full path, the last-resort disambiguator — and the one place
+        // with room to say *why* the name is struck through.
+        .help(isMissing ? "No longer on disk: \(vault.relativePath(for: url))"
+                        : vault.relativePath(for: url))
+        .accessibilityValue(isMissing ? "No longer on disk" : "")
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
         .contextMenu {

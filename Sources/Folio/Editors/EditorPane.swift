@@ -11,41 +11,77 @@ struct EditorPane: View {
     @StateObject private var find = FindModel()
 
     var body: some View {
-        if vault.selection != nil {
-            noteBody
-                .overlay(alignment: .topTrailing) {
-                    OutlineFloater().padding(.top, 14).padding(.trailing, 10)
-                }
-                .overlay(alignment: .bottom) {
-                    BacklinksBar().frame(maxWidth: .infinity)
-                }
-                // Ambient write-mode signal: a hairline accent rule pinned to the
-                // pane's top edge, present only while editing — the mode stays
-                // glanceable peripherally without a banner. (Reading needs no
-                // signal; it's the default state.)
-                .overlay(alignment: .top) {
-                    ZStack {
-                        if ui.mode == .edit {
-                            Rectangle().fill(settings.selectionTint.opacity(0.5))
-                                .frame(height: 2)
-                                .transition(.opacity)
-                        }
+        if let selection = vault.selection {
+            if vault.isMissing(selection) && vault.content.isEmpty {
+                // Nothing left to show: the file is gone and we never captured its
+                // text (or it was empty). Say so, rather than render a blank page
+                // that looks like a note.
+                missingPane(selection)
+            } else {
+                noteBody
+                    .overlay(alignment: .topTrailing) {
+                        OutlineFloater().padding(.top, 14).padding(.trailing, 10)
                     }
-                    .animation(.smooth(duration: 0.2), value: ui.mode)
-                    .allowsHitTesting(false)
-                }
-                .background(settings.paneBackground ?? Color(nsColor: .textBackgroundColor))
-                .background { findShortcuts }
-                // A global-search hit hands us a query + occurrence to focus.
-                .onChange(of: ui.pendingFind) { consumePendingFind() }
-                .onAppear { consumePendingFind() }
-                // Esc in reading mode (routed via the key monitor): close the
-                // find bar if it's open; otherwise it was consumed just to stay
-                // silent — Esc has no further meaning while reading.
-                .onChange(of: ui.escapePulse) { if find.active { find.close() } }
+                    .overlay(alignment: .bottom) {
+                        BacklinksBar().frame(maxWidth: .infinity)
+                    }
+                    // Ambient write-mode signal: a hairline accent rule pinned to the
+                    // pane's top edge, present only while editing — the mode stays
+                    // glanceable peripherally without a banner. (Reading needs no
+                    // signal; it's the default state.)
+                    .overlay(alignment: .top) {
+                        ZStack {
+                            if ui.mode == .edit {
+                                Rectangle().fill(settings.selectionTint.opacity(0.5))
+                                    .frame(height: 2)
+                                    .transition(.opacity)
+                            }
+                        }
+                        .animation(.smooth(duration: 0.2), value: ui.mode)
+                        .allowsHitTesting(false)
+                    }
+                    .background(settings.paneBackground ?? Color(nsColor: .textBackgroundColor))
+                    .background { findShortcuts }
+                    // A global-search hit hands us a query + occurrence to focus.
+                    .onChange(of: ui.pendingFind) { consumePendingFind() }
+                    .onAppear { consumePendingFind() }
+                    // Esc in reading mode (routed via the key monitor): close the
+                    // find bar if it's open; otherwise it was consumed just to stay
+                    // silent — Esc has no further meaning while reading.
+                    .onChange(of: ui.escapePulse) { if find.active { find.close() } }
+            }
         } else {
             emptyPane
         }
+    }
+
+    /// The pane for a note whose file has gone missing with no text to fall back
+    /// on. Folio is a reader: there's nothing to offer but the fact itself.
+    private func missingPane(_ url: URL) -> some View {
+        ContentUnavailableView {
+            Label("File not found", systemImage: "doc.questionmark")
+        } description: {
+            Text("\(vault.relativePath(for: url)) is no longer on disk.")
+        }
+        .background(settings.paneBackground ?? Color(nsColor: .textBackgroundColor))
+    }
+
+    /// Header for a note whose file has gone missing but whose text we still hold:
+    /// the note stays readable (that's the useful thing), and this says why it
+    /// can't be written to. Quiet on purpose — the struck-through tab is the
+    /// primary signal; this is the explanation for someone who looks.
+    private var missingRibbon: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+            Text("No longer on disk. Showing the last version read.")
+        }
+        .font(.system(size: 11))
+        .foregroundStyle(.secondary)
+        .padding(.vertical, 5)
+        .frame(maxWidth: .infinity)
+        .background(Color.primary.opacity(0.05))
+        .overlay(alignment: .bottom) { Divider() }
+        .accessibilityAddTraits(.isStaticText)
     }
 
     /// The no-note pane: instead of a bare "select a note" placeholder, the
@@ -82,6 +118,7 @@ struct EditorPane: View {
 
     private var noteBody: some View {
         VStack(spacing: 0) {
+            if vault.isSelectionMissing { missingRibbon }
             // Find bar is docked into the layout (below the tab bar, above the title)
             // so it's part of the page rather than floating over the content.
             if find.active {

@@ -47,8 +47,13 @@ struct CommandPaletteView: View {
         c.append(AppCommand(title: "Back", subtitle: "⌘[") { vault.goBack() })
         c.append(AppCommand(title: "Forward", subtitle: "⌘]") { vault.goForward() })
         c.append(AppCommand(title: "Toggle Sidebar", subtitle: "⌃⌘S") { ui.toggleSidebar &+= 1 })
-        c.append(AppCommand(title: ui.mode == .read ? "Writing Mode" : "Reading Mode", subtitle: "⌘E") {
-            ui.mode = ui.mode == .read ? .edit : .read })
+        // Offered only when there's something writable to switch to: a note whose
+        // file is gone is read-only, and a command that silently does nothing is
+        // what this whole state exists to avoid.
+        if !vault.isSelectionMissing {
+            c.append(AppCommand(title: ui.mode == .read ? "Writing Mode" : "Reading Mode", subtitle: "⌘E") {
+                ui.mode = ui.mode == .read ? .edit : .read })
+        }
         c.append(AppCommand(title: "Search Files…", subtitle: "⌘K") { ui.showQuickSwitcher = true })
         c.append(AppCommand(title: "Search in Vault…", subtitle: "⇧⌘F") { ui.showSearch = true })
         c.append(AppCommand(title: "Browse Tags", subtitle: "⇧⌘Y") { ui.showTags = true })

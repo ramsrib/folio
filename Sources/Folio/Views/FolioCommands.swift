@@ -80,7 +80,8 @@ struct FolioCommands: Commands {
                 ui?.mode = ui?.mode == .read ? .edit : .read
             }
             .keyboardShortcut("e", modifiers: .command)
-            .disabled(ui == nil)
+            // A note whose file is gone from disk is read-only.
+            .disabled(ui == nil || (vault?.isSelectionMissing ?? false))
             // ⌘= reads as ⌘+ on a US layout — the browser/reader convention.
             Button("Bigger Text") { settings.biggerText() }
                 .keyboardShortcut("=", modifiers: .command)

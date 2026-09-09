@@ -80,6 +80,13 @@ struct ContentView: View {
             if ui.mode != target { ui.mode = target }
             vault.openInEditMode = false
         }
+        // The open note vanished from disk while we were writing in it: fall back
+        // to reading rather than leave a live editor over a file that's gone.
+        .onChange(of: vault.isSelectionMissing) {
+            if vault.isSelectionMissing, ui.mode != .read {
+                withAnimation(.smooth(duration: 0.2)) { ui.mode = .read }
+            }
+        }
         .alert("Rename Note", isPresented: renamePresented) {
             TextField("Name", text: $renameText)
             Button("Cancel", role: .cancel) { renameTarget = nil }
@@ -381,8 +388,10 @@ struct ContentView: View {
         }
         .padding(2)
         .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-        .disabled(vault.selection == nil)
-        .opacity(vault.selection == nil ? 0.4 : 1)
+        // Off for a note whose file is gone: it's read-only, so "Write" has
+        // nothing to switch to.
+        .disabled(vault.selection == nil || vault.isSelectionMissing)
+        .opacity(vault.selection == nil || vault.isSelectionMissing ? 0.4 : 1)
     }
 
     private func modeSegment(_ icon: String, mode: EditorMode, help: String) -> some View {

@@ -11,7 +11,7 @@ struct NoteScreen: View {
 
     var body: some View {
         Group {
-            if ui.mode == .edit {
+            if ui.mode == .edit, !vault.isSelectionMissing {
                 MarkdownEditScreen()
             } else {
                 ReadingView(find: find)
@@ -30,10 +30,19 @@ struct NoteScreen: View {
                     Image(systemName: ui.mode == .edit ? "book" : "pencil.line")
                 }
                 .accessibilityLabel(ui.mode == .edit ? "Reading mode" : "Edit")
+                // A note whose file is gone from disk is read-only: the store
+                // holds no write target for it, so an editor here would take
+                // edits that could never be saved.
+                .disabled(vault.isSelectionMissing)
             }
         }
         .onAppear { vault.select(file.id); ui.mode = .read }
         .onDisappear { vault.flushSave() }
+        // The file can go while the screen is up (deleted on the Mac and synced,
+        // or from the Files app); leave the editor the moment it does.
+        .onChange(of: vault.isSelectionMissing) {
+            if vault.isSelectionMissing { ui.mode = .read }
+        }
     }
 }
 
