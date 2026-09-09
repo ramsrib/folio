@@ -62,7 +62,8 @@ struct WindowRoutingTests {
     static func vault(_ notes: [String], recents: [URL] = []) -> URL {
         makeApp()
         for key in ["folio.recentVaults", "folio.openVaults", "folio.vaultPath",
-                    "folio.tabs", "folio.recentFiles", "folio.didMigrateSingleVault"] {
+                    "folio.tabsByVault", "folio.activeByVault", "folio.recentsByVault",
+                    "folio.didMigrateSingleVault"] {
             UserDefaults.standard.removeObject(forKey: key)
         }
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
