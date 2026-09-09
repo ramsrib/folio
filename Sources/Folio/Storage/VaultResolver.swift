@@ -42,4 +42,20 @@ enum VaultResolver {
             .map { vault.appendingPathComponent($0) }
         return (vault, file)
     }
+
+    /// The file a *vault-less* `folio://open?file=/abs/path` link addresses — the
+    /// form the `folio <file>` shell shim emits. Such a link names no vault, so
+    /// `destination` can't place it; the router resolves it exactly like a plain
+    /// file URL instead (owning window first, then `vault(for:)`). Relative paths
+    /// are rejected: Folio's cwd is "/" under Launch Services, so resolving one
+    /// here would address the wrong file.
+    static func fileTarget(for url: URL) -> URL? {
+        guard url.scheme?.lowercased() == "folio" else { return nil }
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        let vault = items.first(where: { $0.name == "vault" })?.value ?? ""
+        guard vault.isEmpty,
+              let path = items.first(where: { $0.name == "file" })?.value,
+              path.hasPrefix("/") else { return nil }
+        return URL(fileURLWithPath: path)
+    }
 }

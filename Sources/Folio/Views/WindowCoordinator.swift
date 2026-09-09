@@ -202,6 +202,13 @@ final class WindowCoordinator {
             } else if let (vault, _) = VaultResolver.destination(for: url),
                       VaultRef(vault).exists {
                 ref = VaultRef(vault)
+            } else if let file = VaultResolver.fileTarget(for: url) {
+                // A vault-less `folio://open?file=/abs/path` (the `folio <file>`
+                // shell shim). It names no vault, so route it by the file itself,
+                // exactly as the file-URL branch above does — the open vault that
+                // already contains it wins, and only then a recent/parent folder.
+                ref = window(owning: file).map { VaultRef($0.store.vaultURL!) }
+                    ?? VaultRef(VaultResolver.vault(for: file))
             } else {
                 // A folio:// link with no resolvable vault. Handing it to some
                 // window would make that window swap vaults — the single-window
