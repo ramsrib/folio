@@ -46,16 +46,27 @@ enum VaultResolver {
     /// The file a *vault-less* `folio://open?file=/abs/path` link addresses — the
     /// form the `folio <file>` shell shim emits. Such a link names no vault, so
     /// `destination` can't place it; the router resolves it exactly like a plain
-    /// file URL instead (owning window first, then `vault(for:)`). Relative paths
-    /// are rejected: Folio's cwd is "/" under Launch Services, so resolving one
-    /// here would address the wrong file.
+    /// file URL instead (owning window first, then `vault(for:)`).
+    ///
+    /// Everything `VaultStore.openFolioLink` would reject is rejected *here*, so a
+    /// link the store will only beep at never reaches a window: routing a doomed
+    /// link is not free — it can conjure a window (or claim an empty one) for a
+    /// vault that then shows nothing. Hence the same host check as
+    /// `parseFolioLink`, and the extension/existence checks `openExternalFile`
+    /// applies. Relative paths go too: Folio's cwd is "/" under Launch Services,
+    /// so resolving one here would address the wrong file.
     static func fileTarget(for url: URL) -> URL? {
-        guard url.scheme?.lowercased() == "folio" else { return nil }
-        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        guard url.scheme?.lowercased() == "folio",
+              let comps = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              comps.host?.lowercased() == "open" else { return nil }
+        let items = comps.queryItems ?? []
         let vault = items.first(where: { $0.name == "vault" })?.value ?? ""
         guard vault.isEmpty,
               let path = items.first(where: { $0.name == "file" })?.value,
               path.hasPrefix("/") else { return nil }
-        return URL(fileURLWithPath: path)
+        let file = URL(fileURLWithPath: path).standardizedFileURL
+        guard VaultStore.mdExtensions.contains(file.pathExtension.lowercased()),
+              FileManager.default.fileExists(atPath: file.path) else { return nil }
+        return file
     }
 }

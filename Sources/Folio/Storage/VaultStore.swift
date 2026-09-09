@@ -47,7 +47,9 @@ final class VaultStore: ObservableObject {
     private let activeKey = "folio.activeByVault"  // [vaultPath: filePath]
     private let recentKey = "folio.recentVaults"   // [vaultPath]
     private let recentFilesKey = "folio.recentsByVault"  // [vaultPath: [filePath]]
-    private let mdExtensions: Set<String> = ["md", "markdown", "mdown", "mkd"]
+    /// Static so the router can ask the same question before a store exists
+    /// (`VaultResolver.fileTarget`) — one definition of "a note Folio can open".
+    static let mdExtensions: Set<String> = ["md", "markdown", "mdown", "mkd"]
     /// Dependency/build directories never worth scanning (so pointing a vault at a
     /// code project doesn't crawl node_modules and index package READMEs). Hidden
     /// dirs (.git, .build, .next, .venv, …) are already skipped via skipsHiddenFiles.
@@ -384,7 +386,7 @@ final class VaultStore: ObservableObject {
             let url = URL(fileURLWithPath: e.path)
             // Non-note files (attachments, .tmp) don't participate in the tree
             // or the index — ignore them entirely.
-            guard mdExtensions.contains(url.pathExtension.lowercased()) else { continue }
+            guard Self.mdExtensions.contains(url.pathExtension.lowercased()) else { continue }
             let exists = FileManager.default.fileExists(atPath: e.path)
             if !known.contains(url.path) { return .fullRescan(exists ? "new note" : "unknown note event") }
             if !exists { return .fullRescan("note removed or renamed away") }
@@ -493,7 +495,7 @@ final class VaultStore: ObservableObject {
                     nodes.append(VaultNode(id: url, name: url.lastPathComponent,
                                            isDirectory: true, children: children))
                 }
-            } else if mdExtensions.contains(url.pathExtension.lowercased()) {
+            } else if Self.mdExtensions.contains(url.pathExtension.lowercased()) {
                 let file = MarkdownFile(url: url, vaultRoot: root)
                 flat.append(file)
                 nodes.append(VaultNode(id: url, name: file.name, isDirectory: false, children: nil))
@@ -783,7 +785,7 @@ final class VaultStore: ObservableObject {
     /// makes "open any project doc in Folio" just work.
     private func openExternalFile(_ url: URL) {
         let url = url.standardizedFileURL
-        guard mdExtensions.contains(url.pathExtension.lowercased()),
+        guard Self.mdExtensions.contains(url.pathExtension.lowercased()),
               FileManager.default.fileExists(atPath: url.path) else { beep(); return }
         // Compare through resolved symlinks: a vault opened via a symlinked path
         // (e.g. ~/Projects/vapi/dev → vapi-ops) must still claim a file addressed
@@ -859,7 +861,7 @@ final class VaultStore: ObservableObject {
                 }
                 return
             }
-            if mdExtensions.contains(candidate.pathExtension.lowercased()) {
+            if Self.mdExtensions.contains(candidate.pathExtension.lowercased()) {
                 // Inside the vault → in-place navigation; outside → the external
                 // path (new tab, possibly a vault switch) so it's still reachable.
                 if selectResolved(candidate, inNewTab: false) { return }
@@ -1037,7 +1039,7 @@ final class VaultStore: ObservableObject {
             as NSString).lastPathComponent
         guard !trimmed.isEmpty, trimmed != ".", trimmed != ".." else { return }
         var fileName = trimmed
-        if !mdExtensions.contains((fileName as NSString).pathExtension.lowercased()) { fileName += ".md" }
+        if !Self.mdExtensions.contains((fileName as NSString).pathExtension.lowercased()) { fileName += ".md" }
         let dest = id.deletingLastPathComponent().appendingPathComponent(fileName)
         guard dest != id else { return }
         do {
@@ -1138,7 +1140,7 @@ final class VaultStore: ObservableObject {
             let trimmed = target.trimmingCharacters(in: .whitespaces)
             guard !trimmed.isEmpty else { return nil }
             let ext = (trimmed as NSString).pathExtension
-            let hasMdExtension = mdExtensions.contains(ext.lowercased())
+            let hasMdExtension = Self.mdExtensions.contains(ext.lowercased())
             let bare = hasMdExtension ? (trimmed as NSString).deletingPathExtension : trimmed
             guard (bare as NSString).lastPathComponent
                 .caseInsensitiveCompare(oldBase) == .orderedSame else { return nil }
