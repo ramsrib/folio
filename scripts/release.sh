@@ -6,7 +6,8 @@
 #
 # Steps:
 #   1. Preflight: version is well-formed, unused, and follows the last tag; the
-#      working tree is clean and pushed (a tag must name code others can get).
+#      working tree is clean and pushed (a tag must name code others can get);
+#      and `swift test` passes.
 #   2. Clean release build of the .app, Developer ID–signed (scripts/package-app.sh).
 #   3. Notarize + staple when credentials are available (.env). Skipped otherwise —
 #      the artifacts still work, but downloaders hit Gatekeeper and must approve
@@ -14,9 +15,13 @@
 #   4. Package: a .zip (ditto) and a .dmg (create-dmg, else hdiutil).
 #   5. Tag and publish the GitHub release with both artifacts attached.
 #
-# Env knobs: VERSION (required, e.g. v0.1.0) · DRAFT=1 · FORCE_VERSION=1
-#            notarization creds from .env (see .env.example)
+# Env knobs: VERSION (required, e.g. v0.1.0) · DRAFT=1 · FORCE_VERSION=1 ·
+#            SKIP_TESTS=1 · notarization creds from .env (see .env.example)
 set -euo pipefail
+
+# An exported CDPATH makes `cd` echo its target, which would land in ROOT
+# alongside the pwd and break every path below.
+CDPATH=
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -71,6 +76,21 @@ if [[ -n "$(git log --oneline origin/main..HEAD 2>/dev/null)" ]]; then
   echo "       code nobody else has" >&2
   exit 1
 fi
+
+# Releases are immutable, so a red suite is one of the few things worth the
+# minute it costs to find out here rather than after notarization. Only the
+# SwiftPM suite: `make ios-test` needs a working simulator, and a broken one
+# should not be able to block a macOS release. Run that by hand — RELEASE.md.
+if [[ -z "${SKIP_TESTS:-}" ]]; then
+  echo "==> running the test suite"
+  if ! swift test; then
+    echo "error: tests failed — fix them, or SKIP_TESTS=1 to release anyway" >&2
+    exit 1
+  fi
+else
+  echo "==> skipping tests (SKIP_TESTS=1)"
+fi
+
 echo "==> releasing $APP_NAME $VERSION (previous: ${LAST_TAG:-none})"
 
 # 2. build -------------------------------------------------------------------
