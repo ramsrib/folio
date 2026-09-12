@@ -335,8 +335,13 @@ final class DecoratedLayoutFragment: NSTextLayoutFragment {
                  radius: 1.5, NSColor.secondaryLabelColor.withAlphaComponent(0.5))
 
         case .divider:
+            // Symmetric in the column: the fragment sits `layoutFragmentFrame.minX`
+            // (line-fragment padding) into the container, and the text
+            // `text.minX` into the fragment, so the rule stops that far short of
+            // the right edge too.
             let y = text.midY.rounded()
-            fill(CGRect(x: text.minX, y: y, width: max(text.width, columnWidth - text.minX * 2), height: 1),
+            let margin = layoutFragmentFrame.minX + text.minX
+            fill(CGRect(x: text.minX, y: y, width: max(text.width, columnWidth - margin * 2), height: 1),
                  radius: 0, NSColor.separatorColor)
         }
     }

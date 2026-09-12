@@ -3,9 +3,10 @@ import AppKit
 import SwiftUI
 
 extension NSAttributedString.Key {
-    /// Block decoration to draw *behind* a range (code card, callout, quote bar,
-    /// divider rule). TextKit has no block-background concept under TextKit 2, so
-    /// `NoteTextView` draws these from the laid-out fragment geometry.
+    /// Block decoration to draw *behind* a paragraph (code card, callout, quote
+    /// bar, divider rule). TextKit has no block-background concept, so a
+    /// `DecoratedLayoutFragment` draws these under its own text. One paragraph
+    /// per decorated block — lines inside a block are soft breaks.
     static let folioDecoration = NSAttributedString.Key("folioDecoration")
     /// Content index of a task's `[ ]` marker — click to toggle.
     static let folioCheckbox = NSAttributedString.Key("folioCheckbox")
@@ -244,7 +245,7 @@ struct NoteTextRenderer {
         return out
     }
 
-    /// A blank line carrying the rule; `NoteTextView` strikes it through the middle.
+    /// A blank line carrying the rule; its fragment strikes it through the middle.
     private func divider() -> NSAttributedString {
         NSAttributedString(string: " ", attributes: [
             .font: body,

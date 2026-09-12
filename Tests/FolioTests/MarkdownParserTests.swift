@@ -35,3 +35,28 @@ struct MarkdownParserTests {
         #expect(code == ["x"])
     }
 }
+
+extension MarkdownParserTests {
+    private func codeBlocks(_ md: String) -> [String] {
+        MarkdownParser.parse(md).compactMap { block -> String? in
+            if case let .code(_, text) = block.kind { return text }
+            return nil
+        }
+    }
+
+    /// TextKit treats a stray CR as a paragraph break, so a CRLF file's code
+    /// block — joined with soft breaks — would fall apart into one card per line.
+    @Test("CRLF line endings do not leak into a code block")
+    func crlfStripped() {
+        #expect(codeBlocks("```\r\na\r\nb\r\n```\r\n") == ["a\nb"])
+    }
+
+    @Test("Dedent counts tabs by column")
+    func tabDedent() {
+        // Two-space fence: a tab-indented line keeps the two columns it had beyond the fence.
+        #expect(codeBlocks("  ```\n  a\n\tb\n  ```") == ["a\n  b"])
+        // Tab-indented fence (4 columns): a four-space line is fully dedented,
+        // a tab is consumed whole, and the code's own deeper indent survives.
+        #expect(codeBlocks("\t```\n    a\n\tb\n\t\tc\n\t```") == ["a\nb\n\tc"])
+    }
+}

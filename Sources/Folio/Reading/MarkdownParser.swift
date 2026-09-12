@@ -70,10 +70,15 @@ enum MarkdownParser {
     ///   lines); `.reflow` is CommonMark, which reads better for hard-wrapped repo
     ///   docs; `.auto` decides per paragraph via `looksHardWrapped`.
     static func parse(_ content: String, lineBreaks: LineBreakMode = .auto) -> [Block] {
-        let lines = content.components(separatedBy: "\n")
+        // CRLF files: the CR would ride along on every line, and TextKit treats a
+        // stray CR as a paragraph break — a code block joined with soft breaks
+        // would still fall apart into one paragraph (and one card) per line.
+        // Offsets stay in the file's own coordinates, CR included.
+        let rawLines = content.components(separatedBy: "\n")
+        let lines = rawLines.map { $0.hasSuffix("\r") ? String($0.dropLast()) : $0 }
         var offsets: [Int] = []
         var loc = 0
-        for line in lines { offsets.append(loc); loc += (line as NSString).length + 1 }
+        for line in rawLines { offsets.append(loc); loc += (line as NSString).length + 1 }
 
         var blocks: [Block] = []
         var paragraph: [String] = []
@@ -147,11 +152,10 @@ enum MarkdownParser {
                 // way. That indentation belongs to the list, not the code: strip up
                 // to the fence's own indent from every line (CommonMark 4.5), so
                 // the code keeps only its real indentation.
-                let fenceIndent = line.prefix { $0 == " " }.count
+                let fenceIndent = indentColumns(of: line)
                 var code: [String] = []; i += 1
                 while i < lines.count, !lines[i].trimmingCharacters(in: .whitespaces).hasPrefix("```") {
-                    let leading = lines[i].prefix { $0 == " " }.count
-                    code.append(String(lines[i].dropFirst(min(leading, fenceIndent)))); i += 1
+                    code.append(dedent(lines[i], by: fenceIndent)); i += 1
                 }
                 i += 1
                 blocks.append(Block(kind: .code(language: lang, text: code.joined(separator: "\n"))))
@@ -252,6 +256,42 @@ enum MarkdownParser {
         guard r.location != NSNotFound else { return "" }
         return (s as NSString).substring(with: r)
     }
+    /// Width of a line's leading whitespace in columns, tabs advancing to the
+    /// next multiple of four (CommonMark §2.2).
+    private static func indentColumns(of line: String) -> Int {
+        var columns = 0
+        for ch in line {
+            if ch == " " { columns += 1 }
+            else if ch == "\t" { columns += 4 - columns % 4 }
+            else { break }
+        }
+        return columns
+    }
+
+    /// Remove up to `columns` of leading indentation, by column rather than by
+    /// character: a tab that straddles the boundary is replaced by the spaces
+    /// left over, and a line indented less than that is only trimmed of what it
+    /// has.
+    private static func dedent(_ line: String, by columns: Int) -> String {
+        guard columns > 0 else { return line }
+        var consumed = 0
+        var index = line.startIndex
+        while index < line.endIndex, consumed < columns {
+            let ch = line[index]
+            if ch == " " { consumed += 1 }
+            else if ch == "\t" {
+                let width = 4 - consumed % 4
+                if consumed + width > columns {   // straddles: keep the excess as spaces
+                    let excess = consumed + width - columns
+                    return String(repeating: " ", count: excess) + line[line.index(after: index)...]
+                }
+                consumed += width
+            } else { break }
+            index = line.index(after: index)
+        }
+        return String(line[index...])
+    }
+
     private static func parseFrontmatter(_ lines: [String]) -> [Prop] {
         var props: [Prop] = []
         for raw in lines {
