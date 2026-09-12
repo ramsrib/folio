@@ -12,10 +12,13 @@ make release VERSION=v0.1.0
 That one command builds, signs, notarizes, staples, packages, tags, and
 publishes. Everything below is the setup it depends on — done once.
 
-Run `make test` (and `make ios-test` if the iOS app changed) first. The script
-does not gate on them: its preflight guards the things a tag cannot recover
-from — a reused version, a skipped one, a dirty or unpushed tree — not whether
-the code works.
+The preflight runs `swift test` itself and stops on a failure, so a red suite
+never reaches notarization. `SKIP_TESTS=1 make release VERSION=…` overrides it
+deliberately, the way `FORCE_VERSION=1` overrides the version check.
+
+**Run `make ios-test` by hand when the iOS app changed.** The gate deliberately
+leaves it out: it needs a booted simulator and a generated Xcode project, and a
+simulator that won't boot shouldn't be able to block a macOS release.
 
 ## One-time setup
 
@@ -53,9 +56,12 @@ absent, so you can still cut an unsigned local build.
 ## What `make release` does
 
 1. **Preflight.** Refuses to run unless `VERSION` looks like `v1.2.3`, is unused,
-   and follows the previous tag; and unless the working tree is clean and pushed.
-   A tag is the permanent record of what shipped — it must name code others can
-   actually fetch. `FORCE_VERSION=1` deliberately skips a version.
+   and follows the previous tag; unless the working tree is clean and pushed; and
+   unless `swift test` passes. A tag is the permanent record of what shipped — it
+   must name code others can actually fetch, and a release is immutable, so the
+   minute the suite costs here beats finding out after notarization, when the
+   only repair is burning a version number. `FORCE_VERSION=1` deliberately skips
+   a version; `SKIP_TESTS=1` releases over a red suite.
 2. **Build.** Clean release build of `Folio.app`, Developer ID–signed. The
    script then asserts the built `CFBundleShortVersionString` equals the version
    being released — a wrong version in About is invisible to us and permanent to
