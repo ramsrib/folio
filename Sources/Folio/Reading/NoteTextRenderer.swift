@@ -231,8 +231,11 @@ struct NoteTextRenderer {
                 // inside one text stream would be a selection dead-zone, and code
                 // is the thing people copy most.
                 s.lineSpacing = size * 0.3
+                // One paragraph with soft breaks, so `headIndent` reaches every
+                // source line after the first, not just wrapped ones — a hanging
+                // indent would push line 2 of the code right of line 1. Flush it is.
                 s.firstLineHeadIndent = inset
-                s.headIndent = inset * 1.6
+                s.headIndent = inset
                 s.tailIndent = -inset
                 s.paragraphSpacingBefore = inset * 0.7
                 s.paragraphSpacing = blockSpacing + inset * 0.7

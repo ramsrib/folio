@@ -143,9 +143,15 @@ enum MarkdownParser {
             if trimmed.hasPrefix("```") {               // fenced code
                 flush()
                 let lang = String(trimmed.dropFirst(3)).trimmingCharacters(in: .whitespaces)
+                // A fence indented under a list item indents its content the same
+                // way. That indentation belongs to the list, not the code: strip up
+                // to the fence's own indent from every line (CommonMark 4.5), so
+                // the code keeps only its real indentation.
+                let fenceIndent = line.prefix { $0 == " " }.count
                 var code: [String] = []; i += 1
                 while i < lines.count, !lines[i].trimmingCharacters(in: .whitespaces).hasPrefix("```") {
-                    code.append(lines[i]); i += 1
+                    let leading = lines[i].prefix { $0 == " " }.count
+                    code.append(String(lines[i].dropFirst(min(leading, fenceIndent)))); i += 1
                 }
                 i += 1
                 blocks.append(Block(kind: .code(language: lang, text: code.joined(separator: "\n"))))
