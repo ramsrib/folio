@@ -55,8 +55,10 @@ extension MarkdownParserTests {
     func tabDedent() {
         // Two-space fence: a tab-indented line keeps the two columns it had beyond the fence.
         #expect(codeBlocks("  ```\n  a\n\tb\n  ```") == ["a\n  b"])
-        // Tab-indented fence (4 columns): a four-space line is fully dedented,
-        // a tab is consumed whole, and the code's own deeper indent survives.
-        #expect(codeBlocks("\t```\n    a\n\tb\n\t\tc\n\t```") == ["a\nb\n\tc"])
+        // Tab-indented fence under a list item whose content indent is the same
+        // four columns (a bare top-level tab would be indented code, not a fence).
+        // A four-space line is fully dedented, a tab is consumed whole, and the
+        // code's own deeper indent survives.
+        #expect(codeBlocks("-   item\n\n\t```\n    a\n\tb\n\t\tc\n\t```") == ["a\nb\n\tc"])
     }
 }
