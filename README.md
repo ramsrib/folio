@@ -10,8 +10,11 @@ efficiently. Writing is supported — but reading is the default, the most polis
 every interaction is optimized around.
 
 > **Status: early.** macOS is the built target and is genuinely usable day to day. iOS exists but is
-> a partial reader. There is **no test suite** and no release build. See
-> [Limitations](#limitations) before you point it at anything you can't afford to lose.
+> a partial reader. Signed, notarized builds ship through
+> [GitHub Releases](https://github.com/ramsrib/folio/releases) and a
+> [Homebrew tap](https://github.com/ramsrib/homebrew-tap); the test suite covers the parser, tags,
+> link routing, and the store, but not the UI. See [Limitations](#limitations) before you point it
+> at anything you can't afford to lose.
 
 ## Built for read-heavy use
 
@@ -38,8 +41,11 @@ Everything in this list is implemented. Anything not in it, assume it isn't.
   and tag chips — **collapsed by default** to a one-line "Properties · N" row, so opening a note
   lands you on the content; click to expand.
 - Vim-style scrolling: `j`/`k`/`h`/`l`, `d`/`u`, `gg`/`G`, space / ⇧space.
-- Text selection flows across consecutive paragraphs (not across headings, lists, or code blocks —
-  see Limitations).
+- Tables size their columns to their content, and one wider than the reading column pans sideways
+  on its own while vertical scrolling still belongs to the note.
+- **Selection runs the length of the note.** Reading mode is a single TextKit text stream, so
+  selection, ⌘A, copy, Look Up and drag-out cross headings, lists, code, callouts and tables alike.
+  Copying a table or the Properties card yields its Markdown source.
 
 **Navigating & search**
 - **⌘O / ⌘K** — quick switcher. **Fuzzy** name/path matching with highlighted hits, spaces as word
@@ -54,10 +60,14 @@ Everything in this list is implemented. Anything not in it, assume it isn't.
 - **⌘[ / ⌘]** (or ⌘⌥←/→, or a **two-finger swipe** left/right) — **back/forward history** through
   visited notes, with title-bar chevrons.
 - **⌘P** — command palette: every app action, fuzzy-matched, including Switch Vault and Set Theme.
-- **⇧⌘Y** — tag browser: all inline `#tags` and frontmatter `tags:` with counts; click through to notes.
+- **⇧⌘Y** — tag browser: all inline `#tags` and frontmatter `tags:` with counts; click through to
+  notes. A tag has to carry a letter or `_`, so issue references like `#1` or `#1303/#1305` stay out
+  of the list; matching is Unicode, so `#café` and `#日本語` are tags.
 - **⌘F** — find in page, in *both* reading and writing modes, with case toggle and ⌘G / ⇧⌘G.
 - Hover-reveal **outline** at the right edge; click a heading to scroll to it.
 - Collapsible **backlinks** at the bottom of a note, each with a line of context.
+- A pane with no note open shows the moves you'd make next — search files, new note, search in
+  vault, command palette — each row clickable and naming its key.
 - **⌘/** — a cheat sheet of every shortcut. It is the authoritative list.
 
 **Vault & files**
@@ -96,13 +106,17 @@ Everything in this list is implemented. Anything not in it, assume it isn't.
 - Open/close (**⌘W**), drag to reorder, reopen closed (**⇧⌘T**), cycle (**⌃⇥** / **⌃⇧⇥**),
   **⌘1–⌘8** to jump to a tab and **⌘9** to the last, close-others / close-tabs-to-the-right / close-all, and a right-click menu with the same copy actions (relative/absolute path, wikilink) as the explorer. Open tabs and the
   active note are **restored per vault** on relaunch.
+- A note whose file goes away (deleted, moved, a branch switch) gets its tab **struck through**
+  rather than closed. Clicking it opens the last text Folio read, read-only, above a line saying
+  why; it heals back into an ordinary note the moment the file returns.
 
 **Writing**
 - A Live Preview editor (TextKit `NSTextView`) that styles the literal Markdown buffer in place, so
   the file stays byte-for-byte lossless. Syntax markers are **dimmed**, and revealed at full contrast
   on the cursor's line — they are not concealed. Smart quotes, dashes, and text replacement are
   disabled so typing can never mutate the file.
-- Autosave, debounced ~500 ms, written atomically.
+- Autosave, debounced ~500 ms, written atomically. A save only ever *updates* a note — it never
+  creates one — so a file deleted out from under an open tab is not resurrected by a pending write.
 - The page title is editable and renames the file on commit (when the inline title is enabled in ⌘,).
 
 **Vaults & windows**
@@ -161,7 +175,8 @@ The `cd … && pwd` is what makes relative arguments safe: these paths **must be
 resolves a relative path against its own working directory (`/` for a Launch Services app), so a
 literal `folio://open?vault=.` quietly opens the root of the filesystem as a vault.
 
-A missing path, or a `vault=` that isn't a directory, beeps rather than opening an empty window.
+A link Folio can't act on — a missing path, a `vault=` that isn't a directory, a `file=` that isn't
+Markdown, a host other than `open` — beeps rather than summoning a window or claiming an idle one.
 Everything opened this way lands in its **own tab** — an external open never evicts what you're
 reading.
 
@@ -176,7 +191,11 @@ An iOS target exists and builds, but it is a **partial reader**, not a peer of t
 - Editing is a plain `TextEditor`, saving through the same lossless debounced write.
 
 **Not on iOS:** the Live Preview editor, external-change watching (pull to refresh instead),
-find-in-page, backlinks, outline, tabs, and the command palette.
+find-in-page, backlinks, outline, tabs, and the command palette. iOS also still runs the older
+block-per-view reader, so selection there stops at a block boundary.
+
+`make ios-test` runs unit tests (the shared store compiled for iOS) and UI tests (the real app
+driven through the screen) on the simulator.
 
 ## Build & run
 
@@ -186,6 +205,7 @@ executable — no Xcode project, no signing ceremony.
 ```bash
 make build      # swift build
 make run        # dev loop — run straight from SwiftPM
+make test       # swift test — parser, tag syntax, deep-link + window routing, missing notes
 make app        # package build/Folio.app (ad-hoc signed)
 make open       # package, then launch it
 make install    # package and install to /Applications
@@ -230,12 +250,13 @@ Stated plainly, because the alternative is you finding out later:
   (`tag:`, `path:`), no boolean queries. In Reading mode, jumping to a hit can land on a
   *neighboring* occurrence in notes with heavy frontmatter/tables before the match (exact in
   writing mode).
-- **Text selection in Reading mode stops at rich blocks.** Selection flows across paragraphs, but
-  cannot cross a heading, list, code block, table, or callout — each is a separate SwiftUI view,
-  and macOS can't extend a selection across them. A TextKit-backed reading view is the eventual
-  fix.
-- **No test suite.** Nothing is committed — no unit tests, no parser tests, no test target. File
-  writes are lightly exercised by hand only. **Keep backups.**
+- **Selection stops at rich blocks on iOS.** The Mac reader is one text stream and selects
+  straight through; iOS still stacks a view per block, and macOS/iOS can't extend a selection
+  across separate views. iOS gets the same TextKit treatment eventually.
+- **Test coverage is partial.** `make test` covers the Markdown parser, tag syntax, deep-link and
+  window routing, and the missing-note paths in the store; `make ios-test` adds the iOS store and a
+  UI pass. The macOS UI, the reading renderer, and search have no automated coverage, and file
+  writes beyond those suites are exercised by hand. **Keep backups.**
 - **No Source mode**, and Live Preview *dims* Markdown syntax rather than hiding it.
 - **File management is thin:** no folder create/rename/delete, no move, no drag-and-drop, no delete
   confirmation. Explorer sorting is by name only.

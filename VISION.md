@@ -71,9 +71,11 @@ behavior.
 > **Today:** open a folder, recent-vaults menu, and live external-change detection (FSEvents)
 > all work on macOS. You can also open a `.md` from Finder / `open -a Folio` (it finds or opens a
 > vault around the file), follow `folio://open?vault=…&file=…` deep links, and pick recent notes or
-> vaults from the Dock menu. **Not built:** independent multi-vault windows, and restoration of pane layout
-> or scroll/cursor position (only open tabs and the active note are restored). Non-Markdown files
-> are not surfaced. On iOS there is no watcher — pull to refresh.
+> vaults from the Dock menu. Several vaults can be open at once, **one per window**, each with its
+> own tree, tabs and history. **Not built:** restoration of pane layout, and scroll position across
+> a relaunch (it is remembered per note within a session; only open tabs and the active note
+> survive a quit). Non-Markdown files are not surfaced. On iOS there is no watcher — pull to
+> refresh.
 
 ## 3. File explorer & file management
 
@@ -201,9 +203,10 @@ The connective tissue — must feel effortless and stay correct.
 
 > **Today:** `[[wikilinks]]` resolve (by basename or path), render as resolved/unresolved, click to
 > open, create-on-click when unresolved, and `[[` autocompletes **note names**. Renaming a note
-> rewrites `[[old]]`, `[[old|alias]]`, and `[[old#heading]]` across the vault. **Caveats:** the rename
-> updater does *not* fix path-qualified wikilinks (`[[folder/Note]]`) or Markdown-style links, and
-> reports no count. `[[Note#Heading]]` navigates to the note but does **not** scroll to the heading.
+> rewrites `[[old]]`, `[[old|alias]]`, `[[old#heading]]`, path-qualified `[[folder/Note]]`, and
+> Markdown links (`[text](folder/Note.md)`) across the vault. **Caveats:** the rename updater
+> reports no count, and rewrites links inside fenced code blocks too.
+> `[[Note#Heading]]` navigates to the note but does **not** scroll to the heading.
 > **Not built:** block links, alias resolution from frontmatter, heading/block autocomplete,
 > modifier-click-to-new-pane, create confirmation, copy-link commands.
 
@@ -226,8 +229,10 @@ The connective tissue — must feel effortless and stay correct.
 - Tags are searchable and usable as filters everywhere.
 
 > **Today:** inline `#tags` and frontmatter `tags:` are indexed into a browsable tag pane (⇧⌘Y) with
-> counts; click a tag to see its notes. **Not built:** tag autocomplete, hierarchical display of
-> nested tags, tag rename, and tag filters elsewhere in the app.
+> counts; click a tag to see its notes. A tag must carry a letter or `_` — so an issue reference
+> like `#1303/#1305` is not a tag — and matching is Unicode, not ASCII. **Not built:** tag
+> autocomplete, hierarchical display of nested tags, tag rename, and tag filters elsewhere in the
+> app.
 
 ## 10. Properties / frontmatter
 
@@ -278,8 +283,9 @@ The connective tissue — must feel effortless and stay correct.
 - Search is case-insensitive by default with an option for case sensitivity.
 
 > **Today:** in-note find (⌘F) works in both Reading and Writing mode, with case sensitivity and
-> next/previous. In Reading mode it searches headings, paragraphs, lists, tasks, quotes, and code —
-> it does **not** search callouts, tables, properties, or image alt text.
+> next/previous. Reading mode is one text stream, so find reaches everything rendered as text —
+> headings, paragraphs, lists, tasks, quotes, callouts, code. It does **not** reach what renders as
+> an attachment: tables, the properties card, or image alt text.
 >
 > **Vault-wide content search exists (⇧⌘F):** live, case-insensitive search across every note —
 > space-separated words AND together, quotes give an exact phrase — results grouped per file with
@@ -373,7 +379,9 @@ The connective tissue — must feel effortless and stay correct.
 - Per-note appearance hints honored from properties (e.g., width, reading styles).
 
 > **Today:** five themes (System, Light, Dark, Paper, Frosted), reading-font choice (System/Serif/
-> Mono), body font size, and readable line width — all applied live. **Not built:** accent color,
+> Mono), body font size, readable line width or full width, an optional inline title, a line-break
+> policy (Auto / Preserve / Reflow), and a text-rendering choice (Crisp / Smooth / Smoother, applied
+> on relaunch). Everything but text rendering applies live. **Not built:** accent color,
 > configurable editor/monospace fonts, custom themes or CSS snippets, focus/typewriter/zen modes,
 > per-note appearance hints.
 
@@ -451,8 +459,9 @@ behavior are consistent across both; only interaction style and editing depth di
 > **Today:** writes go through `write(to:atomically:)`, so a note is never left half-written.
 > But autosave is **debounced by 500 ms**, so the last half-second of typing can be lost to a crash
 > — "never lost" is a goal, not a current property. There are no benchmarks behind the performance
-> targets, no test suite, and filesystem errors are largely swallowed rather than surfaced. Treat
-> the numbers above as targets and keep backups.
+> targets, and filesystem errors are largely swallowed rather than surfaced. The test suite covers
+> the parser, tag syntax, link routing and the store's missing-note paths, not the UI or the
+> renderer. Treat the numbers above as targets and keep backups.
 
 ## 26. Import & export — *not implemented*
 

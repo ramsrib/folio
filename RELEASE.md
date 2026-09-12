@@ -12,6 +12,11 @@ make release VERSION=v0.1.0
 That one command builds, signs, notarizes, staples, packages, tags, and
 publishes. Everything below is the setup it depends on — done once.
 
+Run `make test` (and `make ios-test` if the iOS app changed) first. The script
+does not gate on them: its preflight guards the things a tag cannot recover
+from — a reused version, a skipped one, a dirty or unpushed tree — not whether
+the code works.
+
 ## One-time setup
 
 **Tools**

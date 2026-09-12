@@ -14,6 +14,13 @@ scene and injected everywhere:
 - **`VaultStore`** — the vault: file tree + flat list, the open note's text
   (disk is always the source of truth; saves are debounced, atomic, lossless),
   tabs + navigation history + recents, and the link/tag indexes.
+  **A save updates a note, it never creates one.** `loadedURL == nil` is what
+  makes read-only real — every save path already stands down without a write
+  target — so a note whose file disappears goes read-only rather than being
+  recreated by a pending debounce. The *read* decides whether a note is missing,
+  not the file index: a deletion the watcher hasn't delivered yet still lists
+  the note, and trusting the list blanks the pane and takes a write target on a
+  file that is already gone.
 - **`UIState`** — window-level UI: palette flags, view mode, cross-view pulses
   (`escapePulse`, `sidebarFilterFocus`, `pendingFind`).
 
@@ -87,9 +94,11 @@ time** — deliberately not an index.
 - **Jump plumbing:** each snippet records its first-hit term and that term's
   occurrence index within the file. ↵ passes `(term, occurrence)` through
   `UIState.pendingFind`; the note pane opens the find bar on that query and
-  focuses that occurrence. Known approximation: reading mode counts occurrences
-  over *rendered* blocks, so heavy frontmatter/tables before the hit can land
-  on a neighbor (exact in writing mode).
+  focuses that occurrence. Known approximation: the palette counts occurrences
+  over the file's bytes while reading mode counts over the rendered text stream,
+  where the properties card and tables are attachments rather than text — so
+  heavy frontmatter or tables before the hit can land on a neighbor. Exact in
+  writing mode, which searches the buffer itself.
 - **Freshness:** a debounce (150 ms), a generation counter (stale in-flight
   scans are discarded; scans check cancellation between files), and a re-run
   when `VaultStore.revision` bumps (any watcher-observed change).
@@ -112,6 +121,20 @@ full rescan, so correctness never depends on the fast path. Watcher events are
 debounced (400 ms) because agents and `git pull` write in bursts; the perf log
 (`log stream --level debug --predicate 'subsystem == "com.sriramb.folio"'`)
 records what every refresh and reindex cost.
+
+What counts as a tag is defined **once**, in `TagSyntax`'s regex; `isValid`
+answers by running that same regex over the whole probe, so a second
+implementation cannot exist to drift from the first. It had drifted twice
+before that: the highlighter coloured tokens the index refused to file, and an
+ASCII character class disagreed with Unicode-aware `Character` predicates on
+every non-ASCII tag — `#café` indexed as `#caf` inline but validated whole in
+frontmatter, putting one tag in the picker twice. The classes are
+`\p{L}`/`\p{N}`, because a vault is not obliged to be in English, and a tag must
+carry a letter or `_` — the rule that separates `#roadmap` from the `#1303` in
+an issue reference. Marks belong to the atom they follow, minus variation
+selectors and enclosing marks: admitting `\p{M}` freely let an invisible
+variation selector make `#a` and `#a<VS16>` two picker entries that render
+identically.
 
 ## Memory model
 
@@ -152,6 +175,23 @@ What is *not* text:
   *ideal* layout, and for a wide table the height that comes back with it is
   near zero — TextKit reads zero height as "no view" and draws the generic
   document icon in place of the block.
+- **TextKit 2 installs an attachment's view only during a viewport layout pass
+  while the text view is displayed.** A fragment laid out at any other moment —
+  before the view joins the window, while the reader sits behind the editor,
+  mid mode-switch animation — keeps that layout forever and never gets its
+  view, so the block renders as the generic icon or as nothing. Three answers,
+  all needed: the attachment measures itself (an off-screen twin answers
+  `attachmentBounds`) so the box is right with or without a view; a heal pass
+  re-lays any in-viewport hosted block whose view isn't installed, because
+  invalidation while displayed is the one path that installs one; and the
+  attachment image is empty, so the beat before install draws nothing rather
+  than a white icon flash. The heal pass reads block positions from a cache
+  built at render time — sweeping the storage on every scroll frame is not
+  affordable.
+- A table wider than the reading column pans sideways in an AppKit scroll
+  island that hands vertical wheel events back to the note. A reported live
+  height is scoped to the width it was measured at, so a resize while the
+  block's provider is released can't reserve stale space and jump the page.
 
 TextKit has no block backgrounds, so code cards, callout fills, quote bars and
 rules are drawn by a **custom layout fragment** (`DecoratedLayoutFragment`,
