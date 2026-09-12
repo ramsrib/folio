@@ -69,6 +69,9 @@ struct NoteTextView: NSViewRepresentable {
         tv.textContainer?.widthTracksTextView = false
         tv.textContainer?.heightTracksTextView = false
         tv.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
+        // Decorated paragraphs get a fragment that paints its own card/bar/rule
+        // (see `DecoratedLayoutFragment`).
+        tv.textLayoutManager?.delegate = context.coordinator
         tv.onToggleTask = onToggleTask
 
         scroll.documentView = tv
@@ -127,7 +130,7 @@ struct NoteTextView: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     @MainActor
-    final class Coordinator: NSObject, NSTextViewDelegate {
+    final class Coordinator: NSObject, NSTextViewDelegate, @preconcurrency NSTextLayoutManagerDelegate {
         var parent: NoteTextView
         weak var textView: NoteContentTextView?
         weak var scrollView: NSScrollView?
@@ -162,7 +165,7 @@ struct NoteTextView: NSViewRepresentable {
                                             loadImage: config.loadImage)
             let string = renderer.render(config.blocks)
             tv.textStorage?.setAttributedString(string)
-            tv.cacheDecorations()
+            tv.cacheHostedBlocks()
             // The new string carries brand-new hosted blocks; nothing else fires
             // for a re-render that moves neither window, mode, nor scroll offset
             // (⌘+/⌘−, switching between notes both resting at the top).
@@ -233,22 +236,123 @@ struct NoteTextView: NSViewRepresentable {
             guard let url else { return false }
             return parent.onOpenLink(url)
         }
+
+        /// A paragraph carrying a block decoration lays out as a fragment that
+        /// draws it. The decoration covers the whole block, so the first
+        /// character is as good as any.
+        func textLayoutManager(_ textLayoutManager: NSTextLayoutManager,
+                               textLayoutFragmentFor location: NSTextLocation,
+                               in textElement: NSTextElement) -> NSTextLayoutFragment {
+            if let paragraph = textElement as? NSTextParagraph,
+               paragraph.attributedString.length > 0,
+               let box = paragraph.attributedString.attribute(.folioDecoration, at: 0,
+                                                              effectiveRange: nil) as? DecorationBox {
+                return DecoratedLayoutFragment(textElement: textElement, range: textElement.elementRange,
+                                               decoration: box.value)
+            }
+            return NSTextLayoutFragment(textElement: textElement, range: textElement.elementRange)
+        }
+    }
+}
+
+// MARK: - Block decorations
+
+/// A paragraph with a block decoration (code card, callout fill, quote bar,
+/// rule) draws it itself, underneath its own text.
+///
+/// TextKit 2 renders text into fragment surfaces of its own, placed by each
+/// viewport layout pass — not by the text view's draw pass. A decoration
+/// painted in `drawBackground` from measured fragment geometry is therefore
+/// only right until the next layout pass moves the text without redrawing the
+/// view. That is routine when a note opens at a remembered scroll offset:
+/// TextKit refines the estimated heights above the viewport over several
+/// passes, the text settles, and the boxes stayed where the text *used* to be
+/// until a click forced a redraw. Drawing inside the fragment ties each
+/// decoration to the text it decorates, whatever moves it.
+final class DecoratedLayoutFragment: NSTextLayoutFragment {
+    let decoration: BlockDecoration
+
+    init(textElement: NSTextElement, range: NSTextRange?, decoration: BlockDecoration) {
+        self.decoration = decoration
+        super.init(textElement: textElement, range: range)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    /// The card is inset outward from the text, the quote bar hangs left of it,
+    /// and the rule runs the column's width: the surface has to cover them or
+    /// they are clipped.
+    override var renderingSurfaceBounds: CGRect {
+        var bounds = super.renderingSurfaceBounds.union(textBox.insetBy(dx: -24, dy: -12))
+        if case .divider = decoration {
+            bounds = bounds.union(CGRect(x: 0, y: bounds.minY, width: columnWidth, height: 1))
+        }
+        return bounds
+    }
+
+    /// The fragment frame is only as wide as its text, so the rule takes its
+    /// width from the container — the reading column.
+    private var columnWidth: CGFloat {
+        textLayoutManager?.textContainer?.size.width ?? layoutFragmentFrame.width
+    }
+
+    /// Union of the laid-out lines, in fragment coordinates.
+    private var textBox: CGRect {
+        textLineFragments.reduce(CGRect.null) { $0.union($1.typographicBounds) }
+    }
+
+    override func draw(at point: CGPoint, in context: CGContext) {
+        let box = textBox
+        if !box.isNull {
+            context.saveGState()
+            context.translateBy(x: point.x, y: point.y)
+            drawDecoration(around: box, in: context)
+            context.restoreGState()
+        }
+        super.draw(at: point, in: context)
+    }
+
+    private func drawDecoration(around text: CGRect, in context: CGContext) {
+        func fill(_ rect: CGRect, radius: CGFloat, _ color: NSColor) {
+            context.setFillColor(color.cgColor)
+            context.addPath(CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil))
+            context.fillPath()
+        }
+        switch decoration {
+        case .code:
+            fill(text.insetBy(dx: -10, dy: -8), radius: 10, NSColor.labelColor.withAlphaComponent(0.06))
+
+        case let .callout(kind):
+            // Fragments draw on the main thread; the renderer's palette lives there.
+            let tint = MainActor.assumeIsolated { NoteTextRenderer.calloutTint(kind) }
+            let card = text.insetBy(dx: -10, dy: -8)
+            fill(card, radius: 10, tint.withAlphaComponent(0.12))
+            fill(CGRect(x: card.minX, y: card.minY, width: 3, height: card.height),
+                 radius: 1.5, tint.withAlphaComponent(0.7))
+
+        case .quote:
+            fill(CGRect(x: text.minX - 14, y: text.minY, width: 3, height: text.height),
+                 radius: 1.5, NSColor.secondaryLabelColor.withAlphaComponent(0.5))
+
+        case .divider:
+            let y = text.midY.rounded()
+            fill(CGRect(x: text.minX, y: y, width: max(text.width, columnWidth - text.minX * 2), height: 1),
+                 radius: 0, NSColor.separatorColor)
+        }
     }
 }
 
 // MARK: - The text view
 
-/// Read-only note surface: draws the block decorations TextKit has no concept of
-/// (code cards, callouts, quote bars, rules), toggles task checkboxes on click,
-/// and copies attachment blocks as their Markdown source.
+/// Read-only note surface: toggles task checkboxes on click, highlights find
+/// matches, heals hosted blocks, and copies attachment blocks as their Markdown
+/// source. Block decorations are drawn by `DecoratedLayoutFragment`.
 final class NoteContentTextView: NSTextView {
     var readableWidth: CGFloat = 720
     var findMatch = Highlight(background: .systemYellow.withAlphaComponent(0.4))
     var findCurrentMatch = Highlight(background: .systemOrange.withAlphaComponent(0.9),
                                      foreground: .black)
     var onToggleTask: (Int) -> Void = { _ in }
-
-    private var decorations: [(range: NSRange, decoration: BlockDecoration)] = []
 
     // MARK: Layout
 
@@ -289,85 +393,17 @@ final class NoteContentTextView: NSTextView {
         return min(120, max(64, (bounds.width * 0.06).rounded()))
     }
 
-    // MARK: Decorations
+    // MARK: Hosted blocks
 
-    func cacheDecorations() {
-        guard let storage = textStorage else { decorations = []; hostedBlockRanges = []; return }
-        var found: [(NSRange, BlockDecoration)] = []
-        storage.enumerateAttribute(.folioDecoration, in: storage.fullRange) { value, range, _ in
-            if let box = value as? DecorationBox { found.append((range, box.value)) }
-        }
-        decorations = found
-        // Hosted-block positions, so the heal pass doesn't sweep the whole
-        // storage on every scroll frame.
+    /// Hosted-block positions, so the heal pass doesn't sweep the whole storage
+    /// on every scroll frame.
+    func cacheHostedBlocks() {
+        guard let storage = textStorage else { hostedBlockRanges = []; return }
         var hosted: [NSRange] = []
         storage.enumerateAttribute(.attachment, in: storage.fullRange) { value, range, _ in
             if value is HostedBlockAttachment { hosted.append(range) }
         }
         hostedBlockRanges = hosted
-        needsDisplay = true
-    }
-
-    override func drawBackground(in rect: NSRect) {
-        super.drawBackground(in: rect)
-        guard !decorations.isEmpty, let layoutManager = textLayoutManager else { return }
-        let origin = textContainerOrigin
-
-        // Only decorations near the viewport. Measuring one means asking TextKit
-        // for its segment rects, which lays that range out — so walking all of
-        // them would lay out the whole document on every draw pass (the trap
-        // `MarkdownTextView.drawBackground` documents, in its TextKit 2 form).
-        guard let visible = visibleCharacterRange() else { return }
-
-        for (range, decoration) in decorations where NSIntersectionRange(range, visible).length > 0
-                                                     || NSLocationInRange(range.location, visible) {
-            guard let frame = boundingRect(for: range, using: layoutManager) else { continue }
-            var box = frame.offsetBy(dx: origin.x, dy: origin.y)
-            guard box.intersects(rect) else { continue }
-
-            switch decoration {
-            case .code:
-                box = box.insetBy(dx: -10, dy: -8)
-                NSColor.labelColor.withAlphaComponent(0.06).setFill()
-                NSBezierPath(roundedRect: box, xRadius: 10, yRadius: 10).fill()
-
-            case let .callout(kind):
-                let tint = NoteTextRenderer.calloutTint(kind)
-                box = box.insetBy(dx: -10, dy: -8)
-                tint.withAlphaComponent(0.12).setFill()
-                NSBezierPath(roundedRect: box, xRadius: 10, yRadius: 10).fill()
-                tint.withAlphaComponent(0.7).setFill()
-                NSBezierPath(roundedRect: NSRect(x: box.minX, y: box.minY, width: 3, height: box.height),
-                             xRadius: 1.5, yRadius: 1.5).fill()
-
-            case .quote:
-                let bar = NSRect(x: box.minX - 14, y: box.minY, width: 3, height: box.height)
-                NSColor.secondaryLabelColor.withAlphaComponent(0.5).setFill()
-                NSBezierPath(roundedRect: bar, xRadius: 1.5, yRadius: 1.5).fill()
-
-            case .divider:
-                let y = box.midY.rounded()
-                NSColor.separatorColor.setFill()
-                NSRect(x: box.minX, y: y, width: max(box.width, bounds.width - box.minX * 2), height: 1).fill()
-            }
-        }
-    }
-
-    /// Character range currently laid out for display, padded by a screen's worth
-    /// either side so a decoration straddling the edge still paints.
-    private func visibleCharacterRange() -> NSRange? {
-        guard let layoutManager = textLayoutManager,
-              let content = layoutManager.textContentManager,
-              let viewport = layoutManager.textViewportLayoutController.viewportRange
-        else { return nil }
-        let origin = content.documentRange.location
-        let start = content.offset(from: origin, to: viewport.location)
-        let end = content.offset(from: origin, to: viewport.endLocation)
-        guard start != NSNotFound, end != NSNotFound, end >= start else { return nil }
-        let slack = 4096
-        let lower = max(0, start - slack)
-        let upper = min((string as NSString).length, end + slack)
-        return NSRange(location: lower, length: upper - lower)
     }
 
     /// Union of the layout segments for a character range, in container space.

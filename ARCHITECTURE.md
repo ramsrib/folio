@@ -154,9 +154,14 @@ What is *not* text:
   document icon in place of the block.
 
 TextKit has no block backgrounds, so code cards, callout fills, quote bars and
-rules are **drawn** from laid-out fragment geometry in `drawBackground`. That
-is bounded to the viewport: measuring a range lays it out, so walking every
-decoration would lay out the whole document on each draw pass.
+rules are drawn by a **custom layout fragment** (`DecoratedLayoutFragment`,
+handed out by the layout-manager delegate for any paragraph carrying
+`.folioDecoration`). They cannot be painted from the text view's
+`drawBackground`: TextKit 2 renders text into fragment surfaces of its own,
+placed by each viewport layout pass, so a note opened at a remembered scroll
+offset settles its estimated geometry over several passes and moves the text
+without redrawing the view — the boxes stayed where the text used to be until
+a click forced a redraw. Drawing inside the fragment moves with the text.
 
 Intra-block line breaks use **U+2028**, not `\n`. TextKit treats `\n` as a
 paragraph terminator, so a hard-wrapped paragraph would fire `paragraphSpacing`
