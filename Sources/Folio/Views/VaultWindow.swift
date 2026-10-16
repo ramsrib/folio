@@ -40,6 +40,11 @@ struct VaultWindow: View {
             .focusedSceneObject(vault)
             .focusedSceneObject(ui)
             .background(WindowBinder { window in coordinator.attach(window, to: vault) })
+            // Load the vault before the first frame, not in `.task`: `.task` runs
+            // after the window has drawn, so every launch flashed the "No vault
+            // open" state before the restored vault replaced it. `start()` is
+            // idempotent, and `register` below reads the vault it loaded.
+            .onAppear { vault.start() }
             .task {
                 // `openWindowAction` is wired at the App level (it must exist
                 // before any window does — a document-driven launch presents no
