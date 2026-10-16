@@ -153,15 +153,15 @@ struct ContentView: View {
         HStack(spacing: 0) {
             if showSidebar {
                 sidebarTitleArea
-                    .frame(width: sidebarWidth, height: 42)
+                    .frame(width: sidebarWidth, height: WindowConfigurator.barHeight)
                     .background(sidebarBackdrop)
                 Divider()
             }
             contentTitleArea
-                .frame(maxWidth: .infinity, minHeight: 42)
+                .frame(maxWidth: .infinity, minHeight: WindowConfigurator.barHeight)
                 .background(settings.topBarBackground)
         }
-        .frame(height: 42)
+        .frame(height: WindowConfigurator.barHeight)
         // The custom title-bar strip is the window's (only) drag handle, like a
         // native toolbar. Buttons and the tab strip's own onDrag still win —
         // child interactions take precedence over this parent gesture.

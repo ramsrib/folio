@@ -19,17 +19,34 @@ struct WindowConfigurator: NSViewRepresentable {
     final class Coordinator {
         var applied: (background: NSColor?, translucent: Bool)?
         var didConfigureChrome = false
+        var observers: [NSObjectProtocol] = []
+
+        deinit { observers.forEach(NotificationCenter.default.removeObserver) }
     }
 
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
+    /// Configures from `viewDidMoveToWindow`, i.e. as soon as the window exists and
+    /// before its first frame. The old `DispatchQueue.main.async` from
+    /// `makeNSView` ran a turn late and often found `view.window` still nil, so
+    /// the window launched with stock chrome (lights high) until some later
+    /// SwiftUI update happened to configure it.
+    final class HostView: NSView {
+        var onWindow: ((NSWindow) -> Void)?
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if let window { onWindow?(window) }   // also fires with nil on teardown
+        }
+    }
+
+    func makeNSView(context: Context) -> HostView {
+        let view = HostView()
         let coordinator = context.coordinator
-        DispatchQueue.main.async { configure(view.window, coordinator) }
+        view.onWindow = { configure($0, coordinator) }
         return view
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {
+    func updateNSView(_ nsView: HostView, context: Context) {
         let coordinator = context.coordinator
+        nsView.onWindow = { configure($0, coordinator) }
         guard coordinator.applied?.background != background
             || coordinator.applied?.translucent != translucent
             || coordinator.applied == nil else { return }
@@ -49,6 +66,33 @@ struct WindowConfigurator: NSViewRepresentable {
             window.titleVisibility = .hidden
             window.isMovableByWindowBackground = false
             coordinator.didConfigureChrome = true
+            // AppKit puts the buttons back at their stock 28pt-bar spot whenever it
+            // lays out the title bar again — on resize, key/main changes, leaving
+            // full screen — so centering once is not enough; it has to follow each.
+            let names: [Notification.Name] = [
+                NSWindow.didResizeNotification, NSWindow.didExitFullScreenNotification,
+                NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification,
+                NSWindow.didBecomeMainNotification, NSWindow.didResignMainNotification,
+            ]
+            coordinator.observers = names.map { name in
+                NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak window] _ in
+                    guard let window else { return }
+                    Self.centerTrafficLights(window, barHeight: Self.barHeight)
+                }
+            }
+            // Closing a background native tab hides the tab bar and restores the
+            // stock title bar without any of the above firing on the survivor, so
+            // any window closing re-centres too — a turn later, once AppKit has
+            // finished taking the tab bar down.
+            coordinator.observers.append(NotificationCenter.default.addObserver(
+                forName: NSWindow.willCloseNotification, object: nil, queue: .main
+            ) { [weak window] note in
+                guard let window, note.object as? NSWindow !== window else { return }
+                DispatchQueue.main.async { [weak window] in
+                    guard let window else { return }
+                    Self.centerTrafficLights(window, barHeight: Self.barHeight)
+                }
+            })
         }
         if translucent {
             window.isOpaque = false
@@ -58,20 +102,37 @@ struct WindowConfigurator: NSViewRepresentable {
             window.backgroundColor = background ?? .windowBackgroundColor
         }
         coordinator.applied = (background, translucent)
-        centerTrafficLights(window, barHeight: 42)
+        Self.centerTrafficLights(window, barHeight: Self.barHeight)
     }
 
+    /// Height of ContentView's custom title-bar row — the single source for both
+    /// the row's frame and the traffic-light centering below.
+    static let barHeight: CGFloat = 42
+
     /// Vertically center the traffic lights within our taller (42pt) title bar.
-    /// Idempotent — sets an absolute target Y so repeated calls don't drift.
-    private func centerTrafficLights(_ window: NSWindow, barHeight: CGFloat) {
+    ///
+    /// The title-bar container is stretched to the full bar first: left at its
+    /// stock ~28pt, a centered button would hang off its bottom edge, clipped and
+    /// outside its own hover area. Idempotent — absolute targets, change-guarded,
+    /// so the repeated calls from the window observers neither drift nor relayout.
+    static func centerTrafficLights(_ window: NSWindow, barHeight: CGFloat) {
+        // Full screen draws the title bar in its own reveal window; leave it stock.
+        guard !window.styleMask.contains(.fullScreen) else { return }
+        // Merged into native window tabs, the container also holds the tab strip
+        // (~68pt); forcing it to 42 would push the lights into that strip and let
+        // it swallow clicks meant for our row. AppKit owns that layout.
+        guard window.tabGroup?.isTabBarVisible != true else { return }
         let buttons = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton]
             .compactMap { window.standardWindowButton($0) }
-        guard let container = buttons.first?.superview else { return }
+        guard let titlebarView = buttons.first?.superview,
+              let container = titlebarView.superview else { return }
+        let target = NSRect(x: container.frame.minX, y: window.frame.height - barHeight,
+                            width: container.frame.width, height: barHeight)
+        if container.frame != target { container.frame = target }
         for button in buttons {
-            let h = button.frame.height
-            let targetY = container.bounds.height - barHeight / 2 - h / 2   // center at barHeight/2 from top
-            if abs(button.frame.origin.y - targetY) > 0.5 {
-                button.setFrameOrigin(NSPoint(x: button.frame.origin.x, y: targetY))
+            let y = ((titlebarView.bounds.height - button.frame.height) / 2).rounded()
+            if button.frame.origin.y != y {
+                button.setFrameOrigin(NSPoint(x: button.frame.origin.x, y: y))
             }
         }
     }
