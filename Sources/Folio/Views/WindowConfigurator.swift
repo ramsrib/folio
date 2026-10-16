@@ -116,6 +116,12 @@ struct WindowConfigurator: NSViewRepresentable {
     /// outside its own hover area. Idempotent — absolute targets, change-guarded,
     /// so the repeated calls from the window observers neither drift nor relayout.
     static func centerTrafficLights(_ window: NSWindow, barHeight: CGFloat) {
+        // Not before the window is on screen. Resizing the title-bar container
+        // while SwiftUI is still placing a newborn window made it give up on its
+        // placement and drop every window at the screen's bottom-left corner.
+        // The window becomes key as it is shown, and that notification centres
+        // the lights before its first frame reaches the screen.
+        guard window.isVisible else { return }
         // Full screen draws the title bar in its own reveal window; leave it stock.
         guard !window.styleMask.contains(.fullScreen) else { return }
         // Merged into native window tabs, the container also holds the tab strip

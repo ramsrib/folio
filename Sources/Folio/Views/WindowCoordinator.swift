@@ -55,6 +55,15 @@ final class WindowCoordinator {
     /// External opens that arrived before any window existed.
     private var bufferedURLs: [URL] = []
     private var didBootstrap = false
+    /// The vault the window being born just claimed, read once by
+    /// `savedPlacement()`: SwiftUI asks for a window's placement *after* its
+    /// `StateObject` autoclosure has run `claimPendingVault()` (measured).
+    private var placingVault: VaultRef?
+    /// Saved frames handed to `defaultWindowPlacement` whose windows are not on
+    /// screen yet. SwiftUI cascades every window after the first *after* taking
+    /// its placement, keeping the size but moving the origin; `saveFrame` puts
+    /// it back while the window is still offscreen.
+    private var placedFrames: [VaultRef: NSRect] = [:]
     private var isTerminating = false
 
     /// Asks SwiftUI for one more window. Set once a window exists.
@@ -74,6 +83,13 @@ final class WindowCoordinator {
             }
         }
         pendingVaults = session
+        for name in [NSWindow.didMoveNotification, NSWindow.didResizeNotification,
+                     NSWindow.didEndLiveResizeNotification] {
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { [weak self] note in
+                guard let window = note.object as? NSWindow else { return }
+                MainActor.assumeIsolated { self?.saveFrame(of: window) }
+            }
+        }
     }
 
     // MARK: Window birth & death
@@ -83,7 +99,9 @@ final class WindowCoordinator {
     /// (⌘N, a system restore) simply gets `nil` and shows the empty state, which
     /// is why this degrades safely.
     func claimPendingVault() -> VaultRef? {
-        pendingVaults.isEmpty ? nil : pendingVaults.removeFirst()
+        let claim = pendingVaults.isEmpty ? nil : pendingVaults.removeFirst()
+        placingVault = claim
+        return claim
     }
 
     func register(_ store: VaultStore, claimed: VaultRef?) {
@@ -107,11 +125,6 @@ final class WindowCoordinator {
         guard entries[i].window !== window else { return }
         entries[i].window = window
         observeClose(window)
-        // Per-vault frame memory, keyed by identity we control rather than by a
-        // scene session — it survives with state restoration switched off.
-        if let url = store.vaultURL {
-            window.setFrameAutosaveName("folio-vault:\(VaultRef(url).path)")
-        }
     }
 
     private func observeClose(_ window: NSWindow) {
@@ -126,6 +139,7 @@ final class WindowCoordinator {
     private func windowWillClose(_ window: NSWindow) {
         guard let i = entries.firstIndex(where: { $0.window === window }) else { return }
         let ref = entries[i].store?.vaultURL.map(VaultRef.init)
+        if let pinned = ref ?? entries[i].claimed { placedFrames[pinned] = nil }
         entries.remove(at: i)
         // Closing the last window quits; keep that vault in the session so the
         // next launch reopens it. Quitting keeps everything for the same reason.
@@ -133,6 +147,62 @@ final class WindowCoordinator {
     }
 
     func applicationWillTerminate() { isTerminating = true }
+
+    // MARK: Frame memory
+
+    /// Per-vault frame memory, keyed by identity we control rather than by a scene
+    /// session, so it survives with state restoration switched off.
+    ///
+    /// Not `setFrameAutosaveName`: SwiftUI's window never writes it (measured,
+    /// nothing is saved however the window moves), and restoring through it ran
+    /// before SwiftUI placed the window, which then moved it anyway. Saving here
+    /// and restoring through `defaultWindowPlacement` puts the window where it
+    /// was before it is first shown.
+    private static func frameKey(_ ref: VaultRef) -> String { "folio.windowFrame:\(ref.path)" }
+
+    private func saveFrame(of window: NSWindow) {
+        guard let entry = entries.first(where: { $0.window === window }),
+              let ref = entry.store?.vaultURL.map(VaultRef.init) ?? entry.claimed else { return }
+        // Placement and cascading move a window before it is shown: hold it to
+        // the restored frame until then, and save nothing.
+        guard window.isVisible else {
+            if let target = placedFrames[ref], window.frame != target {
+                window.setFrame(target, display: false)
+            }
+            return
+        }
+        placedFrames[ref] = nil
+        // Full screen and the Dock are not where it should reopen; a live resize
+        // saves once, at its end.
+        guard !window.inLiveResize, !window.styleMask.contains(.fullScreen),
+              !window.isMiniaturized else { return }
+        UserDefaults.standard.set(NSStringFromRect(window.frame), forKey: Self.frameKey(ref))
+    }
+
+    /// Where the window being born should go: its vault's saved frame, if that
+    /// still lands on a connected display. `nil` (no vault, nothing saved, or the
+    /// display it was on is gone) leaves the default placement.
+    func savedPlacement() -> WindowPlacement? {
+        defer { placingVault = nil }
+        // A pin left by a window that closed before it was shown must not steer
+        // this one, least of all when the fallback below rejects the frame.
+        if let ref = placingVault { placedFrames[ref] = nil }
+        guard let ref = placingVault,
+              let saved = UserDefaults.standard.string(forKey: Self.frameKey(ref)) else { return nil }
+        let frame = NSRectFromString(saved)
+        // Enough of it on some screen to grab the title bar and drag it back.
+        guard frame.width > 0, frame.height > 0,
+              NSScreen.screens.contains(where: {
+                  let visible = $0.visibleFrame.intersection(frame)
+                  return visible.width >= 100 && visible.height >= 42
+              }),
+              let primary = NSScreen.screens.first else { return nil }
+        // AppKit frames are bottom-left-origin in the primary screen's space;
+        // WindowPlacement wants the window's top-left in top-left-origin space.
+        placedFrames[ref] = frame
+        return WindowPlacement(CGPoint(x: frame.minX, y: primary.frame.maxY - frame.maxY),
+                               size: frame.size)
+    }
 
     // MARK: The single "open a vault" entry point
 

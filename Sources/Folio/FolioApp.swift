@@ -49,10 +49,13 @@ struct FolioApp: App {
         // it). The AppDelegate summons the launch window in that case — see
         // `applicationDidFinishLaunching`.
         .handlesExternalEvents(matching: [])
-        // First-launch size: proportional to whichever display the window lands on
-        // (laptop panel vs. big monitor get sensibly different frames), capped so a
-        // 5K display doesn't produce a wall of text.
+        // A vault's window reopens where it was left (see `WindowCoordinator
+        // .savedPlacement`). Otherwise, first-launch size: proportional to
+        // whichever display the window lands on (laptop panel vs. big monitor get
+        // sensibly different frames), capped so a 5K display doesn't produce a
+        // wall of text.
         .defaultWindowPlacement { _, context in
+            if let saved = appDelegate.coordinator.savedPlacement() { return saved }
             let visible = context.defaultDisplay.visibleRect
             return WindowPlacement(size: CGSize(
                 width: min(1500, visible.width * 0.80),
