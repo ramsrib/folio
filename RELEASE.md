@@ -12,6 +12,12 @@ make release VERSION=v0.1.0
 That one command builds, signs, notarizes, staples, packages, tags, and
 publishes. Everything below is the setup it depends on — done once.
 
+**A release is not finished until the Homebrew cask is bumped** (see
+[After releasing](#after-releasing--update-homebrew)). Most people install
+through the tap, so a release the cask doesn't point at hasn't reached them.
+Whoever cuts the release, person or agent, bumps the cask in the same sitting,
+without stopping to ask.
+
 The preflight runs `swift test` itself and stops on a failure, so a red suite
 never reaches notarization. `SKIP_TESTS=1 make release VERSION=…` overrides it
 deliberately, the way `FORCE_VERSION=1` overrides the version check.
@@ -78,19 +84,30 @@ absent, so you can still cut an unsigned local build.
 
 ## After releasing — update Homebrew
 
-The cask in [`ramsrib/homebrew-tap`](https://github.com/ramsrib/homebrew-tap)
-pins a version and a sha256. Take both from the release output:
+Part of every release, not a follow-up (see the top of this file). The cask in
+[`ramsrib/homebrew-tap`](https://github.com/ramsrib/homebrew-tap) pins a version
+and a sha256. Take both from the release output:
 
 ```sh
 cat dist/SHA256SUMS
 ```
 
-Update `Casks/folio.rb` with the new `version` and the `sha256` of the
-`.dmg`, then push the tap. Verify:
+Update `Casks/folio.rb` with the new `version` (no `v`: `0.5.1`) and the
+`sha256` of the `.dmg`. Before pushing, check that hash against the dmg GitHub
+actually serves, since that is what `brew` will download and verify:
 
 ```sh
-brew update && brew upgrade --cask folio
+curl -sL https://github.com/ramsrib/folio/releases/download/v0.5.1/Folio-v0.5.1-arm64.dmg | shasum -a 256
 ```
+
+Commit to the tap's `main` as `folio: bump cask to 0.5.1` and push. Verify:
+
+```sh
+brew update && brew info --cask ramsrib/tap/folio   # shows the new version
+```
+
+A `DRAFT=1` release has no public download yet: bump the cask when the draft is
+published, not before.
 
 ## Versioning
 

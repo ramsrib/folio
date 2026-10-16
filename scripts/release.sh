@@ -201,5 +201,6 @@ gh "${GH_ARGS[@]}"
 
 echo "✓ released $APP_NAME $VERSION"
 echo
-echo "  Homebrew: update the cask's version + sha256 from:"
+echo "  Not finished: bump the Homebrew cask now (RELEASE.md, After releasing)."
+echo "  Its version is ${VERSION#v}; its sha256 is the .dmg line of:"
 echo "    $OUT/SHA256SUMS"
